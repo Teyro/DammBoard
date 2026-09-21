@@ -2,6 +2,12 @@ name: Screenshots
 
 on:
   workflow_dispatch:
+    inputs:
+      api_level:
+        description: "Android-API-Stufe für den Emulator (z. B. 26 für Android 8.0, 30 für Android 11)"
+        required: false
+        default: "30"
+        type: string
 
 jobs:
   screenshots:
@@ -31,7 +37,7 @@ jobs:
       - name: Emulator starten, App installieren, Screenshots aufnehmen
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 30
+          api-level: ${{ inputs.api_level }}
           target: google_apis
           arch: x86_64
           profile: Nexus 9
@@ -44,7 +50,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dammboard-screenshots
+          name: dammboard-screenshots-api${{ inputs.api_level }}
           path: |
             screenshots/*.png
             logcat.txt

@@ -11,7 +11,7 @@ Winkelmesser, Zirkel u. a. mit drehbarer Führung und Längenanzeige)
 sowie ein Werkzeugkasten für Hintergrund, geteilte Ansicht,
 Bildschirmfoto und Lupe.
 
-## Funktionen (v0.3.0)
+## Funktionen (v0.3.1)
 
 - Freihand-Zeichnen mit Finger/Stift, mehrere Seiten mit eigener
   Undo/Redo-Historie
@@ -32,7 +32,11 @@ Bildschirmfoto und Lupe.
 ## Technik
 
 - Kotlin + [Jetpack Compose](https://developer.android.com/jetpack/compose)
-- Minimale Android-Version: Android 10 (API 29)
+- Minimale Android-Version: Android 8.0 (API 26) – eine einzige APK
+  deckt Android 8.0 bis zur jeweils aktuellen Version ab, keine
+  getrennten Versionen. Auf Android 9 und älter fragt die App beim
+  ersten Speichern einmalig die Speicherberechtigung ab (Scoped
+  Storage gibt es erst ab Android 10, siehe `ui/Speichern.kt`)
 - Netzwerkzugriff nur für die IServ-Anbindung (WebDAV über
   [OkHttp](https://square.github.io/okhttp/)); alles andere läuft
   lokal auf dem Gerät
