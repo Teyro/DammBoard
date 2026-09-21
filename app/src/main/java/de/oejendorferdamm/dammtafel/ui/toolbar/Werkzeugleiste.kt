@@ -1,0 +1,507 @@
+package de.oejendorferdamm.dammtafel.ui.toolbar
+
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.graphicsLayer
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import de.oejendorferdamm.dammtafel.model.FormTyp
+import de.oejendorferdamm.dammtafel.model.GeometrieWerkzeug
+import de.oejendorferdamm.dammtafel.model.HintergrundOptionen
+import de.oejendorferdamm.dammtafel.model.RadiererGroesse
+import de.oejendorferdamm.dammtafel.model.StiftArt
+import de.oejendorferdamm.dammtafel.model.Werkzeug
+import de.oejendorferdamm.dammtafel.ui.AufnahmeZweck
+import de.oejendorferdamm.dammtafel.ui.TafelState
+import de.oejendorferdamm.dammtafel.ui.icons.AllgemeinSymbol
+import de.oejendorferdamm.dammtafel.ui.icons.AllgemeinesSymbol
+import de.oejendorferdamm.dammtafel.ui.icons.AllesLoeschenSymbol
+import de.oejendorferdamm.dammtafel.ui.icons.FormSymbol
+import de.oejendorferdamm.dammtafel.ui.icons.GeometrieSymbol
+import de.oejendorferdamm.dammtafel.ui.icons.LinienStilSymbol
+import de.oejendorferdamm.dammtafel.ui.icons.RadiererSymbol
+import de.oejendorferdamm.dammtafel.ui.icons.StiftArtSymbol
+import de.oejendorferdamm.dammtafel.ui.icons.WerkzeugSymbol
+import de.oejendorferdamm.dammtafel.ui.icons.WerkzeugkastenAktion
+import de.oejendorferdamm.dammtafel.ui.icons.WerkzeugkastenSymbol
+
+private val LeistenHintergrund = Color(0xFFF7F6F2)
+private val LeistenAktiv = Color(0xFFDAD8D1)
+private val SymbolFarbe = Color(0xFF2B2B28)
+private val SymbolFarbeSchwach = Color(0xFF8A8880)
+
+/** Vollständige Werkzeugleiste am unteren Bildschirmrand inkl. aller Popup-Panels aus dem Design. */
+@Composable
+fun TafelWerkzeugleiste(
+    state: TafelState,
+    onSchliessen: () -> Unit,
+    onMenu: () -> Unit,
+    onTeilen: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        state.offenesPanel?.let { panel ->
+            PopupRahmen {
+                when (panel) {
+                    Werkzeug.STIFT -> StiftPanelInhalt(state)
+                    Werkzeug.FORMEN -> FormenPanelInhalt(state)
+                    Werkzeug.RADIERER -> RadiererPanelInhalt(state)
+                    Werkzeug.GEOMETRIE -> GeometriePanelInhalt(state)
+                    Werkzeug.WERKZEUGKASTEN -> WerkzeugkastenPanelInhalt(state)
+                    Werkzeug.LASSO, Werkzeug.AUSWAHL -> Unit
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+        }
+        HauptLeiste(state, onSchliessen, onMenu, onTeilen)
+    }
+}
+
+@Composable
+private fun PopupRahmen(inhalt: @Composable () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .shadow(8.dp, RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(16.dp))
+                .background(LeistenHintergrund)
+                .padding(14.dp)
+        ) {
+            inhalt()
+        }
+        Box(
+            modifier = Modifier
+                .size(14.dp)
+                .offset(y = (-7).dp)
+                .graphicsLayer { rotationZ = 45f }
+                .background(LeistenHintergrund, RoundedCornerShape(2.dp))
+        )
+    }
+}
+
+@Composable
+private fun HauptLeiste(state: TafelState, onSchliessen: () -> Unit, onMenu: () -> Unit, onTeilen: () -> Unit) {
+    Row(
+        modifier = Modifier.padding(bottom = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        RundKnopf(hintergrund = Color.White, onClick = onSchliessen) {
+            AllgemeinSymbol(AllgemeinesSymbol.SCHLIESSEN, Modifier.size(18.dp), Color(0xFFE0402E))
+        }
+        RundKnopf(hintergrund = Color.White, onClick = onMenu) {
+            AllgemeinSymbol(AllgemeinesSymbol.MENUE, Modifier.size(18.dp), SymbolFarbe)
+        }
+        RundKnopf(hintergrund = Color.White, onClick = onTeilen) {
+            AllgemeinSymbol(AllgemeinesSymbol.TEILEN, Modifier.size(18.dp), SymbolFarbe)
+        }
+
+        WerkzeugPille {
+            listOf(
+                Werkzeug.STIFT, Werkzeug.FORMEN, Werkzeug.RADIERER, Werkzeug.LASSO,
+                Werkzeug.GEOMETRIE, Werkzeug.AUSWAHL, Werkzeug.WERKZEUGKASTEN
+            ).forEach { werkzeug ->
+                val aktiv = state.werkzeug == werkzeug || (werkzeug == Werkzeug.WERKZEUGKASTEN && state.offenesPanel == werkzeug)
+                AuswahlKnopf(ausgewaehlt = aktiv, onClick = { state.waehleWerkzeug(werkzeug) }, groesse = 40.dp) {
+                    WerkzeugSymbol(werkzeug, Modifier.size(20.dp), if (aktiv) SymbolFarbe else SymbolFarbeSchwach)
+                }
+            }
+        }
+
+        WerkzeugPille {
+            RundKnopfKlein(onClick = { state.seite.entfernenAusgewaehlteOderAlles() }) {
+                AllgemeinSymbol(AllgemeinesSymbol.PAPIERKORB, Modifier.size(18.dp), SymbolFarbe)
+            }
+            RundKnopfKlein(onClick = { state.seite.rueckgaengig() }, aktiviert = state.seite.kannRueckgaengig) {
+                AllgemeinSymbol(AllgemeinesSymbol.RUECKGAENGIG, Modifier.size(18.dp), if (state.seite.kannRueckgaengig) SymbolFarbe else SymbolFarbeSchwach)
+            }
+            RundKnopfKlein(onClick = { state.seite.wiederholen() }, aktiviert = state.seite.kannWiederholen) {
+                AllgemeinSymbol(AllgemeinesSymbol.WIEDERHOLEN, Modifier.size(18.dp), if (state.seite.kannWiederholen) SymbolFarbe else SymbolFarbeSchwach)
+            }
+        }
+
+        RundKnopf(hintergrund = Color(0xFF262A26), onClick = { state.neueSeite() }) {
+            AllgemeinSymbol(AllgemeinesSymbol.PLUS, Modifier.size(18.dp), Color.White)
+        }
+
+        WerkzeugPille {
+            RundKnopfKlein(onClick = { state.vorherigeSeite() }, aktiviert = state.aktiveSeite > 0) {
+                AllgemeinSymbol(AllgemeinesSymbol.PFEIL_LINKS, Modifier.size(16.dp), SymbolFarbe)
+            }
+            Text(
+                "${state.aktiveSeite + 1}/${state.seiten.size}",
+                color = SymbolFarbe, fontSize = 14.sp,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+            RundKnopfKlein(onClick = { state.naechsteSeite() }, aktiviert = state.aktiveSeite < state.seiten.lastIndex) {
+                AllgemeinSymbol(AllgemeinesSymbol.PFEIL_RECHTS, Modifier.size(16.dp), SymbolFarbe)
+            }
+        }
+    }
+}
+
+@Composable
+private fun WerkzeugPille(inhalt: @Composable () -> Unit) {
+    Row(
+        modifier = Modifier
+            .shadow(2.dp, RoundedCornerShape(50)).clip(RoundedCornerShape(50))
+            .background(Color.White)
+            .padding(horizontal = 6.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        inhalt()
+    }
+}
+
+@Composable
+private fun RundKnopf(hintergrund: Color, onClick: () -> Unit, inhalt: @Composable () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(48.dp)
+            .shadow(2.dp, CircleShape)
+            .clip(CircleShape)
+            .background(hintergrund)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) { inhalt() }
+}
+
+@Composable
+private fun RundKnopfKlein(onClick: () -> Unit, aktiviert: Boolean = true, inhalt: @Composable () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(38.dp)
+            .clip(CircleShape)
+            .then(if (aktiviert) Modifier.clickable(onClick = onClick) else Modifier),
+        contentAlignment = Alignment.Center
+    ) { inhalt() }
+}
+
+@Composable
+private fun AuswahlKnopf(ausgewaehlt: Boolean, onClick: () -> Unit, groesse: Dp = 40.dp, inhalt: @Composable () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(groesse)
+            .clip(CircleShape)
+            .background(if (ausgewaehlt) LeistenAktiv else Color.Transparent)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) { inhalt() }
+}
+
+// ---------- Stift-Panel ----------
+
+@Composable
+private fun StiftPanelInhalt(state: TafelState) {
+    Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Top) {
+        StiftSpalte(
+            fein = true,
+            ausgewaehlt = state.stiftArt == StiftArt.FEIN,
+            breite = state.stiftBreiteFein,
+            bereich = 2f..24f,
+            onArtGewaehlt = { state.stiftArt = StiftArt.FEIN },
+            onBreiteGeaendert = { state.stiftBreiteFein = it }
+        )
+        StiftSpalte(
+            fein = false,
+            ausgewaehlt = state.stiftArt == StiftArt.LEUCHT,
+            breite = state.stiftBreiteLeucht,
+            bereich = 8f..48f,
+            onArtGewaehlt = { state.stiftArt = StiftArt.LEUCHT },
+            onBreiteGeaendert = { state.stiftBreiteLeucht = it }
+        )
+        FarbGitterUndVerlauf(ausgewaehlt = state.stiftFarbe, onFarbe = { state.stiftFarbe = it })
+    }
+}
+
+@Composable
+private fun StiftSpalte(
+    fein: Boolean, ausgewaehlt: Boolean, breite: Float, bereich: ClosedFloatingPointRange<Float>,
+    onArtGewaehlt: () -> Unit, onBreiteGeaendert: (Float) -> Unit
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        AuswahlKnopf(ausgewaehlt = ausgewaehlt, onClick = onArtGewaehlt, groesse = 36.dp) {
+            StiftArtSymbol(fein = fein, modifier = Modifier.size(20.dp), tint = SymbolFarbe)
+        }
+        VertikalerRegler(
+            wert = breite, bereich = bereich, onWertGeaendert = onBreiteGeaendert,
+            modifier = Modifier.width(26.dp).height(88.dp)
+        )
+    }
+}
+
+@Composable
+private fun VertikalerRegler(
+    wert: Float,
+    bereich: ClosedFloatingPointRange<Float>,
+    onWertGeaendert: (Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val spanne = bereich.endInclusive - bereich.start
+    val anteil = if (spanne == 0f) 0f else ((wert - bereich.start) / spanne).coerceIn(0f, 1f)
+
+    fun setzeAusPosition(y: Float, hoehe: Float) {
+        val neuerAnteil = 1f - (y / hoehe).coerceIn(0f, 1f)
+        onWertGeaendert(bereich.start + neuerAnteil * spanne)
+    }
+
+    Box(
+        modifier = modifier
+            .pointerInput(bereich) {
+                detectDragGestures { change, _ ->
+                    change.consume()
+                    setzeAusPosition(change.position.y, size.height.toFloat())
+                }
+            }
+            .pointerInput(bereich) {
+                detectTapGestures { position -> setzeAusPosition(position.y, size.height.toFloat()) }
+            }
+    ) {
+        Canvas(modifier = Modifier.size(width = 26.dp, height = 88.dp)) {
+            drawLine(
+                color = Color(0xFFC9C7C0), start = Offset(size.width / 2, 6f), end = Offset(size.width / 2, size.height - 6f),
+                strokeWidth = 4f, cap = StrokeCap.Round
+            )
+            val knopfY = 6f + (size.height - 12f) * (1f - anteil)
+            drawCircle(Color(0xFFE33B3B), radius = 6f, center = Offset(size.width / 2, knopfY))
+            drawCircle(Color.White, radius = 6f, center = Offset(size.width / 2, knopfY), style = Stroke(width = 1.6f))
+        }
+    }
+}
+
+// ---------- Formen-Panel ----------
+
+private val FormenGitter = listOf(
+    FormTyp.DREIECK_RECHTS, FormTyp.DREIECK, FormTyp.KREIS, FormTyp.ELLIPSE, FormTyp.QUADRAT,
+    FormTyp.SECHSECK, FormTyp.ABGERUNDET, FormTyp.FUENFECK, FormTyp.STERN, FormTyp.WELLE,
+    FormTyp.LINIE, FormTyp.PFEIL, FormTyp.DOPPELPFEIL, FormTyp.FREIHANDPFEIL,
+    FormTyp.LINIE_GESTRICHELT, FormTyp.PFEIL_GESTRICHELT, FormTyp.DOPPELPFEIL_GESTRICHELT, FormTyp.FREIHANDPFEIL_GESTRICHELT
+)
+
+@Composable
+private fun FormenPanelInhalt(state: TafelState) {
+    Column(modifier = Modifier.width(340.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+            listOf("2D", "3D", "Anpassen", "Farbe").forEachIndexed { index, titel ->
+                Text(
+                    titel,
+                    color = if (state.formTabIndex == index) SymbolFarbe else SymbolFarbeSchwach,
+                    fontSize = 14.sp,
+                    modifier = Modifier.clickable { state.formTabIndex = index }
+                )
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        when (state.formTabIndex) {
+            0 -> FormenTab2D(state)
+            1 -> Text(
+                "3D-Formen folgen in einer späteren Version.",
+                color = SymbolFarbeSchwach, fontSize = 12.sp,
+                modifier = Modifier.padding(vertical = 20.dp)
+            )
+            2 -> FormenTabAnpassen(state)
+            else -> FarbGitterUndVerlauf(
+                ausgewaehlt = state.formFuellFarbe ?: Color.Transparent,
+                onFarbe = { state.formFuellFarbe = it }
+            )
+        }
+    }
+}
+
+@Composable
+private fun FormenTab2D(state: TafelState) {
+    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(5),
+            modifier = Modifier.width(190.dp).height(140.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            items(FormenGitter) { typ ->
+                AuswahlKnopf(ausgewaehlt = state.formTyp == typ, onClick = { state.formTyp = typ }, groesse = 32.dp) {
+                    FormSymbol(typ, Modifier.size(20.dp), SymbolFarbe)
+                }
+            }
+        }
+        Column {
+            Text("Rand", color = SymbolFarbeSchwach, fontSize = 11.sp)
+            Spacer(Modifier.height(4.dp))
+            FarbGitterUndVerlauf(
+                ausgewaehlt = state.formRandFarbe,
+                onFarbe = { state.formRandFarbe = it },
+                zeigeVerlauf = false
+            )
+        }
+    }
+}
+
+@Composable
+private fun FormenTabAnpassen(state: TafelState) {
+    Column {
+        Text("Randstärke", color = SymbolFarbeSchwach, fontSize = 12.sp)
+        Slider(
+            value = state.formRandBreite, onValueChange = { state.formRandBreite = it },
+            valueRange = 2f..16f, modifier = Modifier.width(260.dp),
+            colors = SliderDefaults.colors(thumbColor = SymbolFarbe, activeTrackColor = SymbolFarbe)
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Füllen", color = SymbolFarbeSchwach, fontSize = 12.sp, modifier = Modifier.padding(end = 8.dp))
+            Switch(
+                checked = state.formFuellFarbe != null,
+                onCheckedChange = { angeschaltet ->
+                    state.formFuellFarbe = if (angeschaltet) state.formRandFarbe else null
+                },
+                colors = SwitchDefaults.colors(checkedTrackColor = SymbolFarbe)
+            )
+        }
+    }
+}
+
+// ---------- Radierer-Panel ----------
+
+@Composable
+private fun RadiererPanelInhalt(state: TafelState) {
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        listOf(RadiererGroesse.KLEIN, RadiererGroesse.MITTEL, RadiererGroesse.GROSS).forEach { groesse ->
+            AuswahlKnopf(ausgewaehlt = state.radiererGroesse == groesse, onClick = { state.radiererGroesse = groesse }, groesse = 44.dp) {
+                RadiererSymbol(groesse, Modifier.size(26.dp), SymbolFarbe)
+            }
+        }
+        AuswahlKnopf(ausgewaehlt = false, onClick = { state.seite.allesLoeschen() }, groesse = 44.dp) {
+            AllesLoeschenSymbol(Modifier.size(26.dp), SymbolFarbe)
+        }
+    }
+}
+
+// ---------- Geometrie-Panel ----------
+
+@Composable
+private fun GeometriePanelInhalt(state: TafelState) {
+    Column {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            listOf(
+                GeometrieWerkzeug.LINEAL, GeometrieWerkzeug.WINKELDREIECK, GeometrieWerkzeug.WINKELMESSER,
+                GeometrieWerkzeug.RECHTWINKLIG, GeometrieWerkzeug.ZIRKEL, GeometrieWerkzeug.GLEICHSCHENKLIG
+            ).forEach { werkzeug ->
+                AuswahlKnopf(ausgewaehlt = state.geometrieWerkzeug == werkzeug, onClick = { state.geometrieWerkzeug = werkzeug }, groesse = 38.dp) {
+                    GeometrieSymbol(werkzeug, Modifier.size(22.dp), SymbolFarbe)
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            AuswahlKnopf(ausgewaehlt = !state.geometrieGestrichelt, onClick = { state.geometrieGestrichelt = false }, groesse = 34.dp) {
+                LinienStilSymbol(gestrichelt = false, modifier = Modifier.size(22.dp), tint = SymbolFarbe)
+            }
+            AuswahlKnopf(ausgewaehlt = state.geometrieGestrichelt, onClick = { state.geometrieGestrichelt = true }, groesse = 34.dp) {
+                LinienStilSymbol(gestrichelt = true, modifier = Modifier.size(22.dp), tint = SymbolFarbe)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "Zeigen Sie die Länge der gezeichneten Linie an",
+                color = SymbolFarbeSchwach, fontSize = 12.sp,
+                modifier = Modifier.width(220.dp)
+            )
+            Switch(
+                checked = state.zeigeLaenge,
+                onCheckedChange = { state.zeigeLaenge = it },
+                colors = SwitchDefaults.colors(checkedTrackColor = SymbolFarbe)
+            )
+        }
+    }
+}
+
+// ---------- Werkzeugkasten-Panel ----------
+
+@Composable
+private fun WerkzeugkastenPanelInhalt(state: TafelState) {
+    var zeigeHintergrundAuswahl by remember { mutableStateOf(false) }
+
+    Column {
+        Row(horizontalArrangement = Arrangement.spacedBy(22.dp)) {
+            WerkzeugkastenEintrag("Hintergrund", WerkzeugkastenAktion.HINTERGRUND) {
+                zeigeHintergrundAuswahl = !zeigeHintergrundAuswahl
+            }
+            WerkzeugkastenEintrag("Bild teilen", WerkzeugkastenAktion.BILD_TEILEN) {
+                state.seite.geteilteAnsicht.value = !state.seite.geteilteAnsicht.value
+            }
+            WerkzeugkastenEintrag("Bildschirmfoto", WerkzeugkastenAktion.BILDSCHIRMFOTO) {
+                state.aufnahmeAnfrage = AufnahmeZweck.SPEICHERN
+                state.schliessePanel()
+            }
+            WerkzeugkastenEintrag("Lupe", WerkzeugkastenAktion.LUPE) {
+                state.lupeAktiv = !state.lupeAktiv
+                state.schliessePanel()
+            }
+        }
+        if (zeigeHintergrundAuswahl) {
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                HintergrundOptionen.forEach { farbe ->
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(farbe)
+                            .clickable { state.seite.hintergrund.value = farbe }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WerkzeugkastenEintrag(label: String, aktion: WerkzeugkastenAktion, onClick: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable(onClick = onClick)) {
+        Box(
+            modifier = Modifier.size(42.dp).clip(CircleShape).background(Color.White),
+            contentAlignment = Alignment.Center
+        ) {
+            WerkzeugkastenSymbol(aktion, Modifier.size(24.dp), SymbolFarbe)
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(label, color = SymbolFarbeSchwach, fontSize = 10.sp)
+    }
+}
