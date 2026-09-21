@@ -1,0 +1,6 @@
+<resources>
+    <style name="Theme.DammTafel" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@color/tafel_gruen</item>
+        <item name="android:windowBackground">@color/tafel_gruen</item>
+    </style>
+</resources>
