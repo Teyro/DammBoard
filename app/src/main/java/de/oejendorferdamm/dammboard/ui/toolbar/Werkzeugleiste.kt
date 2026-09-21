@@ -50,6 +50,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -390,10 +391,12 @@ private fun FormenPanelInhalt(state: TafelState) {
     Column(modifier = Modifier.width(340.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
             listOf("2D", "3D", "Anpassen", "Farbe").forEachIndexed { index, titel ->
+                val aktiv = state.formTabIndex == index
                 Text(
                     titel,
-                    color = if (state.formTabIndex == index) SymbolFarbe else SymbolFarbeSchwach,
+                    color = if (aktiv) SymbolFarbe else SymbolFarbeSchwach,
                     fontSize = 14.sp,
+                    fontWeight = if (aktiv) FontWeight.SemiBold else FontWeight.Normal,
                     modifier = Modifier.clickable { state.formTabIndex = index }
                 )
             }
@@ -433,12 +436,38 @@ private fun FormenTab2D(state: TafelState) {
         Column {
             Text("Rand", color = SymbolFarbeSchwach, fontSize = 11.sp)
             Spacer(Modifier.height(4.dp))
+            RandVorschau(farbe = state.formRandFarbe, breite = state.formRandBreite)
+            Spacer(Modifier.height(8.dp))
             FarbGitterUndVerlauf(
                 ausgewaehlt = state.formRandFarbe,
                 onFarbe = { state.formRandFarbe = it },
                 zeigeVerlauf = false
             )
         }
+    }
+}
+
+@Composable
+private fun RandVorschau(farbe: Color, breite: Float) {
+    Row(
+        modifier = Modifier
+            .width(150.dp)
+            .height(26.dp)
+            .clip(RoundedCornerShape(50))
+            .background(Color.White)
+            .border(1.dp, Color(0xFFE2E0D8), RoundedCornerShape(50))
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Canvas(modifier = Modifier.width(90.dp).height(12.dp)) {
+            drawLine(
+                color = farbe,
+                start = Offset(0f, size.height / 2), end = Offset(size.width, size.height / 2),
+                strokeWidth = breite.coerceIn(2f, 8f), cap = StrokeCap.Round
+            )
+        }
+        AllgemeinSymbol(AllgemeinesSymbol.PFEIL_RECHTS, Modifier.size(10.dp), SymbolFarbeSchwach)
     }
 }
 
@@ -484,7 +513,8 @@ private fun RadiererPanelInhalt(state: TafelState) {
 
 @Composable
 private fun GeometriePanelInhalt(state: TafelState) {
-    Column {
+    Box {
+        Column(modifier = Modifier.padding(end = 18.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             listOf(
                 GeometrieWerkzeug.LINEAL, GeometrieWerkzeug.WINKELDREIECK, GeometrieWerkzeug.WINKELMESSER,
@@ -516,6 +546,17 @@ private fun GeometriePanelInhalt(state: TafelState) {
                 onCheckedChange = { state.zeigeLaenge = it },
                 colors = SwitchDefaults.colors(checkedTrackColor = SymbolFarbe)
             )
+        }
+        }
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .size(20.dp)
+                .clip(CircleShape)
+                .border(1.dp, SymbolFarbeSchwach, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("?", color = SymbolFarbeSchwach, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
