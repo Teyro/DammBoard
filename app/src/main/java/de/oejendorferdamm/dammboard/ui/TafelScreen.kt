@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
@@ -60,6 +61,7 @@ fun TafelScreen(
             onIServ = { state.aufnahmeAnfrage = AufnahmeZweck.ISERV },
             modifier = Modifier
                 .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
                 .padding(top = 4.dp)
         )
     }
