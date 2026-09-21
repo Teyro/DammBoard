@@ -1,4 +1,4 @@
-package de.oejendorferdamm.dammtafel.model
+package de.oejendorferdamm.dammboard.model
 
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -16,6 +16,11 @@ val TafelWeiss = Color(0xFFF7F5EF)
 val TafelGrau = Color(0xFFB9BDB8)
 
 val HintergrundOptionen = listOf(TafelGruen, TafelSchwarz, TafelWeiss, TafelGrau)
+
+/** Musterüberlagerung für den Tafelhintergrund (zusätzlich zur reinen Farbe). */
+enum class MusterTyp { KEIN, LINIERT, KARIERT, GEPUNKTET }
+
+data class HintergrundStil(val farbe: Color, val muster: MusterTyp = MusterTyp.KEIN)
 
 /** Die 12 Kreide-/Stiftfarben aus der Werkzeugleiste (4 Spalten x 3 Zeilen). */
 val KreidePalette = listOf(
@@ -114,7 +119,7 @@ data class LaengenEtikett(
 ) : BoardItem
 
 /** Eine Seite der Tafel: eigener Inhalt, eigener Hintergrund, eigene Undo/Redo-Historie. */
-class Seite(hintergrundStart: Color = TafelGruen) {
+class Seite(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)) {
     val items: SnapshotStateList<BoardItem> = mutableStateListOf()
     val ausgewaehlteIds: SnapshotStateList<Long> = mutableStateListOf()
     val hintergrund = mutableStateOf(hintergrundStart)

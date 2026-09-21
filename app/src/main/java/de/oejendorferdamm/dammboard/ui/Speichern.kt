@@ -1,4 +1,4 @@
-package de.oejendorferdamm.dammtafel.ui
+package de.oejendorferdamm.dammboard.ui
 
 import android.content.ContentValues
 import android.content.Context
@@ -8,15 +8,15 @@ import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 
-/** Schreibt das Tafelbild als PNG in die Galerie (Pictures/DammTafel) und gibt dessen Uri zurück. */
+/** Schreibt das Tafelbild als PNG in die Galerie (Pictures/DammBoard) und gibt dessen Uri zurück. */
 fun speichereBildUndGibUriZurueck(context: Context, bitmap: Bitmap): Uri? {
     return try {
-        val name = "DammTafel_${System.currentTimeMillis()}.png"
+        val name = "DammBoard_${System.currentTimeMillis()}.png"
         val values = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, name)
             put(MediaStore.Images.Media.MIME_TYPE, "image/png")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/DammTafel")
+                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/DammBoard")
             }
         }
         val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return null

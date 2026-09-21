@@ -1,4 +1,4 @@
-package de.oejendorferdamm.dammtafel.ui.canvas
+package de.oejendorferdamm.dammboard.ui.canvas
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -32,17 +32,18 @@ import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
-import de.oejendorferdamm.dammtafel.model.BoardItem
-import de.oejendorferdamm.dammtafel.model.FormItem
-import de.oejendorferdamm.dammtafel.model.FormTyp
-import de.oejendorferdamm.dammtafel.model.GeometrieWerkzeug
-import de.oejendorferdamm.dammtafel.model.LaengenEtikett
-import de.oejendorferdamm.dammtafel.model.StrichItem
-import de.oejendorferdamm.dammtafel.model.Werkzeug
-import de.oejendorferdamm.dammtafel.model.begrenzendesRechteck
-import de.oejendorferdamm.dammtafel.ui.AufnahmeZweck
-import de.oejendorferdamm.dammtafel.ui.TafelState
-import de.oejendorferdamm.dammtafel.ui.naechsteId
+import de.oejendorferdamm.dammboard.model.BoardItem
+import de.oejendorferdamm.dammboard.model.FormItem
+import de.oejendorferdamm.dammboard.model.FormTyp
+import de.oejendorferdamm.dammboard.model.GeometrieWerkzeug
+import de.oejendorferdamm.dammboard.model.LaengenEtikett
+import de.oejendorferdamm.dammboard.model.MusterTyp
+import de.oejendorferdamm.dammboard.model.StrichItem
+import de.oejendorferdamm.dammboard.model.Werkzeug
+import de.oejendorferdamm.dammboard.model.begrenzendesRechteck
+import de.oejendorferdamm.dammboard.ui.AufnahmeZweck
+import de.oejendorferdamm.dammboard.ui.TafelState
+import de.oejendorferdamm.dammboard.ui.naechsteId
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.hypot
@@ -341,7 +342,9 @@ fun TafelCanvas(
             .then(gesteModifier)
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            drawRect(color = seite.hintergrund.value)
+            val hintergrund = seite.hintergrund.value
+            drawRect(color = hintergrund.farbe)
+            zeichneMuster(hintergrund.muster, hintergrund.farbe)
 
             if (seite.geteilteAnsicht.value) {
                 drawLine(
@@ -456,6 +459,46 @@ private fun DrawScope.zeichneGeometrieFuehrung(werkzeug: GeometrieWerkzeug, zent
     val griff = geometrieGriffPosition(zentrum, winkelGrad)
     drawCircle(Color.White, radius = 14f, center = griff, style = Stroke(width = 3f))
     drawCircle(Color.White.copy(alpha = 0.5f), radius = 5f, center = griff)
+}
+
+private fun DrawScope.zeichneMuster(muster: MusterTyp, basisFarbe: Color) {
+    if (muster == MusterTyp.KEIN) return
+    val helligkeit = 0.299f * basisFarbe.red + 0.587f * basisFarbe.green + 0.114f * basisFarbe.blue
+    val linienFarbe = if (helligkeit > 0.5f) Color.Black.copy(alpha = 0.10f) else Color.White.copy(alpha = 0.14f)
+    val abstand = 48f
+    when (muster) {
+        MusterTyp.LINIERT -> {
+            var y = abstand
+            while (y < size.height) {
+                drawLine(linienFarbe, Offset(0f, y), Offset(size.width, y), strokeWidth = 1.4f)
+                y += abstand
+            }
+        }
+        MusterTyp.KARIERT -> {
+            var x = abstand
+            while (x < size.width) {
+                drawLine(linienFarbe, Offset(x, 0f), Offset(x, size.height), strokeWidth = 1.2f)
+                x += abstand
+            }
+            var y = abstand
+            while (y < size.height) {
+                drawLine(linienFarbe, Offset(0f, y), Offset(size.width, y), strokeWidth = 1.2f)
+                y += abstand
+            }
+        }
+        MusterTyp.GEPUNKTET -> {
+            var y = abstand
+            while (y < size.height) {
+                var x = abstand
+                while (x < size.width) {
+                    drawCircle(linienFarbe, radius = 2.2f, center = Offset(x, y))
+                    x += abstand
+                }
+                y += abstand
+            }
+        }
+        MusterTyp.KEIN -> Unit
+    }
 }
 
 private val gestrichelteFormen = setOf(

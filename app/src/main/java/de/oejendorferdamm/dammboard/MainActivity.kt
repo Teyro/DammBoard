@@ -1,4 +1,4 @@
-package de.oejendorferdamm.dammtafel
+package de.oejendorferdamm.dammboard
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import de.oejendorferdamm.dammtafel.ui.TafelScreen
+import de.oejendorferdamm.dammboard.ui.AppWurzel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -17,7 +17,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    TafelScreen()
+                    AppWurzel(onAppSchliessen = { finish() })
                 }
             }
         }

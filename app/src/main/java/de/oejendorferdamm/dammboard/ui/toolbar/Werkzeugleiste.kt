@@ -1,7 +1,14 @@
-package de.oejendorferdamm.dammtafel.ui.toolbar
+package de.oejendorferdamm.dammboard.ui.toolbar
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -26,6 +33,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,25 +51,28 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import de.oejendorferdamm.dammtafel.model.FormTyp
-import de.oejendorferdamm.dammtafel.model.GeometrieWerkzeug
-import de.oejendorferdamm.dammtafel.model.HintergrundOptionen
-import de.oejendorferdamm.dammtafel.model.RadiererGroesse
-import de.oejendorferdamm.dammtafel.model.StiftArt
-import de.oejendorferdamm.dammtafel.model.Werkzeug
-import de.oejendorferdamm.dammtafel.ui.AufnahmeZweck
-import de.oejendorferdamm.dammtafel.ui.TafelState
-import de.oejendorferdamm.dammtafel.ui.icons.AllgemeinSymbol
-import de.oejendorferdamm.dammtafel.ui.icons.AllgemeinesSymbol
-import de.oejendorferdamm.dammtafel.ui.icons.AllesLoeschenSymbol
-import de.oejendorferdamm.dammtafel.ui.icons.FormSymbol
-import de.oejendorferdamm.dammtafel.ui.icons.GeometrieSymbol
-import de.oejendorferdamm.dammtafel.ui.icons.LinienStilSymbol
-import de.oejendorferdamm.dammtafel.ui.icons.RadiererSymbol
-import de.oejendorferdamm.dammtafel.ui.icons.StiftArtSymbol
-import de.oejendorferdamm.dammtafel.ui.icons.WerkzeugSymbol
-import de.oejendorferdamm.dammtafel.ui.icons.WerkzeugkastenAktion
-import de.oejendorferdamm.dammtafel.ui.icons.WerkzeugkastenSymbol
+import de.oejendorferdamm.dammboard.model.AnimationsModus
+import de.oejendorferdamm.dammboard.model.FormTyp
+import de.oejendorferdamm.dammboard.model.GeometrieWerkzeug
+import de.oejendorferdamm.dammboard.model.HintergrundOptionen
+import de.oejendorferdamm.dammboard.model.HintergrundStil
+import de.oejendorferdamm.dammboard.model.MusterTyp
+import de.oejendorferdamm.dammboard.model.RadiererGroesse
+import de.oejendorferdamm.dammboard.model.StiftArt
+import de.oejendorferdamm.dammboard.model.Werkzeug
+import de.oejendorferdamm.dammboard.ui.AufnahmeZweck
+import de.oejendorferdamm.dammboard.ui.TafelState
+import de.oejendorferdamm.dammboard.ui.icons.AllgemeinSymbol
+import de.oejendorferdamm.dammboard.ui.icons.AllgemeinesSymbol
+import de.oejendorferdamm.dammboard.ui.icons.AllesLoeschenSymbol
+import de.oejendorferdamm.dammboard.ui.icons.FormSymbol
+import de.oejendorferdamm.dammboard.ui.icons.GeometrieSymbol
+import de.oejendorferdamm.dammboard.ui.icons.LinienStilSymbol
+import de.oejendorferdamm.dammboard.ui.icons.RadiererSymbol
+import de.oejendorferdamm.dammboard.ui.icons.StiftArtSymbol
+import de.oejendorferdamm.dammboard.ui.icons.WerkzeugSymbol
+import de.oejendorferdamm.dammboard.ui.icons.WerkzeugkastenAktion
+import de.oejendorferdamm.dammboard.ui.icons.WerkzeugkastenSymbol
 
 private val LeistenHintergrund = Color(0xFFF7F6F2)
 private val LeistenAktiv = Color(0xFFDAD8D1)
@@ -72,26 +83,53 @@ private val SymbolFarbeSchwach = Color(0xFF8A8880)
 @Composable
 fun TafelWerkzeugleiste(
     state: TafelState,
+    animationsModus: AnimationsModus,
     onSchliessen: () -> Unit,
     onMenu: () -> Unit,
     onTeilen: () -> Unit,
+    onIServ: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var letztesPanel by remember { mutableStateOf<Werkzeug?>(null) }
+    LaunchedEffect(state.offenesPanel) {
+        state.offenesPanel?.let { letztesPanel = it }
+    }
+
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        state.offenesPanel?.let { panel ->
-            PopupRahmen {
-                when (panel) {
-                    Werkzeug.STIFT -> StiftPanelInhalt(state)
-                    Werkzeug.FORMEN -> FormenPanelInhalt(state)
-                    Werkzeug.RADIERER -> RadiererPanelInhalt(state)
-                    Werkzeug.GEOMETRIE -> GeometriePanelInhalt(state)
-                    Werkzeug.WERKZEUGKASTEN -> WerkzeugkastenPanelInhalt(state)
-                    Werkzeug.LASSO, Werkzeug.AUSWAHL -> Unit
+        if (animationsModus == AnimationsModus.NORMAL) {
+            AnimatedVisibility(
+                visible = state.offenesPanel != null,
+                enter = fadeIn(tween(160)) + scaleIn(tween(180), initialScale = 0.88f),
+                exit = fadeOut(tween(120)) + scaleOut(tween(140), targetScale = 0.88f)
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    letztesPanel?.let { panel ->
+                        PopupRahmen { PanelInhalt(panel, state, onIServ) }
+                    }
+                    Spacer(Modifier.height(4.dp))
                 }
             }
-            Spacer(Modifier.height(4.dp))
+        } else {
+            state.offenesPanel?.let { panel ->
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    PopupRahmen { PanelInhalt(panel, state, onIServ) }
+                    Spacer(Modifier.height(4.dp))
+                }
+            }
         }
         HauptLeiste(state, onSchliessen, onMenu, onTeilen)
+    }
+}
+
+@Composable
+private fun PanelInhalt(panel: Werkzeug, state: TafelState, onIServ: () -> Unit) {
+    when (panel) {
+        Werkzeug.STIFT -> StiftPanelInhalt(state)
+        Werkzeug.FORMEN -> FormenPanelInhalt(state)
+        Werkzeug.RADIERER -> RadiererPanelInhalt(state)
+        Werkzeug.GEOMETRIE -> GeometriePanelInhalt(state)
+        Werkzeug.WERKZEUGKASTEN -> WerkzeugkastenPanelInhalt(state, onIServ)
+        Werkzeug.LASSO, Werkzeug.AUSWAHL -> Unit
     }
 }
 
@@ -455,11 +493,11 @@ private fun GeometriePanelInhalt(state: TafelState) {
 // ---------- Werkzeugkasten-Panel ----------
 
 @Composable
-private fun WerkzeugkastenPanelInhalt(state: TafelState) {
+private fun WerkzeugkastenPanelInhalt(state: TafelState, onIServ: () -> Unit) {
     var zeigeHintergrundAuswahl by remember { mutableStateOf(false) }
 
     Column {
-        Row(horizontalArrangement = Arrangement.spacedBy(22.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             WerkzeugkastenEintrag("Hintergrund", WerkzeugkastenAktion.HINTERGRUND) {
                 zeigeHintergrundAuswahl = !zeigeHintergrundAuswahl
             }
@@ -474,9 +512,14 @@ private fun WerkzeugkastenPanelInhalt(state: TafelState) {
                 state.lupeAktiv = !state.lupeAktiv
                 state.schliessePanel()
             }
+            WerkzeugkastenEintrag("IServ", WerkzeugkastenAktion.ISERV) {
+                state.schliessePanel()
+                onIServ()
+            }
         }
         if (zeigeHintergrundAuswahl) {
             Spacer(Modifier.height(10.dp))
+            val aktuellerStil = state.seite.hintergrund.value
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 HintergrundOptionen.forEach { farbe ->
                     Box(
@@ -484,8 +527,57 @@ private fun WerkzeugkastenPanelInhalt(state: TafelState) {
                             .size(28.dp)
                             .clip(CircleShape)
                             .background(farbe)
-                            .clickable { state.seite.hintergrund.value = farbe }
+                            .border(
+                                width = if (aktuellerStil.farbe == farbe) 3.dp else 0.dp,
+                                color = SymbolFarbe,
+                                shape = CircleShape
+                            )
+                            .clickable { state.seite.hintergrund.value = aktuellerStil.copy(farbe = farbe) }
                     )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text("Muster", color = SymbolFarbeSchwach, fontSize = 11.sp)
+            Spacer(Modifier.height(4.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(
+                    MusterTyp.KEIN to "Einfarbig",
+                    MusterTyp.LINIERT to "Liniert",
+                    MusterTyp.KARIERT to "Kariert",
+                    MusterTyp.GEPUNKTET to "Gepunktet"
+                ).forEach { (muster, label) ->
+                    AuswahlKnopf(
+                        ausgewaehlt = aktuellerStil.muster == muster,
+                        onClick = { state.seite.hintergrund.value = aktuellerStil.copy(muster = muster) },
+                        groesse = 32.dp
+                    ) {
+                        MusterSymbol(muster, Modifier.size(20.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MusterSymbol(muster: MusterTyp, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val w = size.width; val h = size.height
+        when (muster) {
+            MusterTyp.KEIN -> drawLine(SymbolFarbeSchwach, Offset(w * 0.2f, h * 0.5f), Offset(w * 0.8f, h * 0.5f), strokeWidth = 2f)
+            MusterTyp.LINIERT -> {
+                drawLine(SymbolFarbe, Offset(w * 0.1f, h * 0.35f), Offset(w * 0.9f, h * 0.35f), strokeWidth = 1.4f)
+                drawLine(SymbolFarbe, Offset(w * 0.1f, h * 0.65f), Offset(w * 0.9f, h * 0.65f), strokeWidth = 1.4f)
+            }
+            MusterTyp.KARIERT -> {
+                drawLine(SymbolFarbe, Offset(w * 0.35f, h * 0.1f), Offset(w * 0.35f, h * 0.9f), strokeWidth = 1.2f)
+                drawLine(SymbolFarbe, Offset(w * 0.65f, h * 0.1f), Offset(w * 0.65f, h * 0.9f), strokeWidth = 1.2f)
+                drawLine(SymbolFarbe, Offset(w * 0.1f, h * 0.35f), Offset(w * 0.9f, h * 0.35f), strokeWidth = 1.2f)
+                drawLine(SymbolFarbe, Offset(w * 0.1f, h * 0.65f), Offset(w * 0.9f, h * 0.65f), strokeWidth = 1.2f)
+            }
+            MusterTyp.GEPUNKTET -> {
+                listOf(0.3f to 0.3f, 0.7f to 0.3f, 0.3f to 0.7f, 0.7f to 0.7f).forEach { (fx, fy) ->
+                    drawCircle(SymbolFarbe, radius = 1.6f, center = Offset(w * fx, h * fy))
                 }
             }
         }

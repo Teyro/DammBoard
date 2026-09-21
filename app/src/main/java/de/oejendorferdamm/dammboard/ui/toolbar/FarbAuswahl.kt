@@ -1,4 +1,4 @@
-package de.oejendorferdamm.dammtafel.ui.toolbar
+package de.oejendorferdamm.dammboard.ui.toolbar
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -33,7 +33,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import de.oejendorferdamm.dammtafel.model.KreidePalette
+import de.oejendorferdamm.dammboard.model.KreidePalette
 
 /** Errechnet die Farbe aus einer Position im Verlaufsquadrat (x = Farbton, y = Helligkeit/Sättigung). */
 fun hsvVerlaufsFarbe(fractionX: Float, fractionY: Float): Color {

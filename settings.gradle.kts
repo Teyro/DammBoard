@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "DammTafel"
+rootProject.name = "DammBoard"
 include(":app")

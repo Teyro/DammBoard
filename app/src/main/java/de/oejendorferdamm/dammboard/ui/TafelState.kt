@@ -1,4 +1,4 @@
-package de.oejendorferdamm.dammtafel.ui
+package de.oejendorferdamm.dammboard.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -11,19 +11,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import de.oejendorferdamm.dammtafel.model.FormTyp
-import de.oejendorferdamm.dammtafel.model.GeometrieWerkzeug
-import de.oejendorferdamm.dammtafel.model.KreidePalette
-import de.oejendorferdamm.dammtafel.model.RadiererGroesse
-import de.oejendorferdamm.dammtafel.model.Seite
-import de.oejendorferdamm.dammtafel.model.StiftArt
-import de.oejendorferdamm.dammtafel.model.Werkzeug
+import de.oejendorferdamm.dammboard.model.FormTyp
+import de.oejendorferdamm.dammboard.model.GeometrieWerkzeug
+import de.oejendorferdamm.dammboard.model.KreidePalette
+import de.oejendorferdamm.dammboard.model.RadiererGroesse
+import de.oejendorferdamm.dammboard.model.Seite
+import de.oejendorferdamm.dammboard.model.StiftArt
+import de.oejendorferdamm.dammboard.model.Werkzeug
 import java.util.concurrent.atomic.AtomicLong
 
 private val idZaehler = AtomicLong(0)
 fun naechsteId(): Long = idZaehler.incrementAndGet()
 
-enum class AufnahmeZweck { SPEICHERN, TEILEN }
+enum class AufnahmeZweck { SPEICHERN, TEILEN, ISERV }
 
 /** Winkel des Geometrie-Führungswerkzeugs (Lineal, Winkeldreieck, Winkelmesser, ...); die Position ist canvasbezogen fix. */
 class GeometrieFuehrung {

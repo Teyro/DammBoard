@@ -1,4 +1,4 @@
-package de.oejendorferdamm.dammtafel.ui.icons
+package de.oejendorferdamm.dammboard.ui.icons
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
@@ -10,10 +10,10 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import de.oejendorferdamm.dammtafel.model.FormTyp
-import de.oejendorferdamm.dammtafel.model.GeometrieWerkzeug
-import de.oejendorferdamm.dammtafel.model.RadiererGroesse
-import de.oejendorferdamm.dammtafel.model.Werkzeug
+import de.oejendorferdamm.dammboard.model.FormTyp
+import de.oejendorferdamm.dammboard.model.GeometrieWerkzeug
+import de.oejendorferdamm.dammboard.model.RadiererGroesse
+import de.oejendorferdamm.dammboard.model.Werkzeug
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -372,7 +372,7 @@ fun LinienStilSymbol(gestrichelt: Boolean, modifier: Modifier = Modifier, tint: 
     }
 }
 
-enum class WerkzeugkastenAktion { HINTERGRUND, BILD_TEILEN, BILDSCHIRMFOTO, LUPE }
+enum class WerkzeugkastenAktion { HINTERGRUND, BILD_TEILEN, BILDSCHIRMFOTO, LUPE, ISERV }
 
 enum class AllgemeinesSymbol { SCHLIESSEN, MENUE, TEILEN, PAPIERKORB, RUECKGAENGIG, WIEDERHOLEN, PLUS, PFEIL_LINKS, PFEIL_RECHTS }
 
@@ -489,6 +489,17 @@ fun WerkzeugkastenSymbol(aktion: WerkzeugkastenAktion, modifier: Modifier = Modi
                 linie(Offset(w * 0.62f, h * 0.62f), Offset(w * 0.86f, h * 0.86f), tint, 2.6f)
                 linie(Offset(w * 0.3f, h * 0.42f), Offset(w * 0.54f, h * 0.42f), tint, 1.6f)
                 linie(Offset(w * 0.42f, h * 0.3f), Offset(w * 0.42f, h * 0.54f), tint, 1.6f)
+            }
+            WerkzeugkastenAktion.ISERV -> {
+                drawArc(
+                    color = tint, startAngle = 20f, sweepAngle = 320f, useCenter = false,
+                    topLeft = Offset(w * 0.14f, h * 0.32f),
+                    size = androidx.compose.ui.geometry.Size(w * 0.72f, w * 0.5f),
+                    style = stroke
+                )
+                linie(Offset(w * 0.5f, h * 0.82f), Offset(w * 0.5f, h * 0.42f), tint, 2.4f)
+                linie(Offset(w * 0.5f, h * 0.42f), Offset(w * 0.38f, h * 0.56f), tint, 2.2f)
+                linie(Offset(w * 0.5f, h * 0.42f), Offset(w * 0.62f, h * 0.56f), tint, 2.2f)
             }
         }
     }

@@ -1,31 +1,45 @@
-# DammTafel
+# DammBoard
 
 Eine digitale Tafel-App für Android – entwickelt für die **Schule Öjendorfer Damm**.
 
-DammTafel verwandelt ein Android-Tablet in eine einfache, interaktive
-Kreidetafel: mit dem Finger oder Stift schreiben und zeichnen, mit
-mehreren Kreidefarben, einem Radiergummi, "Rückgängig" für den letzten
-Strich und einer "Wischen"-Funktion, die die ganze Tafel auf einmal
-leert – genau wie im echten Klassenzimmer. Der aktuelle Tafelstand lässt
-sich außerdem als Bild speichern (Galerie-Ordner `Pictures/DammTafel`),
-bevor er gelöscht wird.
+DammBoard verwandelt ein Android-Tablet in eine interaktive Kreidetafel
+mit einer vollständigen Werkzeugleiste: Stift (zwei Stiftarten,
+Farbpalette, Verlaufs-Farbwähler), Formen (2D-Formengitter mit Rand-
+und Füllfarbe), Radierer, Lasso- und rechteckige Auswahl mit
+Verschieben/Löschen, Geometrie-Werkzeuge (Lineal, Winkeldreieck,
+Winkelmesser, Zirkel u. a. mit drehbarer Führung und Längenanzeige)
+sowie ein Werkzeugkasten für Hintergrund, geteilte Ansicht,
+Bildschirmfoto und Lupe.
 
-## Funktionen (v0.1.0)
+## Funktionen (v0.3.0)
 
-- Freihand-Zeichnen mit Finger/Stift auf grünem Tafel-Hintergrund
-- Mehrere Kreidefarben (Weiß, Gelb, Hellblau, Rosa, Hellgrün)
-- Einstellbare Strichbreite
-- Radiergummi
-- Rückgängig (letzter Strich)
-- Wischen (ganze Tafel leeren)
-- Tafelbild als PNG speichern
+- Freihand-Zeichnen mit Finger/Stift, mehrere Seiten mit eigener
+  Undo/Redo-Historie
+- Formen, Geometrie-Werkzeuge, Lasso-/Rechteck-Auswahl mit
+  Verschieben und Löschen
+- Hintergrund-Vorlagen: vier Farben, dazu liniert/kariert/gepunktet
+- Zwei Darstellungsmodi: **Normal** (sanfte Übergänge) und
+  **Performance** (ganz ohne Animationen), einstellbar im
+  Einstellungsmenü (☰)
+- **IServ-Anbindung**: Tafelbild direkt in den schuleigenen
+  IServ-WebDAV-Speicher hochladen – "Schnell speichern" in den
+  Hauptordner oder gezielt in einen selbst durchblätterten
+  Unterordner. Zugangsdaten (Web-Adresse, Benutzername, Passwort)
+  werden im Einstellungsmenü hinterlegt.
+- Tafelbild als PNG in die Galerie speichern oder über die
+  Systemfreigabe teilen
 
 ## Technik
 
 - Kotlin + [Jetpack Compose](https://developer.android.com/jetpack/compose)
 - Minimale Android-Version: Android 10 (API 29)
-- Kein Backend, keine Internetverbindung nötig – alles läuft lokal auf
-  dem Gerät
+- Netzwerkzugriff nur für die IServ-Anbindung (WebDAV über
+  [OkHttp](https://square.github.io/okhttp/)); alles andere läuft
+  lokal auf dem Gerät
+- Einstellungen liegen lokal in DataStore Preferences – **das
+  IServ-Passwort wird dabei unverschlüsselt gespeichert**, das ist
+  für ein von der Schule verwaltetes Tablet vorgesehen, nicht für ein
+  privates Gerät mit sensiblen Zugangsdaten Dritter
 
 ## Bauen
 
@@ -37,6 +51,4 @@ Die fertige APK liegt danach unter `app/build/outputs/apk/debug/`.
 
 ## Status
 
-Frühes Grundgerüst (v0.1.0) – als Ausgangspunkt gedacht, um Wünsche aus
-dem Schulalltag (z. B. mehrere Tafel-Seiten, Formen/Lineal, Speichern
-mehrerer Tafeln) nach und nach zu ergänzen.
+DammBoard wird schrittweise nach Wünschen aus dem Schulalltag erweitert.
