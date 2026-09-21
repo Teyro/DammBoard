@@ -1,0 +1,50 @@
+name: Screenshots
+
+on:
+  workflow_dispatch:
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 17 einrichten
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Gradle cachen
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Debug-APK bauen
+        run: ./gradlew assembleDebug
+
+      - name: KVM-Berechtigung für den Emulator setzen
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Emulator starten, App installieren, Screenshots aufnehmen
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: google_apis
+          arch: x86_64
+          profile: Nexus 9
+          disable-animations: true
+          script: |
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            python3 scripts/ui_screenshots.py
+
+      - name: Screenshots und Logcat hochladen
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dammboard-screenshots
+          path: |
+            screenshots/*.png
+            logcat.txt

@@ -48,6 +48,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -73,6 +75,16 @@ import de.oejendorferdamm.dammboard.ui.icons.StiftArtSymbol
 import de.oejendorferdamm.dammboard.ui.icons.WerkzeugSymbol
 import de.oejendorferdamm.dammboard.ui.icons.WerkzeugkastenAktion
 import de.oejendorferdamm.dammboard.ui.icons.WerkzeugkastenSymbol
+
+private fun werkzeugBeschreibung(werkzeug: Werkzeug): String = when (werkzeug) {
+    Werkzeug.STIFT -> "Stift"
+    Werkzeug.FORMEN -> "Formen"
+    Werkzeug.RADIERER -> "Radierer"
+    Werkzeug.LASSO -> "Lasso"
+    Werkzeug.GEOMETRIE -> "Geometrie"
+    Werkzeug.AUSWAHL -> "Auswahl"
+    Werkzeug.WERKZEUGKASTEN -> "Werkzeugkasten"
+}
 
 private val LeistenHintergrund = Color(0xFFF7F6F2)
 private val LeistenAktiv = Color(0xFFDAD8D1)
@@ -162,13 +174,13 @@ private fun HauptLeiste(state: TafelState, onSchliessen: () -> Unit, onMenu: () 
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        RundKnopf(hintergrund = Color.White, onClick = onSchliessen) {
+        RundKnopf(hintergrund = Color.White, onClick = onSchliessen, modifier = Modifier.semantics { contentDescription = "Schließen" }) {
             AllgemeinSymbol(AllgemeinesSymbol.SCHLIESSEN, Modifier.size(18.dp), Color(0xFFE0402E))
         }
-        RundKnopf(hintergrund = Color.White, onClick = onMenu) {
+        RundKnopf(hintergrund = Color.White, onClick = onMenu, modifier = Modifier.semantics { contentDescription = "Menü" }) {
             AllgemeinSymbol(AllgemeinesSymbol.MENUE, Modifier.size(18.dp), SymbolFarbe)
         }
-        RundKnopf(hintergrund = Color.White, onClick = onTeilen) {
+        RundKnopf(hintergrund = Color.White, onClick = onTeilen, modifier = Modifier.semantics { contentDescription = "Teilen" }) {
             AllgemeinSymbol(AllgemeinesSymbol.TEILEN, Modifier.size(18.dp), SymbolFarbe)
         }
 
@@ -178,30 +190,45 @@ private fun HauptLeiste(state: TafelState, onSchliessen: () -> Unit, onMenu: () 
                 Werkzeug.GEOMETRIE, Werkzeug.AUSWAHL, Werkzeug.WERKZEUGKASTEN
             ).forEach { werkzeug ->
                 val aktiv = state.werkzeug == werkzeug || (werkzeug == Werkzeug.WERKZEUGKASTEN && state.offenesPanel == werkzeug)
-                AuswahlKnopf(ausgewaehlt = aktiv, onClick = { state.waehleWerkzeug(werkzeug) }, groesse = 40.dp) {
+                AuswahlKnopf(
+                    ausgewaehlt = aktiv, onClick = { state.waehleWerkzeug(werkzeug) }, groesse = 40.dp,
+                    modifier = Modifier.semantics { contentDescription = werkzeugBeschreibung(werkzeug) }
+                ) {
                     WerkzeugSymbol(werkzeug, Modifier.size(20.dp), if (aktiv) SymbolFarbe else SymbolFarbeSchwach)
                 }
             }
         }
 
         WerkzeugPille {
-            RundKnopfKlein(onClick = { state.seite.entfernenAusgewaehlteOderAlles() }) {
+            RundKnopfKlein(onClick = { state.seite.entfernenAusgewaehlteOderAlles() }, modifier = Modifier.semantics { contentDescription = "Papierkorb" }) {
                 AllgemeinSymbol(AllgemeinesSymbol.PAPIERKORB, Modifier.size(18.dp), SymbolFarbe)
             }
-            RundKnopfKlein(onClick = { state.seite.rueckgaengig() }, aktiviert = state.seite.kannRueckgaengig) {
+            RundKnopfKlein(
+                onClick = { state.seite.rueckgaengig() }, aktiviert = state.seite.kannRueckgaengig,
+                modifier = Modifier.semantics { contentDescription = "Rückgängig" }
+            ) {
                 AllgemeinSymbol(AllgemeinesSymbol.RUECKGAENGIG, Modifier.size(18.dp), if (state.seite.kannRueckgaengig) SymbolFarbe else SymbolFarbeSchwach)
             }
-            RundKnopfKlein(onClick = { state.seite.wiederholen() }, aktiviert = state.seite.kannWiederholen) {
+            RundKnopfKlein(
+                onClick = { state.seite.wiederholen() }, aktiviert = state.seite.kannWiederholen,
+                modifier = Modifier.semantics { contentDescription = "Wiederholen" }
+            ) {
                 AllgemeinSymbol(AllgemeinesSymbol.WIEDERHOLEN, Modifier.size(18.dp), if (state.seite.kannWiederholen) SymbolFarbe else SymbolFarbeSchwach)
             }
         }
 
-        RundKnopf(hintergrund = Color(0xFF262A26), onClick = { state.neueSeite() }) {
+        RundKnopf(
+            hintergrund = Color(0xFF262A26), onClick = { state.neueSeite() },
+            modifier = Modifier.semantics { contentDescription = "Seite hinzufügen" }
+        ) {
             AllgemeinSymbol(AllgemeinesSymbol.PLUS, Modifier.size(18.dp), Color.White)
         }
 
         WerkzeugPille {
-            RundKnopfKlein(onClick = { state.vorherigeSeite() }, aktiviert = state.aktiveSeite > 0) {
+            RundKnopfKlein(
+                onClick = { state.vorherigeSeite() }, aktiviert = state.aktiveSeite > 0,
+                modifier = Modifier.semantics { contentDescription = "Vorherige Seite" }
+            ) {
                 AllgemeinSymbol(AllgemeinesSymbol.PFEIL_LINKS, Modifier.size(16.dp), SymbolFarbe)
             }
             Text(
@@ -209,7 +236,10 @@ private fun HauptLeiste(state: TafelState, onSchliessen: () -> Unit, onMenu: () 
                 color = SymbolFarbe, fontSize = 14.sp,
                 modifier = Modifier.padding(horizontal = 4.dp)
             )
-            RundKnopfKlein(onClick = { state.naechsteSeite() }, aktiviert = state.aktiveSeite < state.seiten.lastIndex) {
+            RundKnopfKlein(
+                onClick = { state.naechsteSeite() }, aktiviert = state.aktiveSeite < state.seiten.lastIndex,
+                modifier = Modifier.semantics { contentDescription = "Nächste Seite" }
+            ) {
                 AllgemeinSymbol(AllgemeinesSymbol.PFEIL_RECHTS, Modifier.size(16.dp), SymbolFarbe)
             }
         }
@@ -231,9 +261,9 @@ private fun WerkzeugPille(inhalt: @Composable () -> Unit) {
 }
 
 @Composable
-private fun RundKnopf(hintergrund: Color, onClick: () -> Unit, inhalt: @Composable () -> Unit) {
+private fun RundKnopf(hintergrund: Color, onClick: () -> Unit, modifier: Modifier = Modifier, inhalt: @Composable () -> Unit) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .size(48.dp)
             .shadow(2.dp, CircleShape)
             .clip(CircleShape)
@@ -244,9 +274,9 @@ private fun RundKnopf(hintergrund: Color, onClick: () -> Unit, inhalt: @Composab
 }
 
 @Composable
-private fun RundKnopfKlein(onClick: () -> Unit, aktiviert: Boolean = true, inhalt: @Composable () -> Unit) {
+private fun RundKnopfKlein(onClick: () -> Unit, aktiviert: Boolean = true, modifier: Modifier = Modifier, inhalt: @Composable () -> Unit) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .size(38.dp)
             .clip(CircleShape)
             .then(if (aktiviert) Modifier.clickable(onClick = onClick) else Modifier),
@@ -255,9 +285,9 @@ private fun RundKnopfKlein(onClick: () -> Unit, aktiviert: Boolean = true, inhal
 }
 
 @Composable
-private fun AuswahlKnopf(ausgewaehlt: Boolean, onClick: () -> Unit, groesse: Dp = 40.dp, inhalt: @Composable () -> Unit) {
+private fun AuswahlKnopf(ausgewaehlt: Boolean, onClick: () -> Unit, groesse: Dp = 40.dp, modifier: Modifier = Modifier, inhalt: @Composable () -> Unit) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .size(groesse)
             .clip(CircleShape)
             .background(if (ausgewaehlt) LeistenAktiv else Color.Transparent)
