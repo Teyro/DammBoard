@@ -10,17 +10,24 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -28,10 +35,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import de.oejendorferdamm.dammboard.model.AnimationsModus
 import de.oejendorferdamm.dammboard.ui.canvas.TafelCanvas
@@ -108,6 +119,19 @@ fun TafelScreen(
                 .padding(top = 4.dp)
         )
 
+        // Immer sichtbar (unabhängig vom Werkzeugkasten-Panel) am rechten Bildschirmrand, wie im
+        // Original-Design: zeigt aktuelle/Gesamtzahl der Seiten und lässt sich zusätzlich durch
+        // vertikales Ziehen/Scrollen blättern.
+        SeitenNavigator(
+            aktuelleSeite = state.aktiveSeite,
+            seitenAnzahl = state.seiten.size,
+            aufVorherige = { state.vorherigeSeite() },
+            aufNaechste = { state.naechsteSeite() },
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 14.dp)
+        )
+
         // Bewusst abseits der Werkzeuggruppe, ganz unten links – damit man beim Arbeiten in der
         // Mitte/rechts nicht versehentlich die App beendet.
         Box(
@@ -141,6 +165,82 @@ fun TafelScreen(
                 TextButton(onClick = { zeigeBeendenDialog = false }) { Text("Abbrechen") }
             }
         )
+    }
+}
+
+private val SeitenFarbe = Color(0xFF2B2B28)
+private val SeitenFarbeSchwach = Color(0xFF8A8880)
+
+/** Ständig sichtbare Seitenanzeige am rechten Rand: Pfeile zum Blättern plus vertikales
+ *  Ziehen über die gesamte Fläche schaltet ebenfalls eine Seite weiter/zurück. */
+@Composable
+private fun SeitenNavigator(
+    aktuelleSeite: Int,
+    seitenAnzahl: Int,
+    aufVorherige: () -> Unit,
+    aufNaechste: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var zugSumme by remember { mutableFloatStateOf(0f) }
+    val schwelle = 56f
+
+    Column(
+        modifier = modifier
+            .shadow(3.dp, RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color.White)
+            .pointerInput(seitenAnzahl) {
+                detectVerticalDragGestures(
+                    onDragStart = { zugSumme = 0f },
+                    onVerticalDrag = { change, dragAmount ->
+                        change.consume()
+                        zugSumme += dragAmount
+                        while (zugSumme <= -schwelle) {
+                            aufNaechste()
+                            zugSumme += schwelle
+                        }
+                        while (zugSumme >= schwelle) {
+                            aufVorherige()
+                            zugSumme -= schwelle
+                        }
+                    },
+                    onDragEnd = { zugSumme = 0f },
+                    onDragCancel = { zugSumme = 0f }
+                )
+            }
+            .padding(vertical = 12.dp, horizontal = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(30.dp)
+                .clip(CircleShape)
+                .then(if (aktuelleSeite > 0) Modifier.clickable(onClick = aufVorherige) else Modifier),
+            contentAlignment = Alignment.Center
+        ) {
+            AllgemeinSymbol(
+                AllgemeinesSymbol.PFEIL_LINKS,
+                Modifier.size(16.dp).rotate(90f),
+                if (aktuelleSeite > 0) SeitenFarbe else SeitenFarbeSchwach
+            )
+        }
+        Text("${aktuelleSeite + 1}", color = SeitenFarbe, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Box(modifier = Modifier.width(16.dp).height(1.dp).background(SeitenFarbeSchwach))
+        Text("$seitenAnzahl", color = SeitenFarbeSchwach, fontSize = 13.sp)
+        Box(
+            modifier = Modifier
+                .size(30.dp)
+                .clip(CircleShape)
+                .then(if (aktuelleSeite < seitenAnzahl - 1) Modifier.clickable(onClick = aufNaechste) else Modifier),
+            contentAlignment = Alignment.Center
+        ) {
+            AllgemeinSymbol(
+                AllgemeinesSymbol.PFEIL_RECHTS,
+                Modifier.size(16.dp).rotate(90f),
+                if (aktuelleSeite < seitenAnzahl - 1) SeitenFarbe else SeitenFarbeSchwach
+            )
+        }
     }
 }
 

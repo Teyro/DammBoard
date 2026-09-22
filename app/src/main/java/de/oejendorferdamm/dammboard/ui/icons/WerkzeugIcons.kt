@@ -416,12 +416,14 @@ fun AllgemeinSymbol(symbol: AllgemeinesSymbol, modifier: Modifier = Modifier, ti
                 linie(Offset(w * 0.22f, h * 0.5f), Offset(w * 0.78f, h * 0.5f), tint, 2.8f)
             }
             AllgemeinesSymbol.PFEIL_LINKS -> {
-                linie(Offset(w * 0.62f, h * 0.22f), Offset(w * 0.34f, h * 0.5f), tint, 2.6f)
-                linie(Offset(w * 0.34f, h * 0.5f), Offset(w * 0.62f, h * 0.78f), tint, 2.6f)
+                linie(Offset(w * 0.78f, h * 0.5f), Offset(w * 0.26f, h * 0.5f), tint, 2.6f)
+                linie(Offset(w * 0.26f, h * 0.5f), Offset(w * 0.48f, h * 0.28f), tint, 2.6f)
+                linie(Offset(w * 0.26f, h * 0.5f), Offset(w * 0.48f, h * 0.72f), tint, 2.6f)
             }
             AllgemeinesSymbol.PFEIL_RECHTS -> {
-                linie(Offset(w * 0.38f, h * 0.22f), Offset(w * 0.66f, h * 0.5f), tint, 2.6f)
-                linie(Offset(w * 0.66f, h * 0.5f), Offset(w * 0.38f, h * 0.78f), tint, 2.6f)
+                linie(Offset(w * 0.22f, h * 0.5f), Offset(w * 0.74f, h * 0.5f), tint, 2.6f)
+                linie(Offset(w * 0.74f, h * 0.5f), Offset(w * 0.52f, h * 0.28f), tint, 2.6f)
+                linie(Offset(w * 0.74f, h * 0.5f), Offset(w * 0.52f, h * 0.72f), tint, 2.6f)
             }
         }
     }

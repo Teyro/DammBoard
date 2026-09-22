@@ -259,37 +259,43 @@ private fun HauptLeiste(
             AllgemeinSymbol(AllgemeinesSymbol.PLUS, Modifier.size(18.dp), Color.White)
         }
 
-        WerkzeugPille {
+        WerkzeugPille(abstand = 10.dp) {
             RundKnopfKlein(
                 onClick = { state.vorherigeSeite() }, aktiviert = state.aktiveSeite > 0,
                 modifier = Modifier.semantics { contentDescription = "Vorherige Seite" }
             ) {
-                AllgemeinSymbol(AllgemeinesSymbol.PFEIL_LINKS, Modifier.size(16.dp), SymbolFarbe)
+                AllgemeinSymbol(
+                    AllgemeinesSymbol.PFEIL_LINKS, Modifier.size(20.dp),
+                    if (state.aktiveSeite > 0) SymbolFarbe else SymbolFarbeSchwach
+                )
             }
             Text(
                 "${state.aktiveSeite + 1}/${state.seiten.size}",
-                color = SymbolFarbe, fontSize = 14.sp,
-                modifier = Modifier.padding(horizontal = 4.dp)
+                color = SymbolFarbe, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 6.dp)
             )
             RundKnopfKlein(
                 onClick = { state.naechsteSeite() }, aktiviert = state.aktiveSeite < state.seiten.lastIndex,
                 modifier = Modifier.semantics { contentDescription = "Nächste Seite" }
             ) {
-                AllgemeinSymbol(AllgemeinesSymbol.PFEIL_RECHTS, Modifier.size(16.dp), SymbolFarbe)
+                AllgemeinSymbol(
+                    AllgemeinesSymbol.PFEIL_RECHTS, Modifier.size(20.dp),
+                    if (state.aktiveSeite < state.seiten.lastIndex) SymbolFarbe else SymbolFarbeSchwach
+                )
             }
         }
     }
 }
 
 @Composable
-private fun WerkzeugPille(inhalt: @Composable () -> Unit) {
+private fun WerkzeugPille(abstand: Dp = 2.dp, inhalt: @Composable () -> Unit) {
     Row(
         modifier = Modifier
             .shadow(2.dp, RoundedCornerShape(50)).clip(RoundedCornerShape(50))
             .background(Color.White)
             .padding(horizontal = 6.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp)
+        horizontalArrangement = Arrangement.spacedBy(abstand)
     ) {
         inhalt()
     }
