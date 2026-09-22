@@ -415,15 +415,14 @@ fun AllgemeinSymbol(symbol: AllgemeinesSymbol, modifier: Modifier = Modifier, ti
                 linie(Offset(w * 0.5f, h * 0.22f), Offset(w * 0.5f, h * 0.78f), tint, 2.8f)
                 linie(Offset(w * 0.22f, h * 0.5f), Offset(w * 0.78f, h * 0.5f), tint, 2.8f)
             }
+            // Schlichter, kräftiger Chevron statt Pfeil-mit-Schaft – näher am Original.
             AllgemeinesSymbol.PFEIL_LINKS -> {
-                linie(Offset(w * 0.78f, h * 0.5f), Offset(w * 0.26f, h * 0.5f), tint, 2.6f)
-                linie(Offset(w * 0.26f, h * 0.5f), Offset(w * 0.48f, h * 0.28f), tint, 2.6f)
-                linie(Offset(w * 0.26f, h * 0.5f), Offset(w * 0.48f, h * 0.72f), tint, 2.6f)
+                linie(Offset(w * 0.64f, h * 0.24f), Offset(w * 0.36f, h * 0.5f), tint, 3f)
+                linie(Offset(w * 0.36f, h * 0.5f), Offset(w * 0.64f, h * 0.76f), tint, 3f)
             }
             AllgemeinesSymbol.PFEIL_RECHTS -> {
-                linie(Offset(w * 0.22f, h * 0.5f), Offset(w * 0.74f, h * 0.5f), tint, 2.6f)
-                linie(Offset(w * 0.74f, h * 0.5f), Offset(w * 0.52f, h * 0.28f), tint, 2.6f)
-                linie(Offset(w * 0.74f, h * 0.5f), Offset(w * 0.52f, h * 0.72f), tint, 2.6f)
+                linie(Offset(w * 0.36f, h * 0.24f), Offset(w * 0.64f, h * 0.5f), tint, 3f)
+                linie(Offset(w * 0.64f, h * 0.5f), Offset(w * 0.36f, h * 0.76f), tint, 3f)
             }
         }
     }

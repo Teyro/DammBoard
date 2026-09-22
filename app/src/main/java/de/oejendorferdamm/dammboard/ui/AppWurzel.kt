@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalContext
 import de.oejendorferdamm.dammboard.BuildConfig
 import de.oejendorferdamm.dammboard.data.EinstellungenSpeicher
@@ -21,6 +22,7 @@ import de.oejendorferdamm.dammboard.model.istNeuereVersion
 import de.oejendorferdamm.dammboard.ui.filemanager.DateiManagerScreen
 import de.oejendorferdamm.dammboard.ui.settings.EinstellungenScreen
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 
 private sealed interface Bildschirm {
@@ -44,9 +46,29 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
     val animationsModus by speicher.animationsModus.collectAsState(initial = AnimationsModus.NORMAL)
     val symbolGroesse by speicher.symbolGroesse.collectAsState(initial = SymbolGroesse.STANDARD)
     val autoUpdatePruefung by speicher.autoUpdatePruefung.collectAsState(initial = true)
+    val zeichenPraezision by speicher.zeichenPraezision.collectAsState(initial = 0.7f)
+    val hintergrundMerken by speicher.hintergrundMerken.collectAsState(initial = false)
+    val gespeicherterHintergrund by speicher.gespeicherterHintergrund.collectAsState(initial = null)
 
     val tafelState = rememberTafelState()
     var bildschirm by remember { mutableStateOf<Bildschirm>(Bildschirm.Brett) }
+
+    // Beim allerersten Laden der gespeicherten Werte (falls "Hintergrund merken" aktiv ist)
+    // einmalig den zuletzt genutzten Hintergrund übernehmen – danach merkt sich jede weitere
+    // Änderung automatisch selbst (siehe LaunchedEffect weiter unten).
+    var anfangsHintergrundGesetzt by remember { mutableStateOf(false) }
+    LaunchedEffect(hintergrundMerken, gespeicherterHintergrund) {
+        val stil = gespeicherterHintergrund
+        if (!anfangsHintergrundGesetzt && hintergrundMerken && stil != null) {
+            tafelState.seite.hintergrund.value = stil
+            anfangsHintergrundGesetzt = true
+        }
+    }
+    LaunchedEffect(Unit) {
+        snapshotFlow { tafelState.seite.hintergrund.value }
+            .drop(1)
+            .collect { stil -> if (hintergrundMerken) speicher.speichereHintergrund(stil) }
+    }
 
     // Automatisch (unauffällig, nur roter Punkt) oder manuell über den Knopf im
     // Einstellungsmenü – beides läuft über dieselbe Prüfung.
@@ -80,6 +102,7 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
             state = tafelState,
             animationsModus = animationsModus,
             symbolSkalierung = symbolGroesse.skalierung,
+            zeichenPraezision = zeichenPraezision,
             zeigeUpdatePunkt = updateInfo != null,
             onSchliessenApp = onAppSchliessen,
             onOeffneEinstellungen = { bildschirm = Bildschirm.Einstellungen },
@@ -94,11 +117,15 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
             autoUpdatePruefung = autoUpdatePruefung,
             updatePruefungLaeuft = updatePruefungLaeuft,
             updateBereitsAktuell = updateBereitsAktuell,
+            zeichenPraezision = zeichenPraezision,
+            hintergrundMerken = hintergrundMerken,
             onZugangSpeichern = { neu -> scope.launch { speicher.speichereIServZugang(neu) } },
             onModusGeaendert = { neu -> scope.launch { speicher.speichereAnimationsModus(neu) } },
             onSymbolGroesseGeaendert = { neu -> scope.launch { speicher.speichereSymbolGroesse(neu) } },
             onAutoUpdateGeaendert = { neu -> scope.launch { speicher.speichereAutoUpdatePruefung(neu) } },
             onUpdatePruefungAnfordern = { scope.launch { pruefeAufUpdate() } },
+            onZeichenPraezisionGeaendert = { neu -> scope.launch { speicher.speichereZeichenPraezision(neu) } },
+            onHintergrundMerkenGeaendert = { neu -> scope.launch { speicher.speichereHintergrundMerken(neu) } },
             onZurueck = { bildschirm = Bildschirm.Brett }
         )
         is Bildschirm.Dateimanager -> DateiManagerScreen(

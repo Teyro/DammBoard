@@ -86,11 +86,16 @@ private class EbenenCache {
 fun TafelCanvas(
     state: TafelState,
     modifier: Modifier = Modifier,
+    zeichenPraezision: Float = 0.7f,
     onAufnahme: (AufnahmeZweck, android.graphics.Bitmap) -> Unit
 ) {
     val seite = state.seite
     val dichte = LocalDensity.current
     val graphicsLayer = rememberGraphicsLayer()
+
+    // 0 = grob/performant (wenige Punkte, für alte Touch-Geräte), 1 = maximal fein (fast jede
+    // Berührungsprobe wird übernommen). Wirkt zusammen mit der Kurvenglättung in zeichneStrich.
+    val minPunktAbstandPx = 8f - 7.2f * zeichenPraezision.coerceIn(0f, 1f)
 
     // Ebene für alle "fertigen" Striche/Formen: wird nur neu gezeichnet, wenn sich der Inhalt
     // der Seite tatsächlich ändert (siehe Seite.versionsZaehler), nicht bei jedem Zeichen-Frame.
@@ -127,7 +132,8 @@ fun TafelCanvas(
         Modifier.pointerInput(
             state.werkzeug, seite, state.stiftArt, state.stiftFarbe, state.aktuelleStiftBreite,
             state.formTyp, state.formRandFarbe, state.formFuellFarbe, state.formRandBreite,
-            state.radiererGroesse, state.geometrieWerkzeug, state.geometrieGestrichelt, state.zeigeLaenge
+            state.radiererGroesse, state.geometrieWerkzeug, state.geometrieGestrichelt, state.zeigeLaenge,
+            minPunktAbstandPx
         ) {
             val brettGroesse = Size(size.width.toFloat(), size.height.toFloat())
             when (state.werkzeug) {
@@ -135,7 +141,11 @@ fun TafelCanvas(
                     onDragStart = { laufenderStrich = listOf(it) },
                     onDrag = { change, _ ->
                         change.consume()
-                        laufenderStrich = laufenderStrich.orEmpty() + change.position
+                        val bisherige = laufenderStrich.orEmpty()
+                        val letzterPunkt = bisherige.lastOrNull()
+                        if (letzterPunkt == null || (change.position - letzterPunkt).getDistance() >= minPunktAbstandPx) {
+                            laufenderStrich = bisherige + change.position
+                        }
                     },
                     onDragEnd = {
                         laufenderStrich?.let { punkte ->
@@ -669,17 +679,35 @@ private fun DrawScope.zeichneStrich(strich: StrichItem) {
         strich.punkte.firstOrNull()?.let { drawCircle(strich.farbe, radius = strich.breite / 2, center = it) }
         return
     }
-    val pfad = Path().apply {
-        moveTo(strich.punkte.first().x, strich.punkte.first().y)
-        for (i in 1 until strich.punkte.size) lineTo(strich.punkte[i].x, strich.punkte[i].y)
-    }
     drawPath(
-        pfad, strich.farbe,
+        glatterPfad(strich.punkte), strich.farbe,
         style = Stroke(
             width = strich.breite, cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round,
             pathEffect = if (strich.gestrichelt) gestricheltEffekt else null
         )
     )
+}
+
+/** Zieht statt roher Eck-zu-Eck-Linien eine quadratische Kurve durch die Mittelpunkte jedes
+ *  Punktpaares (Perry-Kaplan-Glättung) – dadurch wirken Freihandkreise & Rundungen als
+ *  durchgängige Bewegung statt als Polygon aus vielen kleinen Geraden, ganz ohne zusätzliche
+ *  Punkte einsammeln zu müssen. */
+private fun glatterPfad(punkte: List<Offset>): Path {
+    val pfad = Path()
+    pfad.moveTo(punkte.first().x, punkte.first().y)
+    if (punkte.size == 2) {
+        pfad.lineTo(punkte[1].x, punkte[1].y)
+        return pfad
+    }
+    for (i in 1 until punkte.size - 1) {
+        val aktuell = punkte[i]
+        val naechster = punkte[i + 1]
+        val mitte = Offset((aktuell.x + naechster.x) / 2f, (aktuell.y + naechster.y) / 2f)
+        pfad.quadraticTo(aktuell.x, aktuell.y, mitte.x, mitte.y)
+    }
+    val letzter = punkte.last()
+    pfad.lineTo(letzter.x, letzter.y)
+    return pfad
 }
 
 private fun DrawScope.zeichneMarkierung(item: BoardItem) {

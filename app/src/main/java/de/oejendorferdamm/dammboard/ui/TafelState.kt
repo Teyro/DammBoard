@@ -13,10 +13,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import de.oejendorferdamm.dammboard.model.FormTyp
 import de.oejendorferdamm.dammboard.model.GeometrieWerkzeug
+import de.oejendorferdamm.dammboard.model.HintergrundStil
 import de.oejendorferdamm.dammboard.model.KreidePalette
 import de.oejendorferdamm.dammboard.model.RadiererGroesse
 import de.oejendorferdamm.dammboard.model.Seite
 import de.oejendorferdamm.dammboard.model.StiftArt
+import de.oejendorferdamm.dammboard.model.TafelGruen
 import de.oejendorferdamm.dammboard.model.Werkzeug
 import java.util.concurrent.atomic.AtomicLong
 
@@ -30,19 +32,23 @@ class GeometrieFuehrung {
     var winkelGrad by mutableFloatStateOf(0f)
 }
 
-/** Hält den kompletten Bearbeitungszustand der Tafel-App: Seiten, aktives Werkzeug, Panel-Sichtbarkeit. */
-class TafelState {
-    val seiten: SnapshotStateList<Seite> = mutableStateListOf(Seite())
+/** Hält den kompletten Bearbeitungszustand der Tafel-App: Seiten, aktives Werkzeug, Panel-Sichtbarkeit.
+ *  [hintergrundStart] ist der Hintergrund, mit dem neue Seiten beginnen – standardmäßig das
+ *  bekannte Tafelgrün, kann aber (bei aktivierter Option „Letzten Hintergrund merken") der zuletzt
+ *  verwendete Hintergrund sein. */
+class TafelState(private val hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)) {
+    val seiten: SnapshotStateList<Seite> = mutableStateListOf(Seite(hintergrundStart))
     var aktiveSeite by mutableIntStateOf(0)
     val seite: Seite get() = seiten[aktiveSeite]
 
     var werkzeug by mutableStateOf(Werkzeug.STIFT)
     var offenesPanel by mutableStateOf<Werkzeug?>(null)
 
-    // Stift
+    // Stift – Standard: Weiß auf dem bekannten grünen Tafelhintergrund, etwas dickere Linie,
+    // damit man beim App-Start sofort gut lesbar schreiben kann.
     var stiftArt by mutableStateOf(StiftArt.FEIN)
-    var stiftFarbe by mutableStateOf(KreidePalette[2])
-    var stiftBreiteFein by mutableFloatStateOf(6f)
+    var stiftFarbe by mutableStateOf(KreidePalette[0])
+    var stiftBreiteFein by mutableFloatStateOf(8f)
     var stiftBreiteLeucht by mutableFloatStateOf(18f)
     val aktuelleStiftBreite: Float
         get() = if (stiftArt == StiftArt.FEIN) stiftBreiteFein else stiftBreiteLeucht
@@ -97,7 +103,7 @@ class TafelState {
     }
 
     fun neueSeite() {
-        seiten.add(Seite())
+        seiten.add(Seite(hintergrundStart))
         aktiveSeite = seiten.lastIndex
     }
 
@@ -111,4 +117,5 @@ class TafelState {
 }
 
 @Composable
-fun rememberTafelState(): TafelState = remember { TafelState() }
+fun rememberTafelState(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)): TafelState =
+    remember { TafelState(hintergrundStart) }

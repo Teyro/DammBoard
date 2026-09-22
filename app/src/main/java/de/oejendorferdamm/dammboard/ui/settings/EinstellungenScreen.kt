@@ -26,6 +26,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -75,11 +77,15 @@ fun EinstellungenScreen(
     autoUpdatePruefung: Boolean,
     updatePruefungLaeuft: Boolean,
     updateBereitsAktuell: Boolean,
+    zeichenPraezision: Float,
+    hintergrundMerken: Boolean,
     onZugangSpeichern: (IServZugang) -> Unit,
     onModusGeaendert: (AnimationsModus) -> Unit,
     onSymbolGroesseGeaendert: (SymbolGroesse) -> Unit,
     onAutoUpdateGeaendert: (Boolean) -> Unit,
     onUpdatePruefungAnfordern: () -> Unit,
+    onZeichenPraezisionGeaendert: (Float) -> Unit,
+    onHintergrundMerkenGeaendert: (Boolean) -> Unit,
     onZurueck: () -> Unit
 ) {
     var serverUrl by remember(aktuellerZugang) { mutableStateOf(aktuellerZugang.serverUrl) }
@@ -92,7 +98,7 @@ fun EinstellungenScreen(
             modifier = Modifier
                 .align(Alignment.Center)
                 .widthIn(max = 480.dp)
-                .heightIn(max = 720.dp)
+                .heightIn(max = 800.dp)
                 .clip(RoundedCornerShape(18.dp))
                 .background(Hintergrundfarbe)
                 .verticalScroll(rememberScrollState())
@@ -157,6 +163,14 @@ fun EinstellungenScreen(
                     onSymbolGroesseGeaendert(SymbolGroesse.GROSS)
                 }
             }
+
+            Spacer(Modifier.height(22.dp))
+            ErweiterteEinstellungen(
+                zeichenPraezision = zeichenPraezision,
+                hintergrundMerken = hintergrundMerken,
+                onZeichenPraezisionGeaendert = onZeichenPraezisionGeaendert,
+                onHintergrundMerkenGeaendert = onHintergrundMerkenGeaendert
+            )
 
             Spacer(Modifier.height(26.dp))
             Text("IServ-Speicher", color = Textfarbe, fontSize = 15.sp, fontWeight = FontWeight.Bold)
@@ -338,6 +352,54 @@ private fun UpdateAbschnitt(
                 Text("Du hast bereits die neueste Version.", color = TextfarbeSchwach, fontSize = 11.sp)
             }
         }
+    }
+}
+
+@Composable
+private fun ErweiterteEinstellungen(
+    zeichenPraezision: Float,
+    hintergrundMerken: Boolean,
+    onZeichenPraezisionGeaendert: (Float) -> Unit,
+    onHintergrundMerkenGeaendert: (Boolean) -> Unit
+) {
+    Text("Erweitert", color = Textfarbe, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+    Spacer(Modifier.height(4.dp))
+
+    Text("Zeichen-Genauigkeit", color = Textfarbe, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+    Text(
+        "Wie fein Freihandlinien erfasst werden. Weiter rechts = glattere Kurven und besser " +
+            "lesbare kleine Schrift, kostet aber mehr Leistung. Auf älteren Tafel-Geräten eher " +
+            "links lassen.",
+        color = TextfarbeSchwach, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp, bottom = 4.dp)
+    )
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Text("Performance", color = TextfarbeSchwach, fontSize = 10.sp)
+        Slider(
+            value = zeichenPraezision,
+            onValueChange = onZeichenPraezisionGeaendert,
+            valueRange = 0f..1f,
+            steps = 9,
+            colors = SliderDefaults.colors(thumbColor = Akzent, activeTrackColor = Akzent),
+            modifier = Modifier.weight(1f).padding(horizontal = 6.dp)
+        )
+        Text("Fein", color = TextfarbeSchwach, fontSize = 10.sp)
+    }
+
+    Spacer(Modifier.height(14.dp))
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+            Text("Letzten Hintergrund merken", color = Textfarbe, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                "Aus: jede neue Seite startet auf dem bekannten grünen Tafelhintergrund. An: der " +
+                    "zuletzt gewählte Hintergrund wird beim nächsten Start wiederverwendet.",
+                color = TextfarbeSchwach, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp)
+            )
+        }
+        Switch(
+            checked = hintergrundMerken,
+            onCheckedChange = onHintergrundMerkenGeaendert,
+            colors = SwitchDefaults.colors(checkedTrackColor = Akzent)
+        )
     }
 }
 

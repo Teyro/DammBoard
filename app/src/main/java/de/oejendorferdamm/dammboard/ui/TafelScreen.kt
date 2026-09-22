@@ -58,6 +58,7 @@ fun TafelScreen(
     state: TafelState,
     animationsModus: AnimationsModus,
     symbolSkalierung: Float,
+    zeichenPraezision: Float,
     zeigeUpdatePunkt: Boolean,
     onSchliessenApp: () -> Unit,
     onOeffneEinstellungen: () -> Unit,
@@ -97,7 +98,8 @@ fun TafelScreen(
     Box(modifier = modifier.fillMaxSize()) {
         TafelCanvas(
             state = state,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
+            zeichenPraezision = zeichenPraezision
         ) { zweck, bitmap ->
             when (zweck) {
                 AufnahmeZweck.SPEICHERN, AufnahmeZweck.TEILEN -> starteSpeicherung(zweck, bitmap)
