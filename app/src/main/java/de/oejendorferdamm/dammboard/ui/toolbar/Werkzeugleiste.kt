@@ -97,6 +97,7 @@ private val SymbolFarbeSchwach = Color(0xFF8A8880)
 fun TafelWerkzeugleiste(
     state: TafelState,
     animationsModus: AnimationsModus,
+    zeigeUpdatePunkt: Boolean,
     onSchliessen: () -> Unit,
     onMenu: () -> Unit,
     onTeilen: () -> Unit,
@@ -130,7 +131,7 @@ fun TafelWerkzeugleiste(
                 }
             }
         }
-        HauptLeiste(state, onSchliessen, onMenu, onTeilen)
+        HauptLeiste(state, zeigeUpdatePunkt, onSchliessen, onMenu, onTeilen)
     }
 }
 
@@ -169,7 +170,13 @@ private fun PopupRahmen(inhalt: @Composable () -> Unit) {
 }
 
 @Composable
-private fun HauptLeiste(state: TafelState, onSchliessen: () -> Unit, onMenu: () -> Unit, onTeilen: () -> Unit) {
+private fun HauptLeiste(
+    state: TafelState,
+    zeigeUpdatePunkt: Boolean,
+    onSchliessen: () -> Unit,
+    onMenu: () -> Unit,
+    onTeilen: () -> Unit
+) {
     Row(
         modifier = Modifier.padding(bottom = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -179,7 +186,19 @@ private fun HauptLeiste(state: TafelState, onSchliessen: () -> Unit, onMenu: () 
             AllgemeinSymbol(AllgemeinesSymbol.SCHLIESSEN, Modifier.size(18.dp), Color(0xFFE0402E))
         }
         RundKnopf(hintergrund = Color.White, onClick = onMenu, modifier = Modifier.semantics { contentDescription = "Menü" }) {
-            AllgemeinSymbol(AllgemeinesSymbol.MENUE, Modifier.size(18.dp), SymbolFarbe)
+            Box {
+                AllgemeinSymbol(AllgemeinesSymbol.MENUE, Modifier.size(18.dp), SymbolFarbe)
+                if (zeigeUpdatePunkt) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .offset(x = 4.dp, y = (-2).dp)
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFE0402E))
+                    )
+                }
+            }
         }
         RundKnopf(hintergrund = Color.White, onClick = onTeilen, modifier = Modifier.semantics { contentDescription = "Teilen" }) {
             AllgemeinSymbol(AllgemeinesSymbol.TEILEN, Modifier.size(18.dp), SymbolFarbe)

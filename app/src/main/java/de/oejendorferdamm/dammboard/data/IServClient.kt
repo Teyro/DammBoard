@@ -6,7 +6,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Credentials
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.w3c.dom.Element
@@ -23,7 +22,7 @@ private const val PROPFIND_KOERPER = """<?xml version="1.0" encoding="utf-8"?>
 /** Einfacher WebDAV-Client für den IServ-Dateispeicher: Ordner auflisten und Dateien hochladen. */
 class IServClient(private val zugang: IServZugang) {
 
-    private val client = OkHttpClient()
+    private val client = NetzwerkClient.instance
 
     private fun basisPfad(): String {
         val ohneSchema = zugang.serverUrl.substringAfter("://")

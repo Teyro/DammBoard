@@ -34,6 +34,7 @@ import kotlinx.coroutines.launch
 fun TafelScreen(
     state: TafelState,
     animationsModus: AnimationsModus,
+    zeigeUpdatePunkt: Boolean,
     onSchliessenApp: () -> Unit,
     onOeffneEinstellungen: () -> Unit,
     onIServAnfrage: (Bitmap) -> Unit,
@@ -82,6 +83,7 @@ fun TafelScreen(
         TafelWerkzeugleiste(
             state = state,
             animationsModus = animationsModus,
+            zeigeUpdatePunkt = zeigeUpdatePunkt,
             onSchliessen = onSchliessenApp,
             onMenu = onOeffneEinstellungen,
             onTeilen = { state.aufnahmeAnfrage = AufnahmeZweck.TEILEN },

@@ -12,14 +12,32 @@ android {
         applicationId = "de.oejendorferdamm.dammboard"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "0.3.1"
+        versionCode = 4
+        versionName = "0.3.2"
+    }
+
+    // Wird nur in CI über Umgebungsvariablen gesetzt (siehe .github/workflows/release.yml);
+    // lokal/im normalen Debug-Build bleibt der Release-Build dadurch einfach unsigniert.
+    val releaseKeystorePfad = System.getenv("RELEASE_KEYSTORE_PATH")
+    signingConfigs {
+        if (releaseKeystorePfad != null) {
+            create("release") {
+                storeFile = file(releaseKeystorePfad)
+                storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("RELEASE_KEY_ALIAS")
+                keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+                storeType = "PKCS12"
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (releaseKeystorePfad != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
@@ -34,6 +52,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

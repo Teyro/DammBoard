@@ -1,7 +1,10 @@
 package de.oejendorferdamm.dammboard.model
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -125,6 +128,14 @@ class Seite(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)) {
     val hintergrund = mutableStateOf(hintergrundStart)
     val geteilteAnsicht = mutableStateOf(false)
 
+    /**
+     * Zählt jede inhaltliche Änderung an [items]. Die Zeichenfläche nutzt das, um fertige
+     * Striche/Formen in einer Ebene zwischenzuspeichern, statt sie bei jedem Zeichen-Frame neu
+     * zu rendern (siehe TafelCanvas.kt) – wichtig für die Performance bei vielen Strichen.
+     */
+    var versionsZaehler by mutableIntStateOf(0)
+        private set
+
     private val rueckgaengigStapel = mutableStateListOf<Aktion>()
     private val wiederholenStapel = mutableStateListOf<Aktion>()
     private val ausstehendRadiert = mutableListOf<BoardItem>()
@@ -142,6 +153,7 @@ class Seite(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)) {
         if (treffer.isEmpty()) return
         items.removeAll(treffer)
         ausstehendRadiert.addAll(treffer)
+        versionsZaehler++
     }
 
     fun radierenAbschliessen() {
@@ -155,6 +167,7 @@ class Seite(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)) {
         items.add(item)
         rueckgaengigStapel.add(Hinzugefuegt(listOf(item)))
         wiederholenStapel.clear()
+        versionsZaehler++
     }
 
     fun allesLoeschen() {
@@ -164,6 +177,7 @@ class Seite(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)) {
         ausgewaehlteIds.clear()
         rueckgaengigStapel.add(Entfernt(alle))
         wiederholenStapel.clear()
+        versionsZaehler++
     }
 
     fun entfernenAusgewaehlteOderAlles() {
@@ -177,6 +191,7 @@ class Seite(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)) {
         ausgewaehlteIds.clear()
         rueckgaengigStapel.add(Entfernt(zielItems))
         wiederholenStapel.clear()
+        versionsZaehler++
     }
 
     fun rueckgaengig() {
@@ -191,6 +206,7 @@ class Seite(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)) {
                 wiederholenStapel.add(aktion)
             }
         }
+        versionsZaehler++
     }
 
     fun wiederholen() {
@@ -205,6 +221,7 @@ class Seite(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)) {
                 rueckgaengigStapel.add(aktion)
             }
         }
+        versionsZaehler++
     }
 
     fun verschiebeAusgewaehlte(delta: Offset) {
@@ -218,5 +235,6 @@ class Seite(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)) {
                 is LaengenEtikett -> item.copy(position = item.position + delta)
             }
         }
+        versionsZaehler++
     }
 }

@@ -71,6 +71,14 @@ private fun mitte(a: Offset, b: Offset) = Offset((a.x + b.x) / 2, (a.y + b.y) / 
 
 private fun pxNachCm(px: Float, density: Density): Float = px / density.density / 160f * 2.54f
 
+/** Reiner Merker (kein Compose-State) für den letzten Stand der eingebrannten Ebene. */
+private class EbenenCache {
+    var seiteHash = 0
+    var version = -1
+    var breite = -1
+    var hoehe = -1
+}
+
 /** Zeichenfläche der Tafel: Rendering aller Seiteninhalte plus vollständige Gesten-Steuerung pro Werkzeug. */
 @Composable
 fun TafelCanvas(
@@ -81,6 +89,12 @@ fun TafelCanvas(
     val seite = state.seite
     val dichte = LocalDensity.current
     val graphicsLayer = rememberGraphicsLayer()
+
+    // Ebene für alle "fertigen" Striche/Formen: wird nur neu gezeichnet, wenn sich der Inhalt
+    // der Seite tatsächlich ändert (siehe Seite.versionsZaehler), nicht bei jedem Zeichen-Frame.
+    // Das hält das Zeichnen auch bei vielen angesammelten Strichen flüssig.
+    val eingebrannteEbene = rememberGraphicsLayer()
+    val ebenenCache = remember { EbenenCache() }
 
     LaunchedEffect(state.aufnahmeAnfrage) {
         val zweck = state.aufnahmeAnfrage ?: return@LaunchedEffect
@@ -342,22 +356,40 @@ fun TafelCanvas(
             .then(gesteModifier)
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val hintergrund = seite.hintergrund.value
-            drawRect(color = hintergrund.farbe)
-            zeichneMuster(hintergrund.muster, hintergrund.farbe)
+            // Immer gelesen (auch wenn der Cache noch gültig ist): hält die Draw-Phase an
+            // Änderungen von seite.items abonniert, damit ein neuer Strich zuverlässig ein
+            // Neuzeichnen auslöst, ohne dass dafür jeder Frame den ganzen Inhalt neu aufbaut.
+            val version = seite.versionsZaehler
+            val seiteHash = System.identityHashCode(seite)
+            val breitePx = size.width.toInt()
+            val hoehePx = size.height.toInt()
 
-            if (seite.geteilteAnsicht.value) {
-                drawLine(
-                    color = Color.White.copy(alpha = 0.35f),
-                    start = Offset(size.width / 2, 0f), end = Offset(size.width / 2, size.height),
-                    strokeWidth = 2f, pathEffect = gestricheltEffekt
-                )
+            if (ebenenCache.seiteHash != seiteHash || ebenenCache.version != version ||
+                ebenenCache.breite != breitePx || ebenenCache.hoehe != hoehePx
+            ) {
+                val hintergrund = seite.hintergrund.value
+                eingebrannteEbene.record {
+                    drawRect(color = hintergrund.farbe)
+                    zeichneMuster(hintergrund.muster, hintergrund.farbe)
+                    if (seite.geteilteAnsicht.value) {
+                        drawLine(
+                            color = Color.White.copy(alpha = 0.35f),
+                            start = Offset(this.size.width / 2, 0f), end = Offset(this.size.width / 2, this.size.height),
+                            strokeWidth = 2f, pathEffect = gestricheltEffekt
+                        )
+                    }
+                    seite.items.forEach { item -> zeichneItem(item) }
+                }
+                ebenenCache.seiteHash = seiteHash
+                ebenenCache.version = version
+                ebenenCache.breite = breitePx
+                ebenenCache.hoehe = hoehePx
             }
+            drawLayer(eingebrannteEbene)
 
-            seite.items.forEach { item -> zeichneItem(item) }
-
-            seite.ausgewaehlteIds.forEach { id ->
-                seite.items.firstOrNull { it.id == id }?.let { item -> zeichneMarkierung(item) }
+            if (seite.ausgewaehlteIds.isNotEmpty()) {
+                val ausgewaehltSet = seite.ausgewaehlteIds.toHashSet()
+                seite.items.forEach { item -> if (item.id in ausgewaehltSet) zeichneMarkierung(item) }
             }
 
             laufenderStrich?.let { punkte ->

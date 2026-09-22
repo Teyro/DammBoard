@@ -1,0 +1,68 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 17 einrichten
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Gradle cachen
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Release-Keystore entschlüsseln
+        run: echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > app/release-keystore.p12
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+
+      - name: Signierte Release-APK bauen
+        run: ./gradlew assembleRelease
+        env:
+          RELEASE_KEYSTORE_PATH: release-keystore.p12
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+
+      - name: Keystore-Kopie wieder entfernen
+        if: always()
+        run: rm -f app/release-keystore.p12
+
+      - name: Version ermitteln
+        id: version
+        run: |
+          VERSION=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: APK für die Veröffentlichung umbenennen
+        run: |
+          APK=$(find app/build/outputs/apk/release -name "*.apk" | head -n1)
+          cp "$APK" DammBoard.apk
+
+      - name: GitHub-Release veröffentlichen (oder aktualisieren)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          NOTIZEN=$(git log -1 --pretty=%B)
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" DammBoard.apk --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$TAG" DammBoard.apk \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "DammBoard $VERSION" \
+              --notes "$NOTIZEN"
+          fi
