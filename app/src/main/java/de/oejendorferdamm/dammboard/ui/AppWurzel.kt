@@ -29,7 +29,7 @@ private sealed interface Bildschirm {
     data class Dateimanager(val bild: Bitmap) : Bildschirm
 }
 
-/** Wie lange nach dem App-Start die Update-Prüfung im Hintergrund läuft. */
+/** Wie lange nach dem App-Start die automatische Update-Prüfung im Hintergrund läuft. */
 private const val UPDATE_PRUEFUNG_VERZOEGERUNG_MS = 10_000L
 
 /** Wurzel der App: schaltet zwischen Tafel, Einstellungen und IServ-Dateimanager um und hält die geteilten Zustände. */
@@ -43,19 +43,35 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
     val iservZugang by speicher.iservZugang.collectAsState(initial = IServZugang())
     val animationsModus by speicher.animationsModus.collectAsState(initial = AnimationsModus.NORMAL)
     val symbolGroesse by speicher.symbolGroesse.collectAsState(initial = SymbolGroesse.STANDARD)
+    val autoUpdatePruefung by speicher.autoUpdatePruefung.collectAsState(initial = true)
 
     val tafelState = rememberTafelState()
     var bildschirm by remember { mutableStateOf<Bildschirm>(Bildschirm.Brett) }
 
-    // Läuft einmal pro App-Start im Hintergrund; das Ergebnis zeigt sich nur als kleiner roter
-    // Punkt am Einstellungen-Symbol, nie als Dialog – man kann ungestört weiterarbeiten.
+    // Automatisch (unauffällig, nur roter Punkt) oder manuell über den Knopf im
+    // Einstellungsmenü – beides läuft über dieselbe Prüfung.
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
-    LaunchedEffect(Unit) {
-        delay(UPDATE_PRUEFUNG_VERZOEGERUNG_MS)
-        updateClient.neuesteVersionAbrufen().onSuccess { info ->
-            if (istNeuereVersion(BuildConfig.VERSION_NAME, info.version)) {
-                updateInfo = info
+    var updatePruefungLaeuft by remember { mutableStateOf(false) }
+    var updateBereitsAktuell by remember { mutableStateOf(false) }
+
+    suspend fun pruefeAufUpdate() {
+        updatePruefungLaeuft = true
+        updateBereitsAktuell = false
+        updateClient.neuesteVersionAbrufen()
+            .onSuccess { info ->
+                if (istNeuereVersion(BuildConfig.VERSION_NAME, info.version)) {
+                    updateInfo = info
+                } else {
+                    updateBereitsAktuell = true
+                }
             }
+        updatePruefungLaeuft = false
+    }
+
+    LaunchedEffect(autoUpdatePruefung) {
+        if (autoUpdatePruefung) {
+            delay(UPDATE_PRUEFUNG_VERZOEGERUNG_MS)
+            pruefeAufUpdate()
         }
     }
 
@@ -75,9 +91,14 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
             aktuelleSymbolGroesse = symbolGroesse,
             aktuelleVersion = BuildConfig.VERSION_NAME,
             updateInfo = updateInfo,
+            autoUpdatePruefung = autoUpdatePruefung,
+            updatePruefungLaeuft = updatePruefungLaeuft,
+            updateBereitsAktuell = updateBereitsAktuell,
             onZugangSpeichern = { neu -> scope.launch { speicher.speichereIServZugang(neu) } },
             onModusGeaendert = { neu -> scope.launch { speicher.speichereAnimationsModus(neu) } },
             onSymbolGroesseGeaendert = { neu -> scope.launch { speicher.speichereSymbolGroesse(neu) } },
+            onAutoUpdateGeaendert = { neu -> scope.launch { speicher.speichereAutoUpdatePruefung(neu) } },
+            onUpdatePruefungAnfordern = { scope.launch { pruefeAufUpdate() } },
             onZurueck = { bildschirm = Bildschirm.Brett }
         )
         is Bildschirm.Dateimanager -> DateiManagerScreen(

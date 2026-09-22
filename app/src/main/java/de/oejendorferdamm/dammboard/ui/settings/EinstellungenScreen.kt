@@ -26,6 +26,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -62,7 +64,7 @@ private val TextfarbeSchwach = Color(0xFF8A8880)
 private val Akzent = Color(0xFF3A5C4A)
 private val Fehlerfarbe = Color(0xFFB3261E)
 
-/** Einstellungsmenü: IServ-Zugangsdaten, Darstellungsmodus und – falls vorhanden – ein Update-Hinweis. */
+/** Einstellungsmenü: Version/Updates, Darstellung, Symbolgröße und ganz unten IServ-Zugangsdaten. */
 @Composable
 fun EinstellungenScreen(
     aktuellerZugang: IServZugang,
@@ -70,9 +72,14 @@ fun EinstellungenScreen(
     aktuelleSymbolGroesse: SymbolGroesse,
     aktuelleVersion: String,
     updateInfo: UpdateInfo?,
+    autoUpdatePruefung: Boolean,
+    updatePruefungLaeuft: Boolean,
+    updateBereitsAktuell: Boolean,
     onZugangSpeichern: (IServZugang) -> Unit,
     onModusGeaendert: (AnimationsModus) -> Unit,
     onSymbolGroesseGeaendert: (SymbolGroesse) -> Unit,
+    onAutoUpdateGeaendert: (Boolean) -> Unit,
+    onUpdatePruefungAnfordern: () -> Unit,
     onZurueck: () -> Unit
 ) {
     var serverUrl by remember(aktuellerZugang) { mutableStateOf(aktuellerZugang.serverUrl) }
@@ -85,7 +92,7 @@ fun EinstellungenScreen(
             modifier = Modifier
                 .align(Alignment.Center)
                 .widthIn(max = 480.dp)
-                .heightIn(max = 640.dp)
+                .heightIn(max = 720.dp)
                 .clip(RoundedCornerShape(18.dp))
                 .background(Hintergrundfarbe)
                 .verticalScroll(rememberScrollState())
@@ -101,12 +108,57 @@ fun EinstellungenScreen(
                 }
             }
 
-            if (updateInfo != null) {
-                Spacer(Modifier.height(18.dp))
-                UpdateAbschnitt(aktuelleVersion = aktuelleVersion, info = updateInfo)
+            Spacer(Modifier.height(18.dp))
+            UpdateAbschnitt(
+                aktuelleVersion = aktuelleVersion,
+                info = updateInfo,
+                autoPruefung = autoUpdatePruefung,
+                pruefungLaeuft = updatePruefungLaeuft,
+                bereitsAktuell = updateBereitsAktuell,
+                onAutoGeaendert = onAutoUpdateGeaendert,
+                onJetztPruefen = onUpdatePruefungAnfordern
+            )
+
+            Spacer(Modifier.height(24.dp))
+            Text("Darstellung", color = Textfarbe, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Text(
+                "Normalmodus mit sanften Übergängen, oder Performance-Modus ganz ohne Animationen.",
+                color = TextfarbeSchwach, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(Color.White),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                ModusKnopf("Normal", ausgewaehlt = aktuellerModus == AnimationsModus.NORMAL, modifier = Modifier.weight(1f)) {
+                    onModusGeaendert(AnimationsModus.NORMAL)
+                }
+                ModusKnopf("Performance", ausgewaehlt = aktuellerModus == AnimationsModus.PERFORMANCE, modifier = Modifier.weight(1f)) {
+                    onModusGeaendert(AnimationsModus.PERFORMANCE)
+                }
             }
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(22.dp))
+            Text("Symbolgröße", color = Textfarbe, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Text(
+                "Größe der Werkzeugleisten-Symbole – wirkt sich auch auf die Tippflächen aus.",
+                color = TextfarbeSchwach, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(Color.White),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                ModusKnopf("Kompakt", ausgewaehlt = aktuelleSymbolGroesse == SymbolGroesse.KOMPAKT, modifier = Modifier.weight(1f)) {
+                    onSymbolGroesseGeaendert(SymbolGroesse.KOMPAKT)
+                }
+                ModusKnopf("Standard", ausgewaehlt = aktuelleSymbolGroesse == SymbolGroesse.STANDARD, modifier = Modifier.weight(1f)) {
+                    onSymbolGroesseGeaendert(SymbolGroesse.STANDARD)
+                }
+                ModusKnopf("Groß", ausgewaehlt = aktuelleSymbolGroesse == SymbolGroesse.GROSS, modifier = Modifier.weight(1f)) {
+                    onSymbolGroesseGeaendert(SymbolGroesse.GROSS)
+                }
+            }
+
+            Spacer(Modifier.height(26.dp))
             Text("IServ-Speicher", color = Textfarbe, fontSize = 15.sp, fontWeight = FontWeight.Bold)
             Text(
                 "Web-Adresse deines IServ-WebDAV-Speichers, z. B. https://schule.example.de/iserv/webdav",
@@ -165,45 +217,6 @@ fun EinstellungenScreen(
                 Text("IServ-Zugang speichern")
             }
 
-            Spacer(Modifier.height(26.dp))
-            Text("Darstellung", color = Textfarbe, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-            Text(
-                "Normalmodus mit sanften Übergängen, oder Performance-Modus ganz ohne Animationen.",
-                color = TextfarbeSchwach, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(Color.White),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                ModusKnopf("Normal", ausgewaehlt = aktuellerModus == AnimationsModus.NORMAL, modifier = Modifier.weight(1f)) {
-                    onModusGeaendert(AnimationsModus.NORMAL)
-                }
-                ModusKnopf("Performance", ausgewaehlt = aktuellerModus == AnimationsModus.PERFORMANCE, modifier = Modifier.weight(1f)) {
-                    onModusGeaendert(AnimationsModus.PERFORMANCE)
-                }
-            }
-
-            Spacer(Modifier.height(22.dp))
-            Text("Symbolgröße", color = Textfarbe, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-            Text(
-                "Größe der Werkzeugleisten-Symbole – wirkt sich auch auf die Tippflächen aus.",
-                color = TextfarbeSchwach, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(Color.White),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                ModusKnopf("Kompakt", ausgewaehlt = aktuelleSymbolGroesse == SymbolGroesse.KOMPAKT, modifier = Modifier.weight(1f)) {
-                    onSymbolGroesseGeaendert(SymbolGroesse.KOMPAKT)
-                }
-                ModusKnopf("Standard", ausgewaehlt = aktuelleSymbolGroesse == SymbolGroesse.STANDARD, modifier = Modifier.weight(1f)) {
-                    onSymbolGroesseGeaendert(SymbolGroesse.STANDARD)
-                }
-                ModusKnopf("Groß", ausgewaehlt = aktuelleSymbolGroesse == SymbolGroesse.GROSS, modifier = Modifier.weight(1f)) {
-                    onSymbolGroesseGeaendert(SymbolGroesse.GROSS)
-                }
-            }
-
             Spacer(Modifier.height(18.dp))
             Text("DammBoard $aktuelleVersion", color = TextfarbeSchwach, fontSize = 11.sp)
         }
@@ -211,7 +224,15 @@ fun EinstellungenScreen(
 }
 
 @Composable
-private fun UpdateAbschnitt(aktuelleVersion: String, info: UpdateInfo) {
+private fun UpdateAbschnitt(
+    aktuelleVersion: String,
+    info: UpdateInfo?,
+    autoPruefung: Boolean,
+    pruefungLaeuft: Boolean,
+    bereitsAktuell: Boolean,
+    onAutoGeaendert: (Boolean) -> Unit,
+    onJetztPruefen: () -> Unit
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val client = remember { UpdateClient() }
@@ -219,7 +240,7 @@ private fun UpdateAbschnitt(aktuelleVersion: String, info: UpdateInfo) {
     var fortschritt by remember { mutableStateOf(0f) }
     var fehler by remember { mutableStateOf<String?>(null) }
 
-    fun starteHerunterladen() {
+    fun starteHerunterladen(zielInfo: UpdateInfo) {
         if (!kannUnbekannteQuellenInstallieren(context)) {
             Toast.makeText(context, "Bitte DammBoard die Installationserlaubnis erteilen und danach erneut versuchen", Toast.LENGTH_LONG).show()
             oeffneUnbekannteQuellenEinstellungen(context)
@@ -229,7 +250,7 @@ private fun UpdateAbschnitt(aktuelleVersion: String, info: UpdateInfo) {
         fehler = null
         scope.launch {
             val ziel = File(context.cacheDir, "dammboard-update.apk")
-            val ergebnis = client.apkHerunterladen(info.herunterladenUrl, ziel) { fortschritt = it }
+            val ergebnis = client.apkHerunterladen(zielInfo.herunterladenUrl, ziel) { fortschritt = it }
             ladend = false
             ergebnis.onSuccess {
                 context.startActivity(installationsIntentFuer(context, it))
@@ -243,36 +264,79 @@ private fun UpdateAbschnitt(aktuelleVersion: String, info: UpdateInfo) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(Akzent)
+            .background(if (info != null) Akzent else Color.White)
             .padding(16.dp)
     ) {
-        Text("Update verfügbar: Version ${info.version}", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-        Text("Installiert: $aktuelleVersion", color = Color(0xFFD7DFD4), fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
-        if (info.changelog.isNotBlank()) {
+        val textFarbe = if (info != null) Color.White else Textfarbe
+        val subFarbe = if (info != null) Color(0xFFD7DFD4) else TextfarbeSchwach
+
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+            Text("Version & Updates", color = textFarbe, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        }
+        Text("Installiert: $aktuelleVersion", color = subFarbe, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp, bottom = 10.dp))
+
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text(
-                info.changelog.trim(),
-                color = Color(0xFFE9EEE7), fontSize = 11.sp,
-                modifier = Modifier.heightIn(max = 90.dp).verticalScroll(rememberScrollState())
+                "Automatisch nach dem Start prüfen",
+                color = textFarbe, fontSize = 12.sp,
+                modifier = Modifier.weight(1f)
             )
-            Spacer(Modifier.height(10.dp))
+            Switch(
+                checked = autoPruefung,
+                onCheckedChange = onAutoGeaendert,
+                colors = SwitchDefaults.colors(checkedTrackColor = if (info != null) Color.White else Akzent)
+            )
         }
-        Button(
-            onClick = { starteHerunterladen() },
-            enabled = !ladend,
-            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Akzent),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            if (ladend) {
-                CircularProgressIndicator(color = Akzent, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Lädt … ${(fortschritt * 100).toInt()}%")
-            } else {
-                Text("Jetzt aktualisieren")
+        Spacer(Modifier.height(10.dp))
+
+        if (info != null) {
+            Text("Neue Version verfügbar: ${info.version}", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            if (info.changelog.isNotBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    info.changelog.trim(),
+                    color = Color(0xFFE9EEE7), fontSize = 11.sp,
+                    modifier = Modifier.heightIn(max = 90.dp).verticalScroll(rememberScrollState())
+                )
             }
-        }
-        fehler?.let {
-            Spacer(Modifier.height(8.dp))
-            Text(it, color = Color.White, fontSize = 11.sp)
+            Spacer(Modifier.height(10.dp))
+            Button(
+                onClick = { starteHerunterladen(info) },
+                enabled = !ladend,
+                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Akzent),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (ladend) {
+                    CircularProgressIndicator(color = Akzent, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Lädt … ${(fortschritt * 100).toInt()}%")
+                } else {
+                    Text("Jetzt aktualisieren")
+                }
+            }
+            fehler?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(it, color = Color.White, fontSize = 11.sp)
+            }
+        } else {
+            Button(
+                onClick = onJetztPruefen,
+                enabled = !pruefungLaeuft,
+                colors = ButtonDefaults.buttonColors(containerColor = Akzent),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (pruefungLaeuft) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Prüft …")
+                } else {
+                    Text("Jetzt nach Updates suchen")
+                }
+            }
+            if (bereitsAktuell && !pruefungLaeuft) {
+                Spacer(Modifier.height(8.dp))
+                Text("Du hast bereits die neueste Version.", color = TextfarbeSchwach, fontSize = 11.sp)
+            }
         }
     }
 }

@@ -1,6 +1,7 @@
 package de.oejendorferdamm.dammboard.data
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -18,6 +19,7 @@ private object Schluessel {
     val PASSWORT = stringPreferencesKey("iserv_passwort")
     val ANIMATIONSMODUS = stringPreferencesKey("animationsmodus")
     val SYMBOLGROESSE = stringPreferencesKey("symbolgroesse")
+    val AUTO_UPDATE_PRUEFUNG = booleanPreferencesKey("auto_update_pruefung")
 }
 
 /**
@@ -63,6 +65,18 @@ class EinstellungenSpeicher(private val context: Context) {
     suspend fun speichereSymbolGroesse(groesse: SymbolGroesse) {
         context.einstellungenDataStore.edit { prefs ->
             prefs[Schluessel.SYMBOLGROESSE] = groesse.name
+        }
+    }
+
+    /** Ob ca. 10 Sekunden nach dem App-Start automatisch (unauffällig, nur roter Punkt) auf
+     *  Updates geprüft wird. Manuell prüfen geht im Einstellungsmenü immer, unabhängig davon. */
+    val autoUpdatePruefung: Flow<Boolean> = context.einstellungenDataStore.data.map { prefs ->
+        prefs[Schluessel.AUTO_UPDATE_PRUEFUNG] ?: true
+    }
+
+    suspend fun speichereAutoUpdatePruefung(aktiv: Boolean) {
+        context.einstellungenDataStore.edit { prefs ->
+            prefs[Schluessel.AUTO_UPDATE_PRUEFUNG] = aktiv
         }
     }
 }

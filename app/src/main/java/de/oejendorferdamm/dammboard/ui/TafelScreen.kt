@@ -8,10 +8,17 @@ import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -20,11 +27,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import de.oejendorferdamm.dammboard.model.AnimationsModus
 import de.oejendorferdamm.dammboard.ui.canvas.TafelCanvas
+import de.oejendorferdamm.dammboard.ui.icons.AllgemeinSymbol
+import de.oejendorferdamm.dammboard.ui.icons.AllgemeinesSymbol
 import de.oejendorferdamm.dammboard.ui.toolbar.TafelWerkzeugleiste
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -43,6 +55,7 @@ fun TafelScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var zeigeBeendenDialog by remember { mutableStateOf(false) }
 
     // Nur auf Android 9 und älter gebraucht: ab Android 10 übernimmt Scoped Storage das Speichern
     // ohne Berechtigungsdialog (siehe speichereBildUndGibUriZurueck in Speichern.kt).
@@ -86,7 +99,6 @@ fun TafelScreen(
             animationsModus = animationsModus,
             symbolSkalierung = symbolSkalierung,
             zeigeUpdatePunkt = zeigeUpdatePunkt,
-            onSchliessen = onSchliessenApp,
             onMenu = onOeffneEinstellungen,
             onTeilen = { state.aufnahmeAnfrage = AufnahmeZweck.TEILEN },
             onIServ = { state.aufnahmeAnfrage = AufnahmeZweck.ISERV },
@@ -94,6 +106,40 @@ fun TafelScreen(
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
                 .padding(top = 4.dp)
+        )
+
+        // Bewusst abseits der Werkzeuggruppe, ganz unten links – damit man beim Arbeiten in der
+        // Mitte/rechts nicht versehentlich die App beendet.
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .navigationBarsPadding()
+                .padding(start = 16.dp, bottom = 14.dp)
+                .size(40.dp)
+                .shadow(2.dp, CircleShape)
+                .clip(CircleShape)
+                .background(Color.White)
+                .clickable { zeigeBeendenDialog = true },
+            contentAlignment = Alignment.Center
+        ) {
+            AllgemeinSymbol(AllgemeinesSymbol.SCHLIESSEN, Modifier.size(16.dp), Color(0xFFE0402E))
+        }
+    }
+
+    if (zeigeBeendenDialog) {
+        AlertDialog(
+            onDismissRequest = { zeigeBeendenDialog = false },
+            title = { Text("DammBoard beenden?") },
+            text = { Text("Willst du das Programm wirklich beenden?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    zeigeBeendenDialog = false
+                    onSchliessenApp()
+                }) { Text("Beenden") }
+            },
+            dismissButton = {
+                TextButton(onClick = { zeigeBeendenDialog = false }) { Text("Abbrechen") }
+            }
         )
     }
 }

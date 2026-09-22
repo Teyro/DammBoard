@@ -77,6 +77,12 @@ class TafelState {
             offenesPanel = if (offenesPanel == neu) null else neu
             return
         }
+        // Eine Auswahl gehört zum Lasso-/Auswahl-Werkzeug – bei jedem echten Werkzeugwechsel
+        // verschwindet sie, sonst bleibt sie sonst unsichtbar "hängen" und verwirrt beim nächsten
+        // Markieren.
+        if (neu != werkzeug) {
+            seite.ausgewaehlteIds.clear()
+        }
         werkzeug = neu
         lupeAktiv = false
         offenesPanel = when {

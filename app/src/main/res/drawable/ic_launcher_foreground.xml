@@ -4,19 +4,18 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Kräftiger Kreidestrich, wie das Stift-Symbol in der Werkzeugleiste – bewusst innerhalb
-         der sicheren 66dp-Mittelzone gehalten, damit kein Launcher-Icon-Rahmen etwas abschneidet. -->
-    <path
-        android:strokeColor="#F7F5EF"
-        android:strokeWidth="9"
-        android:strokeLineCap="round"
-        android:pathData="M36,74 L68,40" />
-    <path
-        android:strokeColor="#F7F5EF"
-        android:strokeWidth="7"
-        android:strokeLineCap="round"
-        android:pathData="M36,74 L33,77" />
-    <path
-        android:fillColor="#F7F5EF"
-        android:pathData="M77,36a5,5 0 1,1 -10,0a5,5 0 1,1 10,0z" />
+    <!-- Vier Stifte wie im Schulwappen (Schule Öjendorfer Damm), ohne Schriftzug –
+         bewusst nur gerade Kanten (Rechtecke + Dreiecksspitzen), alle Punkte innerhalb der
+         sicheren 66dp-Mittelzone für adaptive Icons. -->
+    <path android:fillColor="#E91E8C" android:pathData="M30.5,37 L38.5,37 L38.5,74 L30.5,74 Z" />
+    <path android:fillColor="#E91E8C" android:pathData="M30.5,37 L38.5,37 L34.5,30 Z" />
+
+    <path android:fillColor="#42A5F5" android:pathData="M43.5,42 L51.5,42 L51.5,74 L43.5,74 Z" />
+    <path android:fillColor="#42A5F5" android:pathData="M43.5,42 L51.5,42 L47.5,35 Z" />
+
+    <path android:fillColor="#66BB6A" android:pathData="M56.5,36 L64.5,36 L64.5,74 L56.5,74 Z" />
+    <path android:fillColor="#66BB6A" android:pathData="M56.5,36 L64.5,36 L60.5,29 Z" />
+
+    <path android:fillColor="#FFA726" android:pathData="M69.5,40 L77.5,40 L77.5,74 L69.5,74 Z" />
+    <path android:fillColor="#FFA726" android:pathData="M69.5,40 L77.5,40 L73.5,33 Z" />
 </vector>

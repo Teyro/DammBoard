@@ -112,6 +112,7 @@ fun TafelCanvas(
     var geometrieModusRotation by remember { mutableStateOf(false) }
     var auswahlModusVerschieben by remember { mutableStateOf(false) }
     var auswahlLetzterPunkt by remember { mutableStateOf<Offset?>(null) }
+    var auswahlStartPunkt by remember { mutableStateOf<Offset?>(null) }
 
     val gesteModifier = if (state.lupeAktiv) {
         Modifier.pointerInput(Unit) {
@@ -187,6 +188,7 @@ fun TafelCanvas(
                         val (min, max) = ausgewaehlteBegrenzung(seite.items, seite.ausgewaehlteIds)
                         auswahlModusVerschieben = min != null && max != null &&
                             start.x in min.x..max.x && start.y in min.y..max.y
+                        auswahlStartPunkt = start
                         auswahlLetzterPunkt = start
                         if (!auswahlModusVerschieben) state.lassoPfad = listOf(start)
                     },
@@ -201,7 +203,13 @@ fun TafelCanvas(
                         }
                     },
                     onDragEnd = {
-                        if (!auswahlModusVerschieben) {
+                        if (auswahlModusVerschieben) {
+                            // Ein bloßes Antippen innerhalb der Auswahl (keine echte Bewegung)
+                            // hebt die Auswahl auf, statt sie unsichtbar "hängen" zu lassen.
+                            val bewegt = auswahlStartPunkt != null && auswahlLetzterPunkt != null &&
+                                (auswahlLetzterPunkt!! - auswahlStartPunkt!!).getDistance() > 6f
+                            if (!bewegt) seite.ausgewaehlteIds.clear()
+                        } else {
                             val pfad = state.lassoPfad
                             if (pfad != null && pfad.size > 2) {
                                 seite.ausgewaehlteIds.clear()
@@ -216,11 +224,13 @@ fun TafelCanvas(
                         state.lassoPfad = null
                         auswahlModusVerschieben = false
                         auswahlLetzterPunkt = null
+                        auswahlStartPunkt = null
                     },
                     onDragCancel = {
                         state.lassoPfad = null
                         auswahlModusVerschieben = false
                         auswahlLetzterPunkt = null
+                        auswahlStartPunkt = null
                     }
                 )
 
@@ -229,6 +239,7 @@ fun TafelCanvas(
                         val (min, max) = ausgewaehlteBegrenzung(seite.items, seite.ausgewaehlteIds)
                         auswahlModusVerschieben = min != null && max != null &&
                             start.x in min.x..max.x && start.y in min.y..max.y
+                        auswahlStartPunkt = start
                         auswahlLetzterPunkt = start
                         if (!auswahlModusVerschieben) state.auswahlRechteck = start to start
                     },
@@ -243,7 +254,11 @@ fun TafelCanvas(
                         }
                     },
                     onDragEnd = {
-                        if (!auswahlModusVerschieben) {
+                        if (auswahlModusVerschieben) {
+                            val bewegt = auswahlStartPunkt != null && auswahlLetzterPunkt != null &&
+                                (auswahlLetzterPunkt!! - auswahlStartPunkt!!).getDistance() > 6f
+                            if (!bewegt) seite.ausgewaehlteIds.clear()
+                        } else {
                             state.auswahlRechteck?.let { (a, b) ->
                                 val minX = minOf(a.x, b.x); val maxX = maxOf(a.x, b.x)
                                 val minY = minOf(a.y, b.y); val maxY = maxOf(a.y, b.y)
@@ -258,11 +273,13 @@ fun TafelCanvas(
                         state.auswahlRechteck = null
                         auswahlModusVerschieben = false
                         auswahlLetzterPunkt = null
+                        auswahlStartPunkt = null
                     },
                     onDragCancel = {
                         state.auswahlRechteck = null
                         auswahlModusVerschieben = false
                         auswahlLetzterPunkt = null
+                        auswahlStartPunkt = null
                     }
                 )
 
@@ -287,6 +304,11 @@ fun TafelCanvas(
                             val zentrum = geometrieZentrum(brettGroesse)
                             val winkel = atan2(change.position.y - zentrum.y, change.position.x - zentrum.x)
                             state.geometrieFuehrung.winkelGrad = Math.toDegrees(winkel.toDouble()).toFloat()
+                        } else if (istDreiecksWerkzeug(state.geometrieWerkzeug)) {
+                            // Dreieck-Führungen: frei aufziehen wie bei Formen, keine Winkel-
+                            // Projektion (die würde Start/Ende auf eine Linie zwingen und das
+                            // Dreieck auf einen Strich zusammenquetschen).
+                            formVorschau = formVorschau?.copy(second = change.position)
                         } else {
                             formVorschau?.let { (start, _) ->
                                 val winkelRad = Math.toRadians(state.geometrieFuehrung.winkelGrad.toDouble())
@@ -318,14 +340,20 @@ fun TafelCanvas(
                         } else if (!geometrieModusRotation) {
                             formVorschau?.let { (start, ende) ->
                                 if ((start - ende).getDistance() > 6f) {
+                                    val dreieck = istDreiecksWerkzeug(state.geometrieWerkzeug)
+                                    val formTyp = when {
+                                        dreieck && state.geometrieWerkzeug == GeometrieWerkzeug.GLEICHSCHENKLIG -> FormTyp.DREIECK
+                                        dreieck -> FormTyp.DREIECK_RECHTS
+                                        state.geometrieGestrichelt -> FormTyp.LINIE_GESTRICHELT
+                                        else -> FormTyp.LINIE
+                                    }
                                     seite.hinzufuegen(
                                         FormItem(
-                                            naechsteId(),
-                                            if (state.geometrieGestrichelt) FormTyp.LINIE_GESTRICHELT else FormTyp.LINIE,
-                                            start, ende, state.stiftFarbe, null, 3.5f, state.geometrieGestrichelt
+                                            naechsteId(), formTyp, start, ende,
+                                            state.stiftFarbe, null, 3.5f, !dreieck && state.geometrieGestrichelt
                                         )
                                     )
-                                    if (state.zeigeLaenge) {
+                                    if (state.zeigeLaenge && !dreieck) {
                                         val text = "%.1f cm".format(pxNachCm((start - ende).getDistance(), dichte))
                                         seite.hinzufuegen(LaengenEtikett(naechsteId(), mitte(start, ende) + Offset(0f, -14f), text))
                                     }
@@ -408,9 +436,16 @@ fun TafelCanvas(
                     val gestrichelt = state.formTyp in gestrichelteFormen
                     zeichneItem(FormItem(-1, state.formTyp, start, ende, state.formRandFarbe, state.formFuellFarbe, state.formRandBreite, gestrichelt))
                 } else if (state.werkzeug == Werkzeug.GEOMETRIE) {
+                    val dreieck = istDreiecksWerkzeug(state.geometrieWerkzeug)
+                    val formTyp = when {
+                        dreieck && state.geometrieWerkzeug == GeometrieWerkzeug.GLEICHSCHENKLIG -> FormTyp.DREIECK
+                        dreieck -> FormTyp.DREIECK_RECHTS
+                        state.geometrieGestrichelt -> FormTyp.LINIE_GESTRICHELT
+                        else -> FormTyp.LINIE
+                    }
                     zeichneItem(
                         FormItem(
-                            -1, FormTyp.LINIE, start, ende, state.stiftFarbe, null, 3.5f, state.geometrieGestrichelt
+                            -1, formTyp, start, ende, state.stiftFarbe, null, 3.5f, !dreieck && state.geometrieGestrichelt
                         )
                     )
                 }
@@ -607,6 +642,11 @@ private val gestrichelteFormen = setOf(
     FormTyp.LINIE_GESTRICHELT, FormTyp.PFEIL_GESTRICHELT,
     FormTyp.DOPPELPFEIL_GESTRICHELT, FormTyp.FREIHANDPFEIL_GESTRICHELT
 )
+
+/** Winkeldreieck, rechtwinkliges und gleichschenkliges Geometrie-Werkzeug zeichnen ein echtes
+ *  Dreieck (frei aufgezogen), alle anderen Geometrie-Werkzeuge eine winkel-eingerastete Linie. */
+private fun istDreiecksWerkzeug(werkzeug: GeometrieWerkzeug): Boolean = werkzeug == GeometrieWerkzeug.WINKELDREIECK ||
+    werkzeug == GeometrieWerkzeug.RECHTWINKLIG || werkzeug == GeometrieWerkzeug.GLEICHSCHENKLIG
 
 private fun DrawScope.zeichneItem(item: BoardItem) {
     when (item) {

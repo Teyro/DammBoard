@@ -103,7 +103,6 @@ fun TafelWerkzeugleiste(
     animationsModus: AnimationsModus,
     symbolSkalierung: Float,
     zeigeUpdatePunkt: Boolean,
-    onSchliessen: () -> Unit,
     onMenu: () -> Unit,
     onTeilen: () -> Unit,
     onIServ: () -> Unit,
@@ -149,7 +148,7 @@ fun TafelWerkzeugleiste(
                 }
             }
         }
-        HauptLeiste(state, zeigeUpdatePunkt, onSchliessen, onMenu, onTeilen)
+        HauptLeiste(state, zeigeUpdatePunkt, onMenu, onTeilen)
     }
     }
     }
@@ -193,7 +192,6 @@ private fun PopupRahmen(inhalt: @Composable () -> Unit) {
 private fun HauptLeiste(
     state: TafelState,
     zeigeUpdatePunkt: Boolean,
-    onSchliessen: () -> Unit,
     onMenu: () -> Unit,
     onTeilen: () -> Unit
 ) {
@@ -202,9 +200,6 @@ private fun HauptLeiste(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        RundKnopf(hintergrund = Color.White, onClick = onSchliessen, modifier = Modifier.semantics { contentDescription = "Schließen" }) {
-            AllgemeinSymbol(AllgemeinesSymbol.SCHLIESSEN, Modifier.size(18.dp), Color(0xFFE0402E))
-        }
         RundKnopf(hintergrund = Color.White, onClick = onMenu, modifier = Modifier.semantics { contentDescription = "Menü" }) {
             Box {
                 AllgemeinSymbol(AllgemeinesSymbol.MENUE, Modifier.size(18.dp), SymbolFarbe)
