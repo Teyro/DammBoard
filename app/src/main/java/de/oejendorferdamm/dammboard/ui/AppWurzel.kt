@@ -15,6 +15,7 @@ import de.oejendorferdamm.dammboard.data.EinstellungenSpeicher
 import de.oejendorferdamm.dammboard.data.UpdateClient
 import de.oejendorferdamm.dammboard.model.AnimationsModus
 import de.oejendorferdamm.dammboard.model.IServZugang
+import de.oejendorferdamm.dammboard.model.SymbolGroesse
 import de.oejendorferdamm.dammboard.model.UpdateInfo
 import de.oejendorferdamm.dammboard.model.istNeuereVersion
 import de.oejendorferdamm.dammboard.ui.filemanager.DateiManagerScreen
@@ -41,6 +42,7 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
 
     val iservZugang by speicher.iservZugang.collectAsState(initial = IServZugang())
     val animationsModus by speicher.animationsModus.collectAsState(initial = AnimationsModus.NORMAL)
+    val symbolGroesse by speicher.symbolGroesse.collectAsState(initial = SymbolGroesse.STANDARD)
 
     val tafelState = rememberTafelState()
     var bildschirm by remember { mutableStateOf<Bildschirm>(Bildschirm.Brett) }
@@ -61,6 +63,7 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
         is Bildschirm.Brett -> TafelScreen(
             state = tafelState,
             animationsModus = animationsModus,
+            symbolSkalierung = symbolGroesse.skalierung,
             zeigeUpdatePunkt = updateInfo != null,
             onSchliessenApp = onAppSchliessen,
             onOeffneEinstellungen = { bildschirm = Bildschirm.Einstellungen },
@@ -69,10 +72,12 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
         is Bildschirm.Einstellungen -> EinstellungenScreen(
             aktuellerZugang = iservZugang,
             aktuellerModus = animationsModus,
+            aktuelleSymbolGroesse = symbolGroesse,
             aktuelleVersion = BuildConfig.VERSION_NAME,
             updateInfo = updateInfo,
             onZugangSpeichern = { neu -> scope.launch { speicher.speichereIServZugang(neu) } },
             onModusGeaendert = { neu -> scope.launch { speicher.speichereAnimationsModus(neu) } },
+            onSymbolGroesseGeaendert = { neu -> scope.launch { speicher.speichereSymbolGroesse(neu) } },
             onZurueck = { bildschirm = Bildschirm.Brett }
         )
         is Bildschirm.Dateimanager -> DateiManagerScreen(

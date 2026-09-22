@@ -4,19 +4,19 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- Kräftiger Kreidestrich, wie das Stift-Symbol in der Werkzeugleiste – bewusst innerhalb
+         der sicheren 66dp-Mittelzone gehalten, damit kein Launcher-Icon-Rahmen etwas abschneidet. -->
     <path
-        android:strokeColor="#F5F3EE"
+        android:strokeColor="#F7F5EF"
+        android:strokeWidth="9"
+        android:strokeLineCap="round"
+        android:pathData="M36,74 L68,40" />
+    <path
+        android:strokeColor="#F7F5EF"
         android:strokeWidth="7"
         android:strokeLineCap="round"
-        android:pathData="M28,42 Q40,26 54,42 T80,42" />
+        android:pathData="M36,74 L33,77" />
     <path
-        android:strokeColor="#F5F3EE"
-        android:strokeWidth="7"
-        android:strokeLineCap="round"
-        android:pathData="M28,62 Q40,46 54,62 T80,62" />
-    <path
-        android:strokeColor="#F5F3EE"
-        android:strokeWidth="7"
-        android:strokeLineCap="round"
-        android:pathData="M28,82 L58,82" />
+        android:fillColor="#F7F5EF"
+        android:pathData="M77,36a5,5 0 1,1 -10,0a5,5 0 1,1 10,0z" />
 </vector>

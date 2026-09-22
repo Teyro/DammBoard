@@ -21,7 +21,7 @@ val TafelGrau = Color(0xFFB9BDB8)
 val HintergrundOptionen = listOf(TafelGruen, TafelSchwarz, TafelWeiss, TafelGrau)
 
 /** Musterüberlagerung für den Tafelhintergrund (zusätzlich zur reinen Farbe). */
-enum class MusterTyp { KEIN, LINIERT, KARIERT, GEPUNKTET }
+enum class MusterTyp { KEIN, LINIERT, KARIERT, GEPUNKTET, NOTENLINIEN, FUSSBALLFELD, STUNDENPLAN }
 
 data class HintergrundStil(val farbe: Color, val muster: MusterTyp = MusterTyp.KEIN)
 

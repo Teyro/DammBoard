@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import de.oejendorferdamm.dammboard.model.AnimationsModus
 import de.oejendorferdamm.dammboard.model.IServZugang
+import de.oejendorferdamm.dammboard.model.SymbolGroesse
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -16,6 +17,7 @@ private object Schluessel {
     val BENUTZERNAME = stringPreferencesKey("iserv_benutzername")
     val PASSWORT = stringPreferencesKey("iserv_passwort")
     val ANIMATIONSMODUS = stringPreferencesKey("animationsmodus")
+    val SYMBOLGROESSE = stringPreferencesKey("symbolgroesse")
 }
 
 /**
@@ -48,9 +50,19 @@ class EinstellungenSpeicher(private val context: Context) {
         }
     }
 
+    val symbolGroesse: Flow<SymbolGroesse> = context.einstellungenDataStore.data.map { prefs ->
+        SymbolGroesse.entries.find { it.name == prefs[Schluessel.SYMBOLGROESSE] } ?: SymbolGroesse.STANDARD
+    }
+
     suspend fun speichereAnimationsModus(modus: AnimationsModus) {
         context.einstellungenDataStore.edit { prefs ->
             prefs[Schluessel.ANIMATIONSMODUS] = modus.name
+        }
+    }
+
+    suspend fun speichereSymbolGroesse(groesse: SymbolGroesse) {
+        context.einstellungenDataStore.edit { prefs ->
+            prefs[Schluessel.SYMBOLGROESSE] = groesse.name
         }
     }
 }

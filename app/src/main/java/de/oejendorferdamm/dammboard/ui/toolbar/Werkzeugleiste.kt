@@ -33,6 +33,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,7 +51,10 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -97,6 +101,7 @@ private val SymbolFarbeSchwach = Color(0xFF8A8880)
 fun TafelWerkzeugleiste(
     state: TafelState,
     animationsModus: AnimationsModus,
+    symbolSkalierung: Float,
     zeigeUpdatePunkt: Boolean,
     onSchliessen: () -> Unit,
     onMenu: () -> Unit,
@@ -109,7 +114,20 @@ fun TafelWerkzeugleiste(
         state.offenesPanel?.let { letztesPanel = it }
     }
 
+    // Skaliert die komplette Werkzeugleiste (Icons, Tippflächen und Abstände gleichermaßen –
+    // eine reine Modifier.scale()-Lösung würde nur optisch vergrößern, die Tippflächen aber
+    // klein lassen, was auf einem Touchscreen zu Fehltreffern führen würde).
+    val basisDichte = LocalDensity.current
+    val skalierteDichte = remember(basisDichte, symbolSkalierung) {
+        Density(density = basisDichte.density * symbolSkalierung, fontScale = basisDichte.fontScale)
+    }
+
+    // modifier (u. a. navigationBarsPadding) bleibt bewusst außerhalb des CompositionLocalProvider,
+    // damit echte System-Insets weiter mit der echten Dichte umgerechnet werden – nur der Inhalt
+    // selbst (Icons, Popups, Tippflächen) wird skaliert.
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+    CompositionLocalProvider(LocalDensity provides skalierteDichte) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
         if (animationsModus == AnimationsModus.NORMAL) {
             AnimatedVisibility(
                 visible = state.offenesPanel != null,
@@ -132,6 +150,8 @@ fun TafelWerkzeugleiste(
             }
         }
         HauptLeiste(state, zeigeUpdatePunkt, onSchliessen, onMenu, onTeilen)
+    }
+    }
     }
 }
 
@@ -627,23 +647,28 @@ private fun WerkzeugkastenPanelInhalt(state: TafelState, onIServ: () -> Unit) {
                 }
             }
             Spacer(Modifier.height(8.dp))
-            Text("Muster", color = SymbolFarbeSchwach, fontSize = 11.sp)
+            Text("Muster / Vorlagen", color = SymbolFarbeSchwach, fontSize = 11.sp)
             Spacer(Modifier.height(4.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(
-                    MusterTyp.KEIN to "Einfarbig",
-                    MusterTyp.LINIERT to "Liniert",
-                    MusterTyp.KARIERT to "Kariert",
-                    MusterTyp.GEPUNKTET to "Gepunktet"
-                ).forEach { (muster, label) ->
-                    AuswahlKnopf(
-                        ausgewaehlt = aktuellerStil.muster == muster,
-                        onClick = { state.seite.hintergrund.value = aktuellerStil.copy(muster = muster) },
-                        groesse = 32.dp
-                    ) {
-                        MusterSymbol(muster, Modifier.size(20.dp))
+            val musterOptionen = listOf(
+                MusterTyp.KEIN to "Einfarbig",
+                MusterTyp.LINIERT to "Liniert",
+                MusterTyp.KARIERT to "Kariert",
+                MusterTyp.GEPUNKTET to "Gepunktet",
+                MusterTyp.NOTENLINIEN to "Noten",
+                MusterTyp.FUSSBALLFELD to "Fußball",
+                MusterTyp.STUNDENPLAN to "Stundenplan"
+            )
+            musterOptionen.chunked(4).forEach { zeile ->
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    zeile.forEach { (muster, label) ->
+                        MusterKnopf(
+                            muster = muster, label = label,
+                            ausgewaehlt = aktuellerStil.muster == muster,
+                            onClick = { state.seite.hintergrund.value = aktuellerStil.copy(muster = muster) }
+                        )
                     }
                 }
+                Spacer(Modifier.height(4.dp))
             }
         }
     }
@@ -670,7 +695,47 @@ private fun MusterSymbol(muster: MusterTyp, modifier: Modifier = Modifier) {
                     drawCircle(SymbolFarbe, radius = 1.6f, center = Offset(w * fx, h * fy))
                 }
             }
+            MusterTyp.NOTENLINIEN -> {
+                for (i in 0 until 5) {
+                    val y = h * (0.22f + i * 0.14f)
+                    drawLine(SymbolFarbe, Offset(w * 0.1f, y), Offset(w * 0.9f, y), strokeWidth = 1f)
+                }
+            }
+            MusterTyp.FUSSBALLFELD -> {
+                drawRect(
+                    SymbolFarbe, topLeft = Offset(w * 0.14f, h * 0.2f),
+                    size = androidx.compose.ui.geometry.Size(w * 0.72f, h * 0.6f), style = Stroke(width = 1.4f)
+                )
+                drawLine(SymbolFarbe, Offset(w * 0.5f, h * 0.2f), Offset(w * 0.5f, h * 0.8f), strokeWidth = 1.4f)
+                drawCircle(SymbolFarbe, radius = w * 0.1f, center = Offset(w * 0.5f, h * 0.5f), style = Stroke(width = 1.4f))
+            }
+            MusterTyp.STUNDENPLAN -> {
+                drawRect(
+                    SymbolFarbe, topLeft = Offset(w * 0.14f, h * 0.18f),
+                    size = androidx.compose.ui.geometry.Size(w * 0.72f, h * 0.64f), style = Stroke(width = 1.4f)
+                )
+                drawLine(SymbolFarbe, Offset(w * 0.14f, h * 0.38f), Offset(w * 0.86f, h * 0.38f), strokeWidth = 1.4f)
+                drawLine(SymbolFarbe, Offset(w * 0.42f, h * 0.18f), Offset(w * 0.42f, h * 0.82f), strokeWidth = 1.2f)
+                drawLine(SymbolFarbe, Offset(w * 0.68f, h * 0.18f), Offset(w * 0.68f, h * 0.82f), strokeWidth = 1.2f)
+            }
         }
+    }
+}
+
+@Composable
+private fun MusterKnopf(muster: MusterTyp, label: String, ausgewaehlt: Boolean, onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.width(58.dp).clickable(onClick = onClick)
+    ) {
+        Box(
+            modifier = Modifier.size(34.dp).clip(CircleShape).background(if (ausgewaehlt) LeistenAktiv else Color.White),
+            contentAlignment = Alignment.Center
+        ) {
+            MusterSymbol(muster, Modifier.size(20.dp))
+        }
+        Spacer(Modifier.height(2.dp))
+        Text(label, color = SymbolFarbeSchwach, fontSize = 9.sp, textAlign = TextAlign.Center, lineHeight = 11.sp)
     }
 }
 

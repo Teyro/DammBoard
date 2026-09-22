@@ -34,6 +34,7 @@ import kotlinx.coroutines.launch
 fun TafelScreen(
     state: TafelState,
     animationsModus: AnimationsModus,
+    symbolSkalierung: Float,
     zeigeUpdatePunkt: Boolean,
     onSchliessenApp: () -> Unit,
     onOeffneEinstellungen: () -> Unit,
@@ -83,6 +84,7 @@ fun TafelScreen(
         TafelWerkzeugleiste(
             state = state,
             animationsModus = animationsModus,
+            symbolSkalierung = symbolSkalierung,
             zeigeUpdatePunkt = zeigeUpdatePunkt,
             onSchliessen = onSchliessenApp,
             onMenu = onOeffneEinstellungen,

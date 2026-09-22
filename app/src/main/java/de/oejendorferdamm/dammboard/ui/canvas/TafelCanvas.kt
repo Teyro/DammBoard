@@ -77,6 +77,8 @@ private class EbenenCache {
     var version = -1
     var breite = -1
     var hoehe = -1
+    var hintergrundHash = 0
+    var geteilt = false
 }
 
 /** Zeichenfläche der Tafel: Rendering aller Seiteninhalte plus vollständige Gesten-Steuerung pro Werkzeug. */
@@ -363,15 +365,18 @@ fun TafelCanvas(
             val seiteHash = System.identityHashCode(seite)
             val breitePx = size.width.toInt()
             val hoehePx = size.height.toInt()
+            val hintergrund = seite.hintergrund.value
+            val hintergrundHash = hintergrund.hashCode()
+            val geteilt = seite.geteilteAnsicht.value
 
             if (ebenenCache.seiteHash != seiteHash || ebenenCache.version != version ||
-                ebenenCache.breite != breitePx || ebenenCache.hoehe != hoehePx
+                ebenenCache.breite != breitePx || ebenenCache.hoehe != hoehePx ||
+                ebenenCache.hintergrundHash != hintergrundHash || ebenenCache.geteilt != geteilt
             ) {
-                val hintergrund = seite.hintergrund.value
                 eingebrannteEbene.record {
                     drawRect(color = hintergrund.farbe)
                     zeichneMuster(hintergrund.muster, hintergrund.farbe)
-                    if (seite.geteilteAnsicht.value) {
+                    if (geteilt) {
                         drawLine(
                             color = Color.White.copy(alpha = 0.35f),
                             start = Offset(this.size.width / 2, 0f), end = Offset(this.size.width / 2, this.size.height),
@@ -384,6 +389,8 @@ fun TafelCanvas(
                 ebenenCache.version = version
                 ebenenCache.breite = breitePx
                 ebenenCache.hoehe = hoehePx
+                ebenenCache.hintergrundHash = hintergrundHash
+                ebenenCache.geteilt = geteilt
             }
             drawLayer(eingebrannteEbene)
 
@@ -497,6 +504,9 @@ private fun DrawScope.zeichneMuster(muster: MusterTyp, basisFarbe: Color) {
     if (muster == MusterTyp.KEIN) return
     val helligkeit = 0.299f * basisFarbe.red + 0.587f * basisFarbe.green + 0.114f * basisFarbe.blue
     val linienFarbe = if (helligkeit > 0.5f) Color.Black.copy(alpha = 0.10f) else Color.White.copy(alpha = 0.14f)
+    // Deutlicher als die reinen Schreib-Hilfslinien: für Vorlagen, die auch inhaltlich als
+    // Linien gelesen werden sollen (Notenlinien, Spielfeld, Stundenplan-Raster).
+    val vorlagenFarbe = if (helligkeit > 0.5f) Color.Black.copy(alpha = 0.32f) else Color.White.copy(alpha = 0.38f)
     val abstand = 48f
     when (muster) {
         MusterTyp.LINIERT -> {
@@ -527,6 +537,66 @@ private fun DrawScope.zeichneMuster(muster: MusterTyp, basisFarbe: Color) {
                     x += abstand
                 }
                 y += abstand
+            }
+        }
+        MusterTyp.NOTENLINIEN -> {
+            val linienAbstand = 14f
+            val gruppenHoehe = linienAbstand * 4
+            val gruppenAbstand = 90f
+            val randX = 50f
+            var gruppenY = 70f
+            while (gruppenY < size.height - gruppenHoehe) {
+                for (i in 0 until 5) {
+                    val y = gruppenY + i * linienAbstand
+                    drawLine(vorlagenFarbe, Offset(randX, y), Offset(size.width - randX, y), strokeWidth = 1.6f)
+                }
+                gruppenY += gruppenHoehe + gruppenAbstand
+            }
+        }
+        MusterTyp.FUSSBALLFELD -> {
+            val rand = 60f
+            val feldBreite = size.width - rand * 2
+            val feldHoehe = size.height - rand * 2
+            drawRect(
+                color = vorlagenFarbe, topLeft = Offset(rand, rand),
+                size = Size(feldBreite, feldHoehe), style = Stroke(width = 2.2f)
+            )
+            drawLine(vorlagenFarbe, Offset(size.width / 2, rand), Offset(size.width / 2, size.height - rand), strokeWidth = 2.2f)
+            val kreisRadius = minOf(feldBreite, feldHoehe) * 0.14f
+            drawCircle(vorlagenFarbe, radius = kreisRadius, center = Offset(size.width / 2, size.height / 2), style = Stroke(width = 2.2f))
+            drawCircle(vorlagenFarbe, radius = 3f, center = Offset(size.width / 2, size.height / 2))
+            val strafraumHoehe = feldHoehe * 0.5f
+            val strafraumTiefe = feldBreite * 0.14f
+            drawRect(
+                color = vorlagenFarbe,
+                topLeft = Offset(rand, size.height / 2 - strafraumHoehe / 2),
+                size = Size(strafraumTiefe, strafraumHoehe), style = Stroke(width = 2.2f)
+            )
+            drawRect(
+                color = vorlagenFarbe,
+                topLeft = Offset(size.width - rand - strafraumTiefe, size.height / 2 - strafraumHoehe / 2),
+                size = Size(strafraumTiefe, strafraumHoehe), style = Stroke(width = 2.2f)
+            )
+        }
+        MusterTyp.STUNDENPLAN -> {
+            val randX = 50f; val randY = 50f
+            val breiteGesamt = size.width - randX * 2
+            val hoeheGesamt = size.height - randY * 2
+            val spalten = 6
+            val zeilen = 7
+            for (i in 0..spalten) {
+                val x = randX + breiteGesamt * i / spalten
+                drawLine(
+                    vorlagenFarbe, Offset(x, randY), Offset(x, randY + hoeheGesamt),
+                    strokeWidth = if (i == 0 || i == spalten) 2.2f else 1.4f
+                )
+            }
+            for (i in 0..zeilen) {
+                val y = randY + hoeheGesamt * i / zeilen
+                drawLine(
+                    vorlagenFarbe, Offset(randX, y), Offset(randX + breiteGesamt, y),
+                    strokeWidth = if (i <= 1 || i == zeilen) 2.2f else 1.4f
+                )
             }
         }
         MusterTyp.KEIN -> Unit

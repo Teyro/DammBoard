@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.sp
 import de.oejendorferdamm.dammboard.data.UpdateClient
 import de.oejendorferdamm.dammboard.model.AnimationsModus
 import de.oejendorferdamm.dammboard.model.IServZugang
+import de.oejendorferdamm.dammboard.model.SymbolGroesse
 import de.oejendorferdamm.dammboard.model.UpdateInfo
 import de.oejendorferdamm.dammboard.ui.icons.AllgemeinSymbol
 import de.oejendorferdamm.dammboard.ui.icons.AllgemeinesSymbol
@@ -66,10 +67,12 @@ private val Fehlerfarbe = Color(0xFFB3261E)
 fun EinstellungenScreen(
     aktuellerZugang: IServZugang,
     aktuellerModus: AnimationsModus,
+    aktuelleSymbolGroesse: SymbolGroesse,
     aktuelleVersion: String,
     updateInfo: UpdateInfo?,
     onZugangSpeichern: (IServZugang) -> Unit,
     onModusGeaendert: (AnimationsModus) -> Unit,
+    onSymbolGroesseGeaendert: (SymbolGroesse) -> Unit,
     onZurueck: () -> Unit
 ) {
     var serverUrl by remember(aktuellerZugang) { mutableStateOf(aktuellerZugang.serverUrl) }
@@ -177,6 +180,27 @@ fun EinstellungenScreen(
                 }
                 ModusKnopf("Performance", ausgewaehlt = aktuellerModus == AnimationsModus.PERFORMANCE, modifier = Modifier.weight(1f)) {
                     onModusGeaendert(AnimationsModus.PERFORMANCE)
+                }
+            }
+
+            Spacer(Modifier.height(22.dp))
+            Text("Symbolgröße", color = Textfarbe, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Text(
+                "Größe der Werkzeugleisten-Symbole – wirkt sich auch auf die Tippflächen aus.",
+                color = TextfarbeSchwach, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(Color.White),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                ModusKnopf("Kompakt", ausgewaehlt = aktuelleSymbolGroesse == SymbolGroesse.KOMPAKT, modifier = Modifier.weight(1f)) {
+                    onSymbolGroesseGeaendert(SymbolGroesse.KOMPAKT)
+                }
+                ModusKnopf("Standard", ausgewaehlt = aktuelleSymbolGroesse == SymbolGroesse.STANDARD, modifier = Modifier.weight(1f)) {
+                    onSymbolGroesseGeaendert(SymbolGroesse.STANDARD)
+                }
+                ModusKnopf("Groß", ausgewaehlt = aktuelleSymbolGroesse == SymbolGroesse.GROSS, modifier = Modifier.weight(1f)) {
+                    onSymbolGroesseGeaendert(SymbolGroesse.GROSS)
                 }
             }
 
