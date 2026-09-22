@@ -220,13 +220,38 @@ private fun HauptLeiste(
         }
 
         WerkzeugPille {
+            // Fünfmal schnell hintereinander auf den Stift getippt: kleines Easter Egg.
+            var stiftTapAnzahl by remember { mutableStateOf(0) }
+            var letzterStiftTap by remember { mutableStateOf(0L) }
+
             listOf(
                 Werkzeug.STIFT, Werkzeug.FORMEN, Werkzeug.RADIERER, Werkzeug.LASSO,
                 Werkzeug.GEOMETRIE, Werkzeug.AUSWAHL, Werkzeug.WERKZEUGKASTEN
             ).forEach { werkzeug ->
-                val aktiv = state.werkzeug == werkzeug || (werkzeug == Werkzeug.WERKZEUGKASTEN && state.offenesPanel == werkzeug)
+                // Solange der Werkzeugkasten offen ist, zeigt nur dessen Knopf den aktiven
+                // Zustand – vorher blieb zusätzlich das zuletzt genutzte Zeichenwerkzeug
+                // markiert, weil state.werkzeug beim Öffnen des Werkzeugkastens unverändert
+                // bleibt (siehe waehleWerkzeug) und dadurch zwei Knöpfe gleichzeitig aktiv wirkten.
+                val aktiv = if (state.offenesPanel == Werkzeug.WERKZEUGKASTEN) {
+                    werkzeug == Werkzeug.WERKZEUGKASTEN
+                } else {
+                    state.werkzeug == werkzeug
+                }
                 AuswahlKnopf(
-                    ausgewaehlt = aktiv, onClick = { state.waehleWerkzeug(werkzeug) }, groesse = 40.dp,
+                    ausgewaehlt = aktiv,
+                    onClick = {
+                        state.waehleWerkzeug(werkzeug)
+                        if (werkzeug == Werkzeug.STIFT) {
+                            val jetzt = System.currentTimeMillis()
+                            stiftTapAnzahl = if (jetzt - letzterStiftTap > 2000L) 1 else stiftTapAnzahl + 1
+                            letzterStiftTap = jetzt
+                            if (stiftTapAnzahl >= 5) {
+                                stiftTapAnzahl = 0
+                                state.loeseStiftEasterEggAus()
+                            }
+                        }
+                    },
+                    groesse = 40.dp,
                     modifier = Modifier.semantics { contentDescription = werkzeugBeschreibung(werkzeug) }
                 ) {
                     WerkzeugSymbol(werkzeug, Modifier.size(20.dp), if (aktiv) SymbolFarbe else SymbolFarbeSchwach)
@@ -339,46 +364,35 @@ private fun AuswahlKnopf(ausgewaehlt: Boolean, onClick: () -> Unit, groesse: Dp 
 
 // ---------- Stift-Panel ----------
 
-@Composable
-private fun StiftPanelInhalt(state: TafelState) {
-    Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Top) {
-        // Wie im Original: Stiftart + zugehöriger Dicke-Regler stehen nebeneinander in einer
-        // Zeile, die beiden Stiftarten (fein/leucht) sind untereinander gestapelt.
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            StiftReihe(
-                fein = true,
-                ausgewaehlt = state.stiftArt == StiftArt.FEIN,
-                breite = state.stiftBreiteFein,
-                bereich = 2f..24f,
-                onArtGewaehlt = { state.stiftArt = StiftArt.FEIN },
-                onBreiteGeaendert = { state.stiftBreiteFein = it }
-            )
-            StiftReihe(
-                fein = false,
-                ausgewaehlt = state.stiftArt == StiftArt.LEUCHT,
-                breite = state.stiftBreiteLeucht,
-                bereich = 8f..48f,
-                onArtGewaehlt = { state.stiftArt = StiftArt.LEUCHT },
-                onBreiteGeaendert = { state.stiftBreiteLeucht = it }
-            )
-        }
-        FarbGitterUndVerlauf(ausgewaehlt = state.stiftFarbe, onFarbe = { state.stiftFarbe = it }, spalten = 3)
-    }
-}
+/** Höhe des einen gemeinsamen Dicke-Reglers – an die Höhe des 3-spaltigen Farbgitters
+ *  angeglichen (4 Zeilen à 44dp + 3 Abstände à 4dp), damit das Panel ausgewogen wirkt. */
+private val StiftReglerHoehe = 188.dp
 
 @Composable
-private fun StiftReihe(
-    fein: Boolean, ausgewaehlt: Boolean, breite: Float, bereich: ClosedFloatingPointRange<Float>,
-    onArtGewaehlt: () -> Unit, onBreiteGeaendert: (Float) -> Unit
-) {
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-        AuswahlKnopf(ausgewaehlt = ausgewaehlt, onClick = onArtGewaehlt, groesse = 36.dp) {
-            StiftArtSymbol(fein = fein, modifier = Modifier.size(20.dp), tint = SymbolFarbe)
+private fun StiftPanelInhalt(state: TafelState) {
+    val fein = state.stiftArt == StiftArt.FEIN
+    val bereich = if (fein) 2f..24f else 8f..48f
+    val breite = if (fein) state.stiftBreiteFein else state.stiftBreiteLeucht
+
+    Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.Top) {
+        // Wie im Original: links wählt man Stift oder Marker, EIN gemeinsamer großer Regler
+        // daneben bestimmt die Dicke der jeweils ausgewählten Stiftart – nicht pro Stiftart ein
+        // eigener kleiner Regler.
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            AuswahlKnopf(ausgewaehlt = fein, onClick = { state.stiftArt = StiftArt.FEIN }, groesse = 36.dp) {
+                StiftArtSymbol(fein = true, modifier = Modifier.size(20.dp), tint = SymbolFarbe)
+            }
+            AuswahlKnopf(ausgewaehlt = !fein, onClick = { state.stiftArt = StiftArt.LEUCHT }, groesse = 36.dp) {
+                StiftArtSymbol(fein = false, modifier = Modifier.size(20.dp), tint = SymbolFarbe)
+            }
         }
         VertikalerRegler(
-            wert = breite, bereich = bereich, onWertGeaendert = onBreiteGeaendert,
-            modifier = Modifier.width(26.dp).height(78.dp)
+            wert = breite,
+            bereich = bereich,
+            onWertGeaendert = { neu -> if (fein) state.stiftBreiteFein = neu else state.stiftBreiteLeucht = neu },
+            modifier = Modifier.width(26.dp).height(StiftReglerHoehe)
         )
+        FarbGitterUndVerlauf(ausgewaehlt = state.stiftFarbe, onFarbe = { state.stiftFarbe = it }, spalten = 3)
     }
 }
 

@@ -118,6 +118,7 @@ fun TafelCanvas(
     var auswahlModusVerschieben by remember { mutableStateOf(false) }
     var auswahlLetzterPunkt by remember { mutableStateOf<Offset?>(null) }
     var auswahlStartPunkt by remember { mutableStateOf<Offset?>(null) }
+    var auswahlGesamtDelta by remember { mutableStateOf(Offset.Zero) }
 
     val gesteModifier = if (state.lupeAktiv) {
         Modifier.pointerInput(Unit) {
@@ -200,13 +201,16 @@ fun TafelCanvas(
                             start.x in min.x..max.x && start.y in min.y..max.y
                         auswahlStartPunkt = start
                         auswahlLetzterPunkt = start
+                        auswahlGesamtDelta = Offset.Zero
                         if (!auswahlModusVerschieben) state.lassoPfad = listOf(start)
                     },
                     onDrag = { change, _ ->
                         change.consume()
                         if (auswahlModusVerschieben) {
                             val letzter = auswahlLetzterPunkt ?: change.position
-                            seite.verschiebeAusgewaehlte(change.position - letzter)
+                            val schritt = change.position - letzter
+                            seite.verschiebeAusgewaehlte(schritt)
+                            auswahlGesamtDelta += schritt
                             auswahlLetzterPunkt = change.position
                         } else {
                             state.lassoPfad = state.lassoPfad.orEmpty() + change.position
@@ -218,7 +222,13 @@ fun TafelCanvas(
                             // hebt die Auswahl auf, statt sie unsichtbar "hängen" zu lassen.
                             val bewegt = auswahlStartPunkt != null && auswahlLetzterPunkt != null &&
                                 (auswahlLetzterPunkt!! - auswahlStartPunkt!!).getDistance() > 6f
-                            if (!bewegt) seite.ausgewaehlteIds.clear()
+                            if (!bewegt) {
+                                seite.ausgewaehlteIds.clear()
+                            } else {
+                                // Die ganze Geste zählt als EIN Rückgängig-Schritt, nicht einer
+                                // pro Bewegungs-Frame.
+                                seite.protokolliereVerschiebung(seite.ausgewaehlteIds.toList(), auswahlGesamtDelta)
+                            }
                         } else {
                             val pfad = state.lassoPfad
                             if (pfad != null && pfad.size > 2) {
@@ -251,13 +261,16 @@ fun TafelCanvas(
                             start.x in min.x..max.x && start.y in min.y..max.y
                         auswahlStartPunkt = start
                         auswahlLetzterPunkt = start
+                        auswahlGesamtDelta = Offset.Zero
                         if (!auswahlModusVerschieben) state.auswahlRechteck = start to start
                     },
                     onDrag = { change, _ ->
                         change.consume()
                         if (auswahlModusVerschieben) {
                             val letzter = auswahlLetzterPunkt ?: change.position
-                            seite.verschiebeAusgewaehlte(change.position - letzter)
+                            val schritt = change.position - letzter
+                            seite.verschiebeAusgewaehlte(schritt)
+                            auswahlGesamtDelta += schritt
                             auswahlLetzterPunkt = change.position
                         } else {
                             state.auswahlRechteck = state.auswahlRechteck?.copy(second = change.position)
@@ -267,7 +280,11 @@ fun TafelCanvas(
                         if (auswahlModusVerschieben) {
                             val bewegt = auswahlStartPunkt != null && auswahlLetzterPunkt != null &&
                                 (auswahlLetzterPunkt!! - auswahlStartPunkt!!).getDistance() > 6f
-                            if (!bewegt) seite.ausgewaehlteIds.clear()
+                            if (!bewegt) {
+                                seite.ausgewaehlteIds.clear()
+                            } else {
+                                seite.protokolliereVerschiebung(seite.ausgewaehlteIds.toList(), auswahlGesamtDelta)
+                            }
                         } else {
                             state.auswahlRechteck?.let { (a, b) ->
                                 val minX = minOf(a.x, b.x); val maxX = maxOf(a.x, b.x)

@@ -15,6 +15,7 @@ import de.oejendorferdamm.dammboard.model.FormTyp
 import de.oejendorferdamm.dammboard.model.GeometrieWerkzeug
 import de.oejendorferdamm.dammboard.model.HintergrundStil
 import de.oejendorferdamm.dammboard.model.KreidePalette
+import de.oejendorferdamm.dammboard.model.LaengenEtikett
 import de.oejendorferdamm.dammboard.model.RadiererGroesse
 import de.oejendorferdamm.dammboard.model.Seite
 import de.oejendorferdamm.dammboard.model.StiftArt
@@ -113,6 +114,15 @@ class TafelState(private val hintergrundStart: HintergrundStil = HintergrundStil
 
     fun naechsteSeite() {
         if (aktiveSeite < seiten.lastIndex) aktiveSeite += 1
+    }
+
+    /** Kleines Easter Egg für aufmerksame Kolleg:innen: 5x schnell hintereinander auf den
+     *  Stift getippt legt eine neue Seite mit dem Namens-Wortspiel an. Ganz normale Seite
+     *  danach – über den Papierkorb oder Rückgängig genauso wieder loszuwerden wie alles andere. */
+    fun loeseStiftEasterEggAus() {
+        neueSeite()
+        seite.hinzufuegen(LaengenEtikett(naechsteId(), Offset(420f, 340f), "DammBoard"))
+        seite.hinzufuegen(LaengenEtikett(naechsteId(), Offset(380f, 420f), "😭 💀 😔 😢 😞"))
     }
 }
 

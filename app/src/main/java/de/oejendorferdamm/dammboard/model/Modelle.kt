@@ -146,6 +146,7 @@ class Seite(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)) {
     private sealed interface Aktion
     private data class Hinzugefuegt(val hinzugefuegteItems: List<BoardItem>) : Aktion
     private data class Entfernt(val entfernteItems: List<BoardItem>) : Aktion
+    private data class Verschoben(val ids: List<Long>, val delta: Offset) : Aktion
 
     /** Entfernt sofort alle Elemente unter dem Radierer; die Aktion wird erst bei [radierenAbschliessen] auf den Undo-Stapel gelegt. */
     fun radiereBeruehrte(punkt: Offset, radius: Float) {
@@ -205,6 +206,10 @@ class Seite(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)) {
                 items.addAll(aktion.entfernteItems)
                 wiederholenStapel.add(aktion)
             }
+            is Verschoben -> {
+                verschiebeItems(aktion.ids, -aktion.delta)
+                wiederholenStapel.add(aktion)
+            }
         }
         versionsZaehler++
     }
@@ -220,21 +225,42 @@ class Seite(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)) {
                 items.removeAll(aktion.entfernteItems)
                 rueckgaengigStapel.add(aktion)
             }
+            is Verschoben -> {
+                verschiebeItems(aktion.ids, aktion.delta)
+                rueckgaengigStapel.add(aktion)
+            }
         }
         versionsZaehler++
     }
 
-    fun verschiebeAusgewaehlte(delta: Offset) {
-        if (ausgewaehlteIds.isEmpty()) return
+    private fun verschiebeItems(ids: List<Long>, delta: Offset) {
         for (i in items.indices) {
             val item = items[i]
-            if (item.id !in ausgewaehlteIds) continue
+            if (item.id !in ids) continue
             items[i] = when (item) {
                 is StrichItem -> item.copy(punkte = item.punkte.map { it + delta })
                 is FormItem -> item.copy(start = item.start + delta, ende = item.ende + delta)
                 is LaengenEtikett -> item.copy(position = item.position + delta)
             }
         }
+    }
+
+    /** Bewegt die ausgewählten Elemente sofort sichtbar – wird während einer laufenden Ziehgeste
+     *  bei jedem Bewegungsschritt aufgerufen. Für die Undo-Historie zählt erst der gesamte Weg
+     *  der ganzen Geste, siehe [protokolliereVerschiebung] – sonst würde jeder einzelne
+     *  Bewegungsschritt einen eigenen Rückgängig-Schritt erzeugen. */
+    fun verschiebeAusgewaehlte(delta: Offset) {
+        if (ausgewaehlteIds.isEmpty()) return
+        verschiebeItems(ausgewaehlteIds.toList(), delta)
         versionsZaehler++
+    }
+
+    /** Trägt eine abgeschlossene Verschiebung (Summe aller Einzelschritte einer Ziehgeste) als
+     *  EINEN Rückgängig-Schritt ein. Verschiebt dabei selbst nichts mehr – das ist während der
+     *  Geste bereits über [verschiebeAusgewaehlte] passiert. */
+    fun protokolliereVerschiebung(ids: List<Long>, gesamtDelta: Offset) {
+        if (ids.isEmpty() || gesamtDelta == Offset.Zero) return
+        rueckgaengigStapel.add(Verschoben(ids, gesamtDelta))
+        wiederholenStapel.clear()
     }
 }
