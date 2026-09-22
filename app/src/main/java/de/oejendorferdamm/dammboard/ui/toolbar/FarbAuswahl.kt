@@ -48,19 +48,29 @@ fun hsvVerlaufsFarbe(fractionX: Float, fractionY: Float): Color {
     return Color(argb)
 }
 
+private val SwatchGroesse = 44.dp
+private val SwatchAbstand = 4.dp
+
+/** Zeilen/Spalten-Aufteilung wie im Original: Stift-Panel 3 Spalten (breiter Verlauf daneben),
+ *  Formen-Panel 4 Spalten (schmalere „Rand"-Leiste daneben) – bei gleicher Farbanzahl. */
 @Composable
 fun FarbGitterUndVerlauf(
     ausgewaehlt: Color,
     onFarbe: (Color) -> Unit,
     modifier: Modifier = Modifier,
-    zeigeVerlauf: Boolean = true
+    zeigeVerlauf: Boolean = true,
+    spalten: Int = 4
 ) {
+    val zeilen = (KreidePalette.size + spalten - 1) / spalten
+    val gitterBreite = SwatchGroesse * spalten + SwatchAbstand * (spalten - 1)
+    val gitterHoehe = SwatchGroesse * zeilen + SwatchAbstand * (zeilen - 1)
+
     Row(modifier = modifier, horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp)) {
         LazyVerticalGrid(
-            columns = GridCells.Fixed(4),
-            modifier = Modifier.width(140.dp).height(96.dp),
-            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
-            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)
+            columns = GridCells.Fixed(spalten),
+            modifier = Modifier.width(gitterBreite).height(gitterHoehe),
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(SwatchAbstand),
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(SwatchAbstand)
         ) {
             items(KreidePalette) { farbe ->
                 FarbFeld(farbe = farbe, ausgewaehlt = farbe == ausgewaehlt, onClick = { onFarbe(farbe) })
@@ -69,7 +79,7 @@ fun FarbGitterUndVerlauf(
 
         if (zeigeVerlauf) {
             VerlaufsQuadrat(
-                modifier = Modifier.size(96.dp),
+                modifier = Modifier.width(gitterHoehe).height(gitterHoehe),
                 onFarbe = onFarbe
             )
         }
@@ -80,20 +90,20 @@ fun FarbGitterUndVerlauf(
 private fun FarbFeld(farbe: Color, ausgewaehlt: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(26.dp)
-            .clip(RoundedCornerShape(5.dp))
+            .size(SwatchGroesse)
+            .clip(RoundedCornerShape(4.dp))
             .background(farbe)
             .border(
                 width = if (farbe == Color.White || farbe.luminanz() > 0.9f) 1.dp else 0.dp,
                 color = Color(0xFFBBBBBB),
-                shape = RoundedCornerShape(5.dp)
+                shape = RoundedCornerShape(4.dp)
             )
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         if (ausgewaehlt) {
             val hakenFarbe = if (farbe.luminanz() > 0.55f) Color.Black else Color.White
-            Text("✓", color = hakenFarbe, fontSize = 13.sp)
+            Text("✓", color = hakenFarbe, fontSize = 20.sp)
         }
     }
 }

@@ -342,38 +342,42 @@ private fun AuswahlKnopf(ausgewaehlt: Boolean, onClick: () -> Unit, groesse: Dp 
 @Composable
 private fun StiftPanelInhalt(state: TafelState) {
     Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Top) {
-        StiftSpalte(
-            fein = true,
-            ausgewaehlt = state.stiftArt == StiftArt.FEIN,
-            breite = state.stiftBreiteFein,
-            bereich = 2f..24f,
-            onArtGewaehlt = { state.stiftArt = StiftArt.FEIN },
-            onBreiteGeaendert = { state.stiftBreiteFein = it }
-        )
-        StiftSpalte(
-            fein = false,
-            ausgewaehlt = state.stiftArt == StiftArt.LEUCHT,
-            breite = state.stiftBreiteLeucht,
-            bereich = 8f..48f,
-            onArtGewaehlt = { state.stiftArt = StiftArt.LEUCHT },
-            onBreiteGeaendert = { state.stiftBreiteLeucht = it }
-        )
-        FarbGitterUndVerlauf(ausgewaehlt = state.stiftFarbe, onFarbe = { state.stiftFarbe = it })
+        // Wie im Original: Stiftart + zugehöriger Dicke-Regler stehen nebeneinander in einer
+        // Zeile, die beiden Stiftarten (fein/leucht) sind untereinander gestapelt.
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            StiftReihe(
+                fein = true,
+                ausgewaehlt = state.stiftArt == StiftArt.FEIN,
+                breite = state.stiftBreiteFein,
+                bereich = 2f..24f,
+                onArtGewaehlt = { state.stiftArt = StiftArt.FEIN },
+                onBreiteGeaendert = { state.stiftBreiteFein = it }
+            )
+            StiftReihe(
+                fein = false,
+                ausgewaehlt = state.stiftArt == StiftArt.LEUCHT,
+                breite = state.stiftBreiteLeucht,
+                bereich = 8f..48f,
+                onArtGewaehlt = { state.stiftArt = StiftArt.LEUCHT },
+                onBreiteGeaendert = { state.stiftBreiteLeucht = it }
+            )
+        }
+        FarbGitterUndVerlauf(ausgewaehlt = state.stiftFarbe, onFarbe = { state.stiftFarbe = it }, spalten = 3)
     }
 }
 
 @Composable
-private fun StiftSpalte(
+private fun StiftReihe(
     fein: Boolean, ausgewaehlt: Boolean, breite: Float, bereich: ClosedFloatingPointRange<Float>,
     onArtGewaehlt: () -> Unit, onBreiteGeaendert: (Float) -> Unit
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
         AuswahlKnopf(ausgewaehlt = ausgewaehlt, onClick = onArtGewaehlt, groesse = 36.dp) {
             StiftArtSymbol(fein = fein, modifier = Modifier.size(20.dp), tint = SymbolFarbe)
         }
         VertikalerRegler(
             wert = breite, bereich = bereich, onWertGeaendert = onBreiteGeaendert,
-            modifier = Modifier.width(26.dp).height(88.dp)
+            modifier = Modifier.width(26.dp).height(78.dp)
         )
     }
 }
@@ -393,7 +397,7 @@ private fun VertikalerRegler(
         onWertGeaendert(bereich.start + neuerAnteil * spanne)
     }
 
-    Box(
+    Canvas(
         modifier = modifier
             .pointerInput(bereich) {
                 detectDragGestures { change, _ ->
@@ -405,15 +409,13 @@ private fun VertikalerRegler(
                 detectTapGestures { position -> setzeAusPosition(position.y, size.height.toFloat()) }
             }
     ) {
-        Canvas(modifier = Modifier.size(width = 26.dp, height = 88.dp)) {
-            drawLine(
-                color = Color(0xFFC9C7C0), start = Offset(size.width / 2, 6f), end = Offset(size.width / 2, size.height - 6f),
-                strokeWidth = 4f, cap = StrokeCap.Round
-            )
-            val knopfY = 6f + (size.height - 12f) * (1f - anteil)
-            drawCircle(Color(0xFFE33B3B), radius = 6f, center = Offset(size.width / 2, knopfY))
-            drawCircle(Color.White, radius = 6f, center = Offset(size.width / 2, knopfY), style = Stroke(width = 1.6f))
-        }
+        drawLine(
+            color = Color(0xFFC9C7C0), start = Offset(size.width / 2, 6f), end = Offset(size.width / 2, size.height - 6f),
+            strokeWidth = 4f, cap = StrokeCap.Round
+        )
+        val knopfY = 6f + (size.height - 12f) * (1f - anteil)
+        drawCircle(Color(0xFFE33B3B), radius = 6f, center = Offset(size.width / 2, knopfY))
+        drawCircle(Color.White, radius = 6f, center = Offset(size.width / 2, knopfY), style = Stroke(width = 1.6f))
     }
 }
 
@@ -428,7 +430,7 @@ private val FormenGitter = listOf(
 
 @Composable
 private fun FormenPanelInhalt(state: TafelState) {
-    Column(modifier = Modifier.width(340.dp)) {
+    Column(modifier = Modifier.width(410.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
             listOf("2D", "3D", "Anpassen", "Farbe").forEachIndexed { index, titel ->
                 val aktiv = state.formTabIndex == index
@@ -491,8 +493,8 @@ private fun FormenTab2D(state: TafelState) {
 private fun RandVorschau(farbe: Color, breite: Float) {
     Row(
         modifier = Modifier
-            .width(150.dp)
-            .height(26.dp)
+            .width(188.dp)
+            .height(30.dp)
             .clip(RoundedCornerShape(50))
             .background(Color.White)
             .border(1.dp, Color(0xFFE2E0D8), RoundedCornerShape(50))
