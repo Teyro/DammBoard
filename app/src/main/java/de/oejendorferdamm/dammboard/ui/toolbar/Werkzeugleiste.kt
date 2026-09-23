@@ -290,7 +290,7 @@ private fun HauptLeiste(
                 modifier = Modifier.semantics { contentDescription = "Vorherige Seite" }
             ) {
                 AllgemeinSymbol(
-                    AllgemeinesSymbol.PFEIL_LINKS, Modifier.size(20.dp),
+                    AllgemeinesSymbol.PFEIL_LINKS, Modifier.size(22.dp),
                     if (state.aktiveSeite > 0) SymbolFarbe else SymbolFarbeSchwach
                 )
             }
@@ -304,7 +304,7 @@ private fun HauptLeiste(
                 modifier = Modifier.semantics { contentDescription = "Nächste Seite" }
             ) {
                 AllgemeinSymbol(
-                    AllgemeinesSymbol.PFEIL_RECHTS, Modifier.size(20.dp),
+                    AllgemeinesSymbol.PFEIL_RECHTS, Modifier.size(22.dp),
                     if (state.aktiveSeite < state.seiten.lastIndex) SymbolFarbe else SymbolFarbeSchwach
                 )
             }
@@ -390,7 +390,7 @@ private fun StiftPanelInhalt(state: TafelState) {
             wert = breite,
             bereich = bereich,
             onWertGeaendert = { neu -> if (fein) state.stiftBreiteFein = neu else state.stiftBreiteLeucht = neu },
-            modifier = Modifier.width(26.dp).height(StiftReglerHoehe)
+            modifier = Modifier.width(34.dp).height(StiftReglerHoehe)
         )
         FarbGitterUndVerlauf(ausgewaehlt = state.stiftFarbe, onFarbe = { state.stiftFarbe = it }, spalten = 3)
     }
@@ -423,13 +423,22 @@ private fun VertikalerRegler(
                 detectTapGestures { position -> setzeAusPosition(position.y, size.height.toFloat()) }
             }
     ) {
+        // Auf einem großen Touch-Board aus normalem Betrachtungsabstand ist eine dünne 4px-Linie
+        // praktisch unsichtbar – deutlich kräftigere Leiste, dazu ein Füllbalken als Mengenanzeige
+        // (wie bei einem Pegel), damit die aktuell eingestellte Dicke auf einen Blick klar ist.
+        val rand = 10f
+        val leistenBreite = 14f
         drawLine(
-            color = Color(0xFFC9C7C0), start = Offset(size.width / 2, 6f), end = Offset(size.width / 2, size.height - 6f),
-            strokeWidth = 4f, cap = StrokeCap.Round
+            color = Color(0xFFDAD8CF), start = Offset(size.width / 2, rand), end = Offset(size.width / 2, size.height - rand),
+            strokeWidth = leistenBreite, cap = StrokeCap.Round
         )
-        val knopfY = 6f + (size.height - 12f) * (1f - anteil)
-        drawCircle(Color(0xFFE33B3B), radius = 6f, center = Offset(size.width / 2, knopfY))
-        drawCircle(Color.White, radius = 6f, center = Offset(size.width / 2, knopfY), style = Stroke(width = 1.6f))
+        val knopfY = rand + (size.height - rand * 2) * (1f - anteil)
+        drawLine(
+            color = Color(0xFF3A3A36), start = Offset(size.width / 2, knopfY), end = Offset(size.width / 2, size.height - rand),
+            strokeWidth = leistenBreite, cap = StrokeCap.Round
+        )
+        drawCircle(Color.White, radius = 13f, center = Offset(size.width / 2, knopfY))
+        drawCircle(Color(0xFFE33B3B), radius = 13f, center = Offset(size.width / 2, knopfY), style = Stroke(width = 3.5f))
     }
 }
 

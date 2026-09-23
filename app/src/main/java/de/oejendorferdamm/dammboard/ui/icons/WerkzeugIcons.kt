@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -415,15 +416,26 @@ fun AllgemeinSymbol(symbol: AllgemeinesSymbol, modifier: Modifier = Modifier, ti
                 linie(Offset(w * 0.5f, h * 0.22f), Offset(w * 0.5f, h * 0.78f), tint, 2.8f)
                 linie(Offset(w * 0.22f, h * 0.5f), Offset(w * 0.78f, h * 0.5f), tint, 2.8f)
             }
-            // Schlichter, kräftiger Chevron statt Pfeil-mit-Schaft – näher am Original.
-            AllgemeinesSymbol.PFEIL_LINKS -> {
-                linie(Offset(w * 0.64f, h * 0.24f), Offset(w * 0.36f, h * 0.5f), tint, 3f)
-                linie(Offset(w * 0.36f, h * 0.5f), Offset(w * 0.64f, h * 0.76f), tint, 3f)
-            }
-            AllgemeinesSymbol.PFEIL_RECHTS -> {
-                linie(Offset(w * 0.36f, h * 0.24f), Offset(w * 0.64f, h * 0.5f), tint, 3f)
-                linie(Offset(w * 0.64f, h * 0.5f), Offset(w * 0.36f, h * 0.76f), tint, 3f)
-            }
+            // Ausgefülltes Dreieck statt dünner Linien-Chevron – auf einem großen Touch-Board aus
+            // Entfernung betrachtet ist eine dünne Kontur kaum zu erkennen, eine satte Fläche schon.
+            AllgemeinesSymbol.PFEIL_LINKS -> drawPath(
+                Path().apply {
+                    moveTo(w * 0.68f, h * 0.18f)
+                    lineTo(w * 0.28f, h * 0.5f)
+                    lineTo(w * 0.68f, h * 0.82f)
+                    close()
+                },
+                tint
+            )
+            AllgemeinesSymbol.PFEIL_RECHTS -> drawPath(
+                Path().apply {
+                    moveTo(w * 0.32f, h * 0.18f)
+                    lineTo(w * 0.72f, h * 0.5f)
+                    lineTo(w * 0.32f, h * 0.82f)
+                    close()
+                },
+                tint
+            )
         }
     }
 }
