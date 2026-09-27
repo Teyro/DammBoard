@@ -1,4 +1,5 @@
 <resources>
-    <color name="tafel_gruen">#1E3D2F</color>
+    <!-- Gleiches Grün wie die Tafel selbst, damit beim Start nichts aufblitzt. -->
+    <color name="tafel_gruen">#5E8C6A</color>
     <color name="kreide_weiss">#F5F3EE</color>
 </resources>

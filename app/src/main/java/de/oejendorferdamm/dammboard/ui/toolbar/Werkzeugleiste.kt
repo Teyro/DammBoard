@@ -413,6 +413,3 @@ fun SeitenLeiste(state: TafelState, modifier: Modifier = Modifier) {
         }
     }
 }
-
-/** Kleiner Helfer für Stellen, die nur tippbar sein sollen (Beschriftungen in Panels). */
-internal fun Modifier.antippbar(onClick: () -> Unit): Modifier = clickable(role = Role.Button, onClick = onClick)
