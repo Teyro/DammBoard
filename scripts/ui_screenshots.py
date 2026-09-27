@@ -30,10 +30,42 @@ def screenshot(dateiname: str):
     print(f"Screenshot gespeichert: {pfad}")
 
 
+def ui_baum():
+    """uiautomator-Abbild der Oberfläche; im Emulator schlägt das gelegentlich fehl – dann erneut."""
+    for _ in range(4):
+        dump = adb("shell", "uiautomator", "dump", "/sdcard/dump.xml", check=False)
+        pull = adb("pull", "/sdcard/dump.xml", "dump.xml", check=False)
+        if dump.returncode == 0 and pull.returncode == 0:
+            try:
+                return ET.parse("dump.xml")
+            except ET.ParseError:
+                pass
+        time.sleep(1.5)
+    return None
+
+
+def raeume_systemdialoge_weg():
+    """Nach 'wm density' stürzt im Emulator gern der Launcher ab; sein Fehlerdialog verdeckt die
+    App. Mit Zurück schließen und DammBoard wieder nach vorne holen."""
+    for _ in range(3):
+        baum = ui_baum()
+        if baum is None:
+            break
+        texte = " ".join((k.get("text") or "") for k in baum.iter("node"))
+        if "has stopped" in texte or "keeps stopping" in texte or "isn't responding" in texte:
+            adb("shell", "input", "keyevent", "KEYCODE_BACK")
+            time.sleep(1.5)
+        else:
+            break
+    adb("shell", "am", "start", "-n", f"{PAKET}/.MainActivity")
+    time.sleep(2)
+
+
 def tippe_mitte_von(beschreibung: str) -> bool:
-    adb("shell", "uiautomator", "dump", "/sdcard/dump.xml")
-    adb("pull", "/sdcard/dump.xml", "dump.xml")
-    baum = ET.parse("dump.xml")
+    baum = ui_baum()
+    if baum is None:
+        print(f"WARNUNG: Oberfläche nicht lesbar, '{beschreibung}' übersprungen", file=sys.stderr)
+        return False
     for knoten in baum.iter("node"):
         if knoten.get("content-desc") == beschreibung:
             grenzen = knoten.get("bounds", "")
@@ -69,6 +101,7 @@ def main():
         sichere_logcat()
         sys.exit(1)
 
+    raeume_systemdialoge_weg()
     screenshot("01_start.png")
 
     ablauf = [

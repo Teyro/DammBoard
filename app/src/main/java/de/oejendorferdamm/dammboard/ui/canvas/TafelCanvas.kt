@@ -80,6 +80,14 @@ private fun gestricheltEffekt(p: Float): PathEffect {
     return strichelEffekt
 }
 
+/**
+ * Strichelung für gezeichnete Linien und Formen. Die runden Linienenden ragen um die halbe
+ * Linienbreite in jede Lücke – bei festen Abständen verschwanden die Lücken dicker Linien
+ * deshalb ganz. Hier wachsen Striche und Lücken mit der Linienbreite mit.
+ */
+private fun strichelungFuer(breite: Float, p: Float): PathEffect =
+    PathEffect.dashPathEffect(floatArrayOf(8f * p + breite * 0.5f, 7f * p + breite), 0f)
+
 /** Eine wiederverwendete Paint für Längenbeschriftungen statt einer neuen pro Beschriftung und Frame. */
 private val etikettPinsel = android.graphics.Paint().apply {
     color = android.graphics.Color.WHITE
@@ -828,7 +836,7 @@ private fun DrawScope.zeichneStrich(strich: StrichItem, pfadCache: PfadCache?) {
         pfadCache?.pfadFuer(strich) ?: glatterPfad(strich.punkte), strich.farbe,
         style = Stroke(
             width = strich.breite, cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round,
-            pathEffect = if (strich.gestrichelt) gestricheltEffekt(pixelFaktor) else null
+            pathEffect = if (strich.gestrichelt) strichelungFuer(strich.breite, pixelFaktor) else null
         )
     )
 }
@@ -874,7 +882,7 @@ private fun DrawScope.zeichneForm(form: FormItem) {
     val h = kotlin.math.abs(form.ende.y - form.start.y)
     val randStil = Stroke(
         width = form.randBreite, cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round,
-        pathEffect = if (form.gestrichelt) gestricheltEffekt(pixelFaktor) else null
+        pathEffect = if (form.gestrichelt) strichelungFuer(form.randBreite, pixelFaktor) else null
     )
 
     fun fuelleUndZeichne(pfad: Path) {

@@ -33,7 +33,7 @@ import kotlin.math.sin
 
 private const val SYMBOL_RASTER = 24f
 
-private val strichelung = PathEffect.dashPathEffect(floatArrayOf(3.4f, 2.6f), 0f)
+private val strichelung = PathEffect.dashPathEffect(floatArrayOf(3.0f, 2.4f), 0f)
 private val punktierung = PathEffect.dashPathEffect(floatArrayOf(0.01f, 2.7f), 0f)
 
 /** Zeichnet [zeichnen] im virtuellen Symbolraster (w/h = Rastermaße) und skaliert es auf die echte Größe. */
@@ -48,8 +48,10 @@ internal fun DrawScope.symbolRaster(zeichnen: DrawScope.(w: Float, h: Float) -> 
 }
 
 private fun DrawScope.linie(a: Offset, b: Offset, tint: Color, breite: Float = 1.9f, gestrichelt: Boolean = false) {
+    // Gestrichelt mit geraden Enden: runde Enden würden die kleinen Lücken im Symbol zudecken.
     drawLine(
-        color = tint, start = a, end = b, strokeWidth = breite, cap = StrokeCap.Round,
+        color = tint, start = a, end = b, strokeWidth = breite,
+        cap = if (gestrichelt) StrokeCap.Butt else StrokeCap.Round,
         pathEffect = if (gestrichelt) strichelung else null
     )
 }
@@ -350,7 +352,11 @@ fun FormSymbol(typ: FormTyp, modifier: Modifier = Modifier, tint: Color = Color.
                     }
                     drawPath(
                         pfad, tint,
-                        style = Stroke(width = 1.7f, cap = StrokeCap.Round, pathEffect = if (gestrichelt) strichelung else null)
+                        style = Stroke(
+                            width = 1.7f,
+                            cap = if (gestrichelt) StrokeCap.Butt else StrokeCap.Round,
+                            pathEffect = if (gestrichelt) strichelung else null
+                        )
                     )
                     pfeilSpitze(Offset(w * 0.82f, h * 0.24f), Offset(w * 0.6f, h * 0.16f), tint)
                 }
