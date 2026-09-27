@@ -147,6 +147,25 @@ def main():
         time.sleep(0.5)
         screenshot("09_rueckgaengig.png")
 
+    # Gestrichelte Linie und gestrichelter Pfeil (auf Android 8 früher durchgezogen)
+    if tippe_mitte_von("Formen"):
+        time.sleep(0.8)
+        if tippe_mitte_von("Linie gestrichelt"):
+            tippe_mitte_von("Formen")  # Panel schließen
+            time.sleep(0.5)
+            y = int(hoehe * 0.55)
+            adb("shell", "input", "swipe", str(int(breite * 0.15)), str(y), str(int(breite * 0.55)), str(y), "500")
+            time.sleep(0.5)
+        if tippe_mitte_von("Formen"):
+            time.sleep(0.8)
+            if tippe_mitte_von("Pfeil gestrichelt"):
+                tippe_mitte_von("Formen")
+                time.sleep(0.5)
+                y = int(hoehe * 0.65)
+                adb("shell", "input", "swipe", str(int(breite * 0.15)), str(y), str(int(breite * 0.55)), str(y), "500")
+                time.sleep(0.8)
+        screenshot("09b_gestrichelt.png")
+
     # Seiten: neue Seite anlegen (Pille zeigt 2/2), dann zurückblättern
     if tippe_mitte_von("Seite hinzufügen"):
         time.sleep(0.8)

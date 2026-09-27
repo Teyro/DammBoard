@@ -187,6 +187,28 @@ private val FormenGitter = listOf(
     FormTyp.LINIE_GESTRICHELT, FormTyp.PFEIL_GESTRICHELT, FormTyp.DOPPELPFEIL_GESTRICHELT, FormTyp.FREIHANDPFEIL_GESTRICHELT
 )
 
+/** Name einer Form – für Bedienungshilfen (Vorlesen) und die automatischen Oberflächentests. */
+private fun formBeschreibung(typ: FormTyp): String = when (typ) {
+    FormTyp.DREIECK_RECHTS -> "Rechtwinkliges Dreieck"
+    FormTyp.DREIECK -> "Dreieck"
+    FormTyp.KREIS -> "Kreis"
+    FormTyp.ELLIPSE -> "Ellipse"
+    FormTyp.QUADRAT -> "Quadrat"
+    FormTyp.SECHSECK -> "Sechseck"
+    FormTyp.ABGERUNDET -> "Abgerundetes Rechteck"
+    FormTyp.FUENFECK -> "Fünfeck"
+    FormTyp.STERN -> "Stern"
+    FormTyp.WELLE -> "Welle"
+    FormTyp.LINIE -> "Linie"
+    FormTyp.PFEIL -> "Pfeil"
+    FormTyp.DOPPELPFEIL -> "Doppelpfeil"
+    FormTyp.FREIHANDPFEIL -> "Bogenpfeil"
+    FormTyp.LINIE_GESTRICHELT -> "Linie gestrichelt"
+    FormTyp.PFEIL_GESTRICHELT -> "Pfeil gestrichelt"
+    FormTyp.DOPPELPFEIL_GESTRICHELT -> "Doppelpfeil gestrichelt"
+    FormTyp.FREIHANDPFEIL_GESTRICHELT -> "Bogenpfeil gestrichelt"
+}
+
 @Composable
 private fun FormenPanel(state: TafelState) {
     Column(Modifier.width(470.dp)) {
@@ -240,7 +262,7 @@ private fun Formen2D(state: TafelState) {
             FormenGitter.chunked(5).forEach { zeile ->
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     zeile.forEach { typ ->
-                        AuswahlKreis(state.formTyp == typ, onClick = { state.formTyp = typ }, groesse = 48.dp) {
+                        AuswahlKreis(state.formTyp == typ, onClick = { state.formTyp = typ }, groesse = 48.dp, beschreibung = formBeschreibung(typ)) {
                             FormSymbol(typ, Modifier.size(30.dp), SymbolFarbe)
                         }
                     }

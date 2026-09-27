@@ -88,6 +88,30 @@ private fun gestricheltEffekt(p: Float): PathEffect {
 private fun strichelungFuer(breite: Float, p: Float): PathEffect =
     PathEffect.dashPathEffect(floatArrayOf(8f * p + breite * 0.5f, 7f * p + breite), 0f)
 
+/**
+ * Gerade Linie, gestrichelt als Pfad gezeichnet: Android vor Version 9 (also die Android-8-Boards)
+ * ignoriert die Strichelung bei drawLine mit Hardwarebeschleunigung – die Linie war dort immer
+ * durchgezogen, egal ob "gestrichelt" gewählt war.
+ */
+private fun DrawScope.geradeLinie(
+    farbe: Color,
+    start: Offset,
+    ende: Offset,
+    breite: Float,
+    effekt: PathEffect?,
+    cap: StrokeCap = StrokeCap.Round
+) {
+    if (effekt == null) {
+        drawLine(farbe, start, ende, strokeWidth = breite, cap = cap)
+    } else {
+        val pfad = Path().apply {
+            moveTo(start.x, start.y)
+            lineTo(ende.x, ende.y)
+        }
+        drawPath(pfad, farbe, style = Stroke(width = breite, cap = cap, pathEffect = effekt))
+    }
+}
+
 /** Eine wiederverwendete Paint für Längenbeschriftungen statt einer neuen pro Beschriftung und Frame. */
 private val etikettPinsel = android.graphics.Paint().apply {
     color = android.graphics.Color.WHITE
@@ -569,10 +593,10 @@ fun TafelCanvas(
                     drawRect(color = hintergrund.farbe)
                     zeichneMuster(hintergrund.muster, hintergrund.farbe)
                     if (geteilt) {
-                        drawLine(
-                            color = Color.White.copy(alpha = 0.35f),
-                            start = Offset(this.size.width / 2, 0f), end = Offset(this.size.width / 2, this.size.height),
-                            strokeWidth = 2f * p, pathEffect = gestricheltEffekt(p)
+                        geradeLinie(
+                            Color.White.copy(alpha = 0.35f),
+                            Offset(this.size.width / 2, 0f), Offset(this.size.width / 2, this.size.height),
+                            2f * p, gestricheltEffekt(p), cap = StrokeCap.Butt
                         )
                     }
                     seite.items.forEach { item -> zeichneItem(item, pfadCache) }
@@ -920,7 +944,7 @@ private fun DrawScope.zeichneForm(form: FormItem) {
         FormTyp.FUENFECK -> fuelleUndZeichne(vieleckPfad(topLeft, w, h, 5))
         FormTyp.STERN -> fuelleUndZeichne(sternPfad(topLeft, w, h))
         FormTyp.WELLE -> drawPath(wellenPfad(topLeft, w, h), form.randFarbe, style = randStil)
-        FormTyp.LINIE, FormTyp.LINIE_GESTRICHELT -> drawLine(form.randFarbe, form.start, form.ende, strokeWidth = form.randBreite, cap = StrokeCap.Round, pathEffect = randStil.pathEffect)
+        FormTyp.LINIE, FormTyp.LINIE_GESTRICHELT -> geradeLinie(form.randFarbe, form.start, form.ende, form.randBreite, randStil.pathEffect)
         FormTyp.PFEIL, FormTyp.PFEIL_GESTRICHELT -> zeichnePfeil(form.start, form.ende, form.randFarbe, form.randBreite, false, randStil)
         FormTyp.DOPPELPFEIL, FormTyp.DOPPELPFEIL_GESTRICHELT -> zeichnePfeil(form.start, form.ende, form.randFarbe, form.randBreite, true, randStil)
         FormTyp.FREIHANDPFEIL, FormTyp.FREIHANDPFEIL_GESTRICHELT -> {
@@ -936,7 +960,7 @@ private fun DrawScope.zeichneForm(form: FormItem) {
 }
 
 private fun DrawScope.zeichnePfeil(start: Offset, ende: Offset, farbe: Color, breite: Float, doppelt: Boolean, stil: Stroke) {
-    drawLine(farbe, start, ende, strokeWidth = breite, cap = StrokeCap.Round, pathEffect = stil.pathEffect)
+    geradeLinie(farbe, start, ende, breite, stil.pathEffect)
     zeichnePfeilspitze(ende, start, farbe, breite)
     if (doppelt) zeichnePfeilspitze(start, ende, farbe, breite)
 }

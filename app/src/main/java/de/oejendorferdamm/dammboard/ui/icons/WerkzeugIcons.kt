@@ -48,12 +48,17 @@ internal fun DrawScope.symbolRaster(zeichnen: DrawScope.(w: Float, h: Float) -> 
 }
 
 private fun DrawScope.linie(a: Offset, b: Offset, tint: Color, breite: Float = 1.9f, gestrichelt: Boolean = false) {
-    // Gestrichelt mit geraden Enden: runde Enden würden die kleinen Lücken im Symbol zudecken.
-    drawLine(
-        color = tint, start = a, end = b, strokeWidth = breite,
-        cap = if (gestrichelt) StrokeCap.Butt else StrokeCap.Round,
-        pathEffect = if (gestrichelt) strichelung else null
-    )
+    if (!gestrichelt) {
+        drawLine(color = tint, start = a, end = b, strokeWidth = breite, cap = StrokeCap.Round)
+        return
+    }
+    // Gestrichelt als Pfad (Android 8 ignoriert Strichelungen bei drawLine) und mit geraden
+    // Enden – runde Enden würden die kleinen Lücken im Symbol zudecken.
+    val pfad = Path().apply {
+        moveTo(a.x, a.y)
+        lineTo(b.x, b.y)
+    }
+    drawPath(pfad, tint, style = Stroke(width = breite, cap = StrokeCap.Butt, pathEffect = strichelung))
 }
 
 private fun kontur(breite: Float) = Stroke(width = breite, cap = StrokeCap.Round, join = StrokeJoin.Round)
