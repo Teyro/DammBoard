@@ -56,7 +56,9 @@ import de.oejendorferdamm.dammboard.model.SymbolGroesse
 import de.oejendorferdamm.dammboard.model.UpdateInfo
 import de.oejendorferdamm.dammboard.ui.icons.AllgemeinSymbol
 import de.oejendorferdamm.dammboard.ui.icons.AllgemeinesSymbol
+import de.oejendorferdamm.dammboard.ui.update.ApkPruefung
 import de.oejendorferdamm.dammboard.ui.update.installationsIntentFuer
+import de.oejendorferdamm.dammboard.ui.update.pruefeUpdateApk
 import de.oejendorferdamm.dammboard.ui.update.kannUnbekannteQuellenInstallieren
 import de.oejendorferdamm.dammboard.ui.update.oeffneUnbekannteQuellenEinstellungen
 import kotlinx.coroutines.launch
@@ -151,8 +153,8 @@ fun EinstellungenScreen(
             Spacer(Modifier.height(22.dp))
             Text("Symbolgröße", color = Textfarbe, fontSize = 15.sp, fontWeight = FontWeight.Bold)
             Text(
-                "Größe aller Knöpfe, Symbole und Menüs – inklusive der Tippflächen. Auf großen " +
-                    "Bildschirmen wird zusätzlich automatisch vergrößert.",
+                "\"Wie Original\" entspricht genau der Tafel-App des Boards – Knöpfe, Abstände und Menüs " +
+                    "werden automatisch an die Bildschirmbreite angepasst. Größer oder kleiner verändert alles gemeinsam.",
                 color = TextfarbeSchwach, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
             )
             Row(
@@ -268,10 +270,19 @@ private fun UpdateAbschnitt(
         fehler = null
         scope.launch {
             val ziel = File(context.cacheDir, "dammboard-update.apk")
-            val ergebnis = client.apkHerunterladen(zielInfo.herunterladenUrl, ziel) { fortschritt = it }
+            val ergebnis = client.apkHerunterladen(zielInfo.herunterladenUrl, ziel, zielInfo.dateigroesseBytes) { fortschritt = it }
             ladend = false
-            ergebnis.onSuccess {
-                context.startActivity(installationsIntentFuer(context, it))
+            ergebnis.onSuccess { datei ->
+                // Vor dem Installer prüfen, ob das Update überhaupt passt – sonst meldet Android
+                // nur ein unverständliches "App nicht installiert".
+                when (pruefeUpdateApk(context, datei)) {
+                    ApkPruefung.IN_ORDNUNG -> context.startActivity(installationsIntentFuer(context, datei))
+                    ApkPruefung.ANDERE_SIGNATUR -> fehler = "Auf diesem Gerät ist noch eine alte Testversion von DammBoard " +
+                        "installiert, die anders signiert ist. Bitte DammBoard einmal deinstallieren und die aktuelle " +
+                        "DammBoard.apk von github.com/Teyro/DammBoard/releases neu installieren – danach klappen " +
+                        "Updates wieder direkt hier."
+                    ApkPruefung.UNGUELTIG -> fehler = "Die heruntergeladene Datei ist keine gültige DammBoard-Installationsdatei."
+                }
             }.onFailure {
                 fehler = "Herunterladen fehlgeschlagen: ${it.message}"
             }

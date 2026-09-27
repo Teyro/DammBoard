@@ -11,7 +11,7 @@ Winkelmesser, Zirkel u. a. mit drehbarer Führung und Längenanzeige)
 sowie ein Werkzeugkasten für Hintergrund, geteilte Ansicht,
 Bildschirmfoto und Lupe.
 
-## Funktionen (v0.5.0)
+## Funktionen (v0.6.0)
 
 - Freihand-Zeichnen mit Finger/Stift, mehrere Seiten mit eigener
   Undo/Redo-Historie
@@ -28,10 +28,14 @@ Bildschirmfoto und Lupe.
   werden im Einstellungsmenü hinterlegt.
 - Tafelbild als PNG in die Galerie speichern oder über die
   Systemfreigabe teilen
-- **Automatische Größenanpassung**: Knöpfe, Menüs, Radierer, Lineal
-  und Hilfslinien wachsen auf großen/hochauflösenden Boards
-  automatisch mit – zusätzlich einstellbar über die Symbolgröße
-  (Kompakt bis Sehr groß) im Einstellungsmenü
+- **Oberfläche wie die Original-Tafel-App der CTOUCH-Boards**: runde
+  Knöpfe über die ganze Breite verteilt, Panels direkt über dem
+  jeweiligen Werkzeug. Alle Maße stammen aus Screenshots des Originals
+  (1920×1080) und werden proportional auf den Bildschirm übertragen –
+  unabhängig davon, welche Pixeldichte ein Board meldet. Die Größe ist
+  zusätzlich einstellbar ("Kompakt" bis "Sehr groß")
+- Die Zurück-Taste des Boards schließt erst Panels und fragt vor dem
+  Beenden nach, statt den Tafelinhalt sofort zu verwerfen
 
 ## Technik
 
@@ -44,10 +48,12 @@ Bildschirmfoto und Lupe.
 - Netzwerkzugriff nur für die IServ-Anbindung (WebDAV über
   [OkHttp](https://square.github.io/okhttp/)); alles andere läuft
   lokal auf dem Gerät
-- Einstellungen liegen lokal in DataStore Preferences – **das
-  IServ-Passwort wird dabei unverschlüsselt gespeichert**, das ist
-  für ein von der Schule verwaltetes Tablet vorgesehen, nicht für ein
-  privates Gerät mit sensiblen Zugangsdaten Dritter
+- Einstellungen liegen lokal in DataStore Preferences; das
+  IServ-Passwort wird mit einem Schlüssel aus dem Android-Keystore
+  verschlüsselt (AES-GCM). IServ nur über https, ohne Weiterleitung
+  auf unverschlüsselte Adressen
+- Updates kommen ausschließlich aus den Releases dieses Repositories;
+  vor der Installation prüft die App Paketname, Signatur und Größe
 
 ## Hilfe bei Problemen
 
@@ -60,8 +66,12 @@ Bildschirmfoto und Lupe.
   neu installieren – danach funktionieren Updates wieder direkt aus
   der App.
 - **Alles wirkt zu klein oder zu groß**: Im Einstellungsmenü unter
-  „Symbolgröße" anpassen. Die Zeile darunter zeigt, welche Auflösung
-  und Pixeldichte das Gerät meldet – hilfreich bei Rückfragen.
+  „Symbolgröße" anpassen („Wie Original" = genau wie die Tafel-App
+  des Boards). Die Zeile darunter zeigt, welche Auflösung und
+  Pixeldichte das Gerät meldet – hilfreich bei Rückfragen.
+- **Welche Version läuft?** Nach jedem Update erscheint oben kurz ein
+  Hinweis mit der Versionsnummer; dauerhaft steht sie im Menü (☰)
+  unter „Installiert".
 
 ## Bauen
 

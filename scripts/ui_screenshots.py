@@ -114,10 +114,31 @@ def main():
         time.sleep(0.5)
         screenshot("09_rueckgaengig.png")
 
-    # Einstellungen (zeigt auch die gemeldete Auflösung/Dichte und den Bedienfaktor)
+    # Seiten: neue Seite anlegen (Pille zeigt 2/2), dann zurückblättern
+    if tippe_mitte_von("Seite hinzufügen"):
+        time.sleep(0.8)
+        screenshot("10_neue_seite.png")
+        tippe_mitte_von("Vorherige Seite")
+        time.sleep(0.8)
+
+    # Zurück-Taste: darf die App nicht sofort beenden, sondern muss nachfragen
+    adb("shell", "input", "keyevent", "KEYCODE_BACK")
+    time.sleep(1)
+    screenshot("11_zurueck_taste.png")
+    if not laeuft_noch():
+        print("FEHLER: Zurück-Taste hat die App beendet", file=sys.stderr)
+        sichere_logcat()
+        sys.exit(1)
+    adb("shell", "input", "keyevent", "KEYCODE_BACK")
+    time.sleep(1)
+
+    # Einstellungen (zeigt auch die gemeldete Auflösung/Dichte und die Oberflächengröße)
     if tippe_mitte_von("Menü"):
         time.sleep(1.5)
-        screenshot("10_einstellungen.png")
+        screenshot("12_einstellungen.png")
+        adb("shell", "input", "keyevent", "KEYCODE_BACK")
+        time.sleep(1)
+        screenshot("13_zurueck_zur_tafel.png")
 
     if not laeuft_noch():
         print("FEHLER: App ist während der Bedienung abgestürzt", file=sys.stderr)

@@ -1,6 +1,8 @@
 package de.oejendorferdamm.dammboard.ui.canvas
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -527,6 +529,14 @@ fun TafelCanvas(
                 graphicsLayer.record { this@drawWithContent.drawContent() }
                 drawLayer(graphicsLayer)
                 state.lupePosition?.let { pos -> zeichneLupe(graphicsLayer, pos) }
+            }
+            // Wie im Original: Wer auf die Tafel tippt oder zu zeichnen beginnt, schließt ein
+            // offenes Panel. Nur beobachten, nichts verbrauchen – das Zeichnen läuft normal weiter.
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    if (state.offenesPanel != null) state.schliessePanel()
+                }
             }
             .then(gesteModifier)
     ) {

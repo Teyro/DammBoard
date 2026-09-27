@@ -15,8 +15,12 @@ import de.oejendorferdamm.dammboard.model.HintergrundStil
 import de.oejendorferdamm.dammboard.model.IServZugang
 import de.oejendorferdamm.dammboard.model.MusterTyp
 import de.oejendorferdamm.dammboard.model.SymbolGroesse
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 
 private val Context.einstellungenDataStore by preferencesDataStore(name = "dammboard_einstellungen")
 
@@ -31,22 +35,29 @@ private object Schluessel {
     val HINTERGRUND_MERKEN = booleanPreferencesKey("hintergrund_merken")
     val HINTERGRUND_FARBE = intPreferencesKey("hintergrund_farbe")
     val HINTERGRUND_MUSTER = stringPreferencesKey("hintergrund_muster")
+    val ZULETZT_GESTARTETE_VERSION = stringPreferencesKey("zuletzt_gestartete_version")
 }
 
 /**
- * Persistiert IServ-Zugangsdaten und den Animationsmodus lokal auf dem Gerät (DataStore
- * Preferences, unverschlüsselt). Für ein von der Schule verwaltetes Tablet ausreichend; das
- * Passwort liegt aber im Klartext in der App-Sandbox, nicht in einem verschlüsselten Speicher.
+ * Persistiert alle Einstellungen lokal auf dem Gerät (DataStore Preferences). Das IServ-Passwort
+ * wird dabei mit einem Schlüssel aus dem Android-Keystore verschlüsselt (siehe Tresor.kt);
+ * ältere, noch unverschlüsselt gespeicherte Passwörter werden beim nächsten Speichern umgestellt.
  */
 class EinstellungenSpeicher(private val context: Context) {
 
-    val iservZugang: Flow<IServZugang> = context.einstellungenDataStore.data.map { prefs ->
-        IServZugang(
-            serverUrl = prefs[Schluessel.SERVER_URL] ?: "",
-            benutzername = prefs[Schluessel.BENUTZERNAME] ?: "",
-            passwort = prefs[Schluessel.PASSWORT] ?: ""
-        )
-    }
+    val iservZugang: Flow<IServZugang> = context.einstellungenDataStore.data
+        .map { prefs ->
+            Triple(
+                prefs[Schluessel.SERVER_URL] ?: "",
+                prefs[Schluessel.BENUTZERNAME] ?: "",
+                prefs[Schluessel.PASSWORT] ?: ""
+            )
+        }
+        // Nur neu entschlüsseln, wenn sich der Zugang wirklich geändert hat – DataStore meldet
+        // sich bei JEDER gespeicherten Einstellung, auch z. B. beim Hintergrund.
+        .distinctUntilChanged()
+        .map { (url, benutzer, passwort) -> IServZugang(url, benutzer, Tresor.entschluesseln(passwort)) }
+        .flowOn(Dispatchers.Default)
 
     val animationsModus: Flow<AnimationsModus> = context.einstellungenDataStore.data.map { prefs ->
         when (prefs[Schluessel.ANIMATIONSMODUS]) {
@@ -60,10 +71,22 @@ class EinstellungenSpeicher(private val context: Context) {
     }
 
     suspend fun speichereIServZugang(zugang: IServZugang) {
+        val verschluesselt = withContext(Dispatchers.Default) { Tresor.verschluesseln(zugang.passwort) }
         context.einstellungenDataStore.edit { prefs ->
             prefs[Schluessel.SERVER_URL] = zugang.serverUrl
             prefs[Schluessel.BENUTZERNAME] = zugang.benutzername
-            prefs[Schluessel.PASSWORT] = zugang.passwort
+            prefs[Schluessel.PASSWORT] = verschluesselt
+        }
+    }
+
+    /** Version, mit der die App zuletzt gestartet wurde – für den Hinweis nach einem Update. */
+    val zuletztGestarteteVersion: Flow<String?> = context.einstellungenDataStore.data.map { prefs ->
+        prefs[Schluessel.ZULETZT_GESTARTETE_VERSION]
+    }
+
+    suspend fun speichereZuletztGestarteteVersion(version: String) {
+        context.einstellungenDataStore.edit { prefs ->
+            prefs[Schluessel.ZULETZT_GESTARTETE_VERSION] = version
         }
     }
 

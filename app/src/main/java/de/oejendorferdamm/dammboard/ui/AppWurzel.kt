@@ -1,6 +1,7 @@
 package de.oejendorferdamm.dammboard.ui
 
 import android.graphics.Bitmap
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -10,7 +11,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import de.oejendorferdamm.dammboard.BuildConfig
 import de.oejendorferdamm.dammboard.data.EinstellungenSpeicher
@@ -26,7 +26,9 @@ import de.oejendorferdamm.dammboard.ui.filemanager.DateiManagerScreen
 import de.oejendorferdamm.dammboard.ui.settings.EinstellungenScreen
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 private sealed interface Bildschirm {
     data object Brett : Bildschirm
@@ -37,18 +39,14 @@ private sealed interface Bildschirm {
 /** Wie lange nach dem App-Start die automatische Update-Prüfung im Hintergrund läuft. */
 private const val UPDATE_PRUEFUNG_VERZOEGERUNG_MS = 10_000L
 
-// Platzbedarf bei Faktor 1 (in dp): Werkzeugleiste mit dem breitesten geöffneten Panel bzw.
-// die Menü-Karte von Einstellungen/Dateimanager. Größer als der Bildschirm wird nie skaliert.
-private const val TAFEL_INHALT_BREITE_DP = 930f
-private const val TAFEL_INHALT_HOEHE_DP = 350f
-private const val MENUE_INHALT_BREITE_DP = 540f
-private const val MENUE_INHALT_HOEHE_DP = 380f
+/** Menüs (Einstellungen, Dateimanager) etwas größer als die Leiste – dort wird mehr gelesen. */
+private const val MENUE_FAKTOR = 1.3f
 
 /** Wurzel der App: schaltet zwischen Tafel, Einstellungen und IServ-Dateimanager um und hält die geteilten Zustände. */
 @Composable
 fun AppWurzel(onAppSchliessen: () -> Unit) {
     val context = LocalContext.current
-    val speicher = remember { EinstellungenSpeicher(context) }
+    val speicher = remember { EinstellungenSpeicher(context.applicationContext) }
     val updateClient = remember { UpdateClient() }
     val scope = rememberCoroutineScope()
 
@@ -63,17 +61,20 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
     val tafelState = rememberTafelState()
     var bildschirm by remember { mutableStateOf<Bildschirm>(Bildschirm.Brett) }
 
-    // Bedienelemente wachsen automatisch mit der Bildschirmgröße (in dp) und zusätzlich mit der
-    // eingestellten Symbolgröße – siehe Skalierung.kt, warum das gerade auf alten Boards nötig ist.
-    val konfiguration = LocalConfiguration.current
-    val breiteDp = konfiguration.screenWidthDp.toFloat()
-    val hoeheDp = konfiguration.screenHeightDp.toFloat()
-    val gewuenschterFaktor = automatischerBildschirmFaktor(breiteDp, hoeheDp) * symbolGroesse.skalierung
-    val tafelFaktor = passenderFaktor(gewuenschterFaktor, breiteDp, hoeheDp, TAFEL_INHALT_BREITE_DP, TAFEL_INHALT_HOEHE_DP)
-    val menueFaktor = passenderFaktor(gewuenschterFaktor, breiteDp, hoeheDp, MENUE_INHALT_BREITE_DP, MENUE_INHALT_HOEHE_DP)
-    val anzeige = context.resources.displayMetrics
-    val bildschirmInfo = "Bildschirm: ${anzeige.widthPixels}×${anzeige.heightPixels} px, ${anzeige.densityDpi} dpi " +
-        "(${breiteDp.toInt()}×${hoeheDp.toInt()} dp) · Bedienfaktor " + "%.2f".format(tafelFaktor)
+    // Aus Einstellungen/Dateimanager führt die Zurück-Taste zur Tafel – vorher beendete sie die
+    // ganze App und der Tafelinhalt war weg.
+    BackHandler(enabled = bildschirm != Bildschirm.Brett) { bildschirm = Bildschirm.Brett }
+
+    // Nach einem Update einmal kurz zeigen, dass die neue Version läuft.
+    var neuigkeiten by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        val vorher = speicher.zuletztGestarteteVersion.first()
+        if (vorher != BuildConfig.VERSION_NAME) {
+            neuigkeiten = "DammBoard ${BuildConfig.VERSION_NAME} ist installiert – Knöpfe, Abstände und Menüs " +
+                "jetzt wie in der Original-Tafel-App, auf jedem Board gleich groß. (Antippen zum Schließen)"
+            speicher.speichereZuletztGestarteteVersion(BuildConfig.VERSION_NAME)
+        }
+    }
 
     // Beim allerersten Laden der gespeicherten Werte (falls "Hintergrund merken" aktiv ist)
     // einmalig den zuletzt genutzten Hintergrund übernehmen – danach merkt sich jede weitere
@@ -81,8 +82,7 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
     var anfangsHintergrundGesetzt by remember { mutableStateOf(false) }
     LaunchedEffect(hintergrundMerken, gespeicherterHintergrund) {
         val stil = gespeicherterHintergrund
-        // Auch jede neu angelegte Seite startet dann mit dem zuletzt gewählten Hintergrund –
-        // bis 0.4.6 galt die Option nur für die allererste Seite nach dem Start.
+        // Auch jede neu angelegte Seite startet dann mit dem zuletzt gewählten Hintergrund.
         tafelState.neueSeitenHintergrund = if (hintergrundMerken && stil != null) stil else HintergrundStil(TafelGruen)
         if (!anfangsHintergrundGesetzt && hintergrundMerken && stil != null) {
             tafelState.seite.hintergrund.value = stil
@@ -122,18 +122,27 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
         }
     }
 
+    // Für die Fehlersuche aus der Ferne: was das Gerät meldet und wie groß die Oberfläche wird.
+    val anzeige = context.resources.displayMetrics
+    val einheit = pixelProVorbildPixel(anzeige.widthPixels, anzeige.heightPixels)
+    val wirksameGroesse = minOf(symbolGroesse.skalierung, groessterLeistenFaktor(anzeige.widthPixels, anzeige.heightPixels))
+    val bildschirmInfo = "Bildschirm: ${anzeige.widthPixels}×${anzeige.heightPixels} px, ${anzeige.densityDpi} dpi · " +
+        "1 Original-Pixel = ${"%.2f".format(einheit)} px · Größe ${(wirksameGroesse * 100).roundToInt()} %"
+
     when (val aktuell = bildschirm) {
         is Bildschirm.Brett -> TafelScreen(
             state = tafelState,
             animationsModus = animationsModus,
-            bedienFaktor = tafelFaktor,
+            oberflaechenFaktor = symbolGroesse.skalierung,
             zeichenPraezision = zeichenPraezision,
             zeigeUpdatePunkt = updateInfo != null,
+            neuigkeiten = neuigkeiten,
+            onNeuigkeitenGelesen = { neuigkeiten = null },
             onSchliessenApp = onAppSchliessen,
             onOeffneEinstellungen = { bildschirm = Bildschirm.Einstellungen },
             onIServAnfrage = { bitmap -> bildschirm = Bildschirm.Dateimanager(bitmap) }
         )
-        is Bildschirm.Einstellungen -> SkalierteDichte(menueFaktor) {
+        is Bildschirm.Einstellungen -> VorbildRaster(faktor = symbolGroesse.skalierung * MENUE_FAKTOR) {
             EinstellungenScreen(
                 aktuellerZugang = iservZugang,
                 aktuellerModus = animationsModus,
@@ -156,7 +165,7 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
                 onZurueck = { bildschirm = Bildschirm.Brett }
             )
         }
-        is Bildschirm.Dateimanager -> SkalierteDichte(menueFaktor) {
+        is Bildschirm.Dateimanager -> VorbildRaster(faktor = symbolGroesse.skalierung * MENUE_FAKTOR) {
             DateiManagerScreen(
                 zugang = iservZugang,
                 bild = aktuell.bild,

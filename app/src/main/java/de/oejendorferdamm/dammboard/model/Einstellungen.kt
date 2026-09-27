@@ -4,16 +4,16 @@ package de.oejendorferdamm.dammboard.model
 enum class AnimationsModus { NORMAL, PERFORMANCE }
 
 /**
- * Größe aller Bedienelemente (Werkzeugleiste, Seitenanzeige, Menüs – inkl. Tippflächen).
- * Wirkt ZUSÄTZLICH zur automatischen Anpassung an die Bildschirmgröße (siehe
- * ui/Skalierung.kt): "Groß" sieht dadurch auf jedem Board gleich groß aus, egal welche
- * Pixeldichte das Gerät meldet.
+ * Größe der Oberfläche (Knöpfe, Abstände, Menüs – inkl. Tippflächen) relativ zum Vorbild, der
+ * Tafel-App der CTOUCH-Boards. STANDARD entspricht genau dem Original; die Umrechnung auf den
+ * jeweiligen Bildschirm passiert automatisch (siehe ui/Skalierung.kt). Die Namen der Einträge
+ * werden gespeichert und dürfen sich deshalb nicht ändern.
  */
 enum class SymbolGroesse(val skalierung: Float, val bezeichnung: String) {
-    KOMPAKT(1.0f, "Kompakt"),
-    STANDARD(1.15f, "Standard"),
-    GROSS(1.35f, "Groß"),
-    SEHR_GROSS(1.6f, "Sehr groß")
+    KOMPAKT(0.85f, "Kompakt"),
+    STANDARD(1.0f, "Wie Original"),
+    GROSS(1.12f, "Groß"),
+    SEHR_GROSS(1.25f, "Sehr groß")
 }
 
 /** Zugangsdaten für den schuleigenen IServ-WebDAV-Speicher. */

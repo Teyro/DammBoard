@@ -6,60 +6,70 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.os.Build
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import de.oejendorferdamm.dammboard.model.AnimationsModus
 import de.oejendorferdamm.dammboard.ui.canvas.TafelCanvas
-import de.oejendorferdamm.dammboard.ui.icons.AllgemeinSymbol
-import de.oejendorferdamm.dammboard.ui.icons.AllgemeinesSymbol
-import de.oejendorferdamm.dammboard.ui.toolbar.TafelWerkzeugleiste
+import de.oejendorferdamm.dammboard.ui.toolbar.SeitenLeiste
+import de.oejendorferdamm.dammboard.ui.toolbar.TafelBedienung
+import de.oejendorferdamm.dammboard.ui.toolbar.faengtBeruehrungen
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/** Bildschirm der Tafel: Zeichenfläche plus vollständige Werkzeugleiste, wie im Design vorgegeben. */
+/** Wie lange der Hinweis "neue Version installiert" höchstens stehen bleibt. */
+private const val NEUIGKEITEN_ANZEIGE_MS = 12_000L
+
+/**
+ * Bildschirm der Tafel: Zeichenfläche plus komplette Bedienung darüber. Die Zeichenfläche
+ * rechnet in echten Bildschirmpixeln; alles darüber wird im Maßstab der Original-App
+ * dargestellt (siehe Skalierung.kt).
+ */
 @Composable
 fun TafelScreen(
     state: TafelState,
     animationsModus: AnimationsModus,
-    bedienFaktor: Float,
+    oberflaechenFaktor: Float,
     zeichenPraezision: Float,
     zeigeUpdatePunkt: Boolean,
+    neuigkeiten: String?,
+    onNeuigkeitenGelesen: () -> Unit,
     onSchliessenApp: () -> Unit,
     onOeffneEinstellungen: () -> Unit,
     onIServAnfrage: (Bitmap) -> Unit,
@@ -67,10 +77,21 @@ fun TafelScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var zeigeBeendenDialog by remember { mutableStateOf(false) }
+    var zeigeBeendenAbfrage by remember { mutableStateOf(false) }
+
+    // Die Zurück-Taste (viele Boards haben sie am Rahmen) schließt erst Panel/Lupe und fragt dann
+    // nach – vorher beendete sie die App sofort, und der ganze Tafelinhalt war weg.
+    BackHandler {
+        when {
+            zeigeBeendenAbfrage -> zeigeBeendenAbfrage = false
+            state.offenesPanel != null -> state.schliessePanel()
+            state.lupeAktiv -> state.lupeAktiv = false
+            else -> zeigeBeendenAbfrage = true
+        }
+    }
 
     // Nur auf Android 9 und älter gebraucht: ab Android 10 übernimmt Scoped Storage das Speichern
-    // ohne Berechtigungsdialog (siehe speichereBildUndGibUriZurueck in Speichern.kt).
+    // ohne Berechtigungsdialog (siehe Speichern.kt).
     var ausstehendeSpeicherung by remember { mutableStateOf<Pair<AufnahmeZweck, Bitmap>?>(null) }
     val speicherErlaubnisLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -107,151 +128,129 @@ fun TafelScreen(
             }
         }
 
-        // Alle Bedienelemente über der Tafel werden gemeinsam an die Bildschirmgröße und die
-        // gewählte Symbolgröße angepasst (siehe Skalierung.kt) – bis 0.4.6 galt die Symbolgröße
-        // nur für die untere Leiste, Seitenanzeige und Beenden-Knopf blieben immer klein. Die
-        // Zeichenfläche selbst liegt bewusst außerhalb: sie rechnet in echten Bildschirmpixeln.
-        SkalierteDichte(bedienFaktor) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                TafelWerkzeugleiste(
+        VorbildRaster(faktor = oberflaechenFaktor, leisteMussPassen = true) {
+            Box(Modifier.fillMaxSize()) {
+                TafelBedienung(
                     state = state,
                     animationsModus = animationsModus,
                     zeigeUpdatePunkt = zeigeUpdatePunkt,
+                    onSchliessen = { zeigeBeendenAbfrage = true },
                     onMenu = onOeffneEinstellungen,
                     onTeilen = { state.aufnahmeAnfrage = AufnahmeZweck.TEILEN },
-                    onIServ = { state.aufnahmeAnfrage = AufnahmeZweck.ISERV },
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .navigationBarsPadding()
-                        .padding(top = 4.dp)
+                    onIServ = { state.aufnahmeAnfrage = AufnahmeZweck.ISERV }
                 )
 
-                // Immer sichtbar (unabhängig vom Werkzeugkasten-Panel) am rechten Bildschirmrand, wie im
-                // Original-Design: zeigt aktuelle/Gesamtzahl der Seiten und lässt sich zusätzlich durch
-                // vertikales Ziehen/Scrollen blättern.
-                SeitenNavigator(
-                    aktuelleSeite = state.aktiveSeite,
-                    seitenAnzahl = state.seiten.size,
-                    aufVorherige = { state.vorherigeSeite() },
-                    aufNaechste = { state.naechsteSeite() },
+                SeitenLeiste(
+                    state = state,
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
-                        .padding(end = 14.dp)
+                        .padding(end = 12.dp)
                 )
 
-                // Bewusst abseits der Werkzeuggruppe, ganz unten links – damit man beim Arbeiten in der
-                // Mitte/rechts nicht versehentlich die App beendet.
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .navigationBarsPadding()
-                        .padding(start = 16.dp, bottom = 18.dp)
-                        .size(40.dp)
-                        .shadow(2.dp, CircleShape)
-                        .clip(CircleShape)
-                        .background(Color.White)
-                        .clickable { zeigeBeendenDialog = true },
-                    contentAlignment = Alignment.Center
-                ) {
-                    AllgemeinSymbol(AllgemeinesSymbol.SCHLIESSEN, Modifier.size(16.dp), Color(0xFFE0402E))
+                if (neuigkeiten != null) {
+                    NeuigkeitenHinweis(
+                        text = neuigkeiten,
+                        onSchliessen = onNeuigkeitenGelesen,
+                        modifier = Modifier.align(Alignment.TopCenter)
+                    )
                 }
-            }
 
-            if (zeigeBeendenDialog) {
-                AlertDialog(
-                    onDismissRequest = { zeigeBeendenDialog = false },
-                    title = { Text("DammBoard beenden?") },
-                    text = { Text("Willst du das Programm wirklich beenden?") },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            zeigeBeendenDialog = false
+                if (zeigeBeendenAbfrage) {
+                    BeendenAbfrage(
+                        onAbbrechen = { zeigeBeendenAbfrage = false },
+                        onBeenden = {
+                            zeigeBeendenAbfrage = false
                             onSchliessenApp()
-                        }) { Text("Beenden") }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { zeigeBeendenDialog = false }) { Text("Abbrechen") }
-                    }
-                )
+                        }
+                    )
+                }
             }
         }
     }
 }
 
-private val SeitenFarbe = Color(0xFF2B2B28)
-private val SeitenFarbeSchwach = Color(0xFF8A8880)
-
-/** Ständig sichtbare Seitenanzeige am rechten Rand: Pfeile zum Blättern plus vertikales
- *  Ziehen über die gesamte Fläche schaltet ebenfalls eine Seite weiter/zurück. */
+/**
+ * Sicherheitsabfrage vor dem Beenden. Bewusst kein System-Dialog: der würde je nach
+ * Android-Version anders aussehen und nicht mit der Oberfläche mitwachsen.
+ */
 @Composable
-private fun SeitenNavigator(
-    aktuelleSeite: Int,
-    seitenAnzahl: Int,
-    aufVorherige: () -> Unit,
-    aufNaechste: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    var zugSumme by remember { mutableFloatStateOf(0f) }
-
-    Column(
-        modifier = modifier
-            .shadow(3.dp, RoundedCornerShape(20.dp))
-            .clip(RoundedCornerShape(20.dp))
-            .background(Color.White)
-            .pointerInput(seitenAnzahl) {
-                // Zugweg pro Seite in dp (wächst mit dem Bedienfaktor) statt fester Pixel –
-                // sonst müsste man auf hochauflösenden Boards nur halb so weit ziehen.
-                val schwelle = 48.dp.toPx()
-                detectVerticalDragGestures(
-                    onDragStart = { zugSumme = 0f },
-                    onVerticalDrag = { change, dragAmount ->
-                        change.consume()
-                        zugSumme += dragAmount
-                        while (zugSumme <= -schwelle) {
-                            aufNaechste()
-                            zugSumme += schwelle
-                        }
-                        while (zugSumme >= schwelle) {
-                            aufVorherige()
-                            zugSumme -= schwelle
-                        }
-                    },
-                    onDragEnd = { zugSumme = 0f },
-                    onDragCancel = { zugSumme = 0f }
-                )
-            }
-            .padding(vertical = 12.dp, horizontal = 10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+private fun BeendenAbfrage(onAbbrechen: () -> Unit, onBeenden: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.4f))
+            .pointerInput(Unit) { detectTapGestures { onAbbrechen() } },
+        contentAlignment = Alignment.Center
     ) {
-        Box(
+        Column(
             modifier = Modifier
-                .size(30.dp)
-                .clip(CircleShape)
-                .then(if (aktuelleSeite > 0) Modifier.clickable(onClick = aufVorherige) else Modifier),
-            contentAlignment = Alignment.Center
+                .widthIn(max = 640.dp)
+                .shadow(12.dp, RoundedCornerShape(18.dp))
+                .clip(RoundedCornerShape(18.dp))
+                .background(Color.White)
+                .faengtBeruehrungen()
+                .padding(36.dp)
         ) {
-            AllgemeinSymbol(
-                AllgemeinesSymbol.PFEIL_LINKS,
-                Modifier.size(16.dp).rotate(90f),
-                if (aktuelleSeite > 0) SeitenFarbe else SeitenFarbeSchwach
+            Text("DammBoard beenden?", color = Color(0xFF2B2B2B), fontSize = 34.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(14.dp))
+            Text(
+                "Willst du das Programm wirklich beenden? Nicht gespeicherte Tafelbilder gehen dabei verloren.",
+                color = Color(0xFF555555), fontSize = 24.sp, lineHeight = 32.sp
             )
+            Spacer(Modifier.height(30.dp))
+            Row(
+                modifier = Modifier.align(Alignment.End),
+                horizontalArrangement = Arrangement.spacedBy(18.dp)
+            ) {
+                DialogKnopf("Abbrechen", hervorgehoben = false, onClick = onAbbrechen)
+                DialogKnopf("Beenden", hervorgehoben = true, onClick = onBeenden)
+            }
         }
-        Text("${aktuelleSeite + 1}", color = SeitenFarbe, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-        Box(modifier = Modifier.width(16.dp).height(1.dp).background(SeitenFarbeSchwach))
-        Text("$seitenAnzahl", color = SeitenFarbeSchwach, fontSize = 13.sp)
-        Box(
-            modifier = Modifier
-                .size(30.dp)
-                .clip(CircleShape)
-                .then(if (aktuelleSeite < seitenAnzahl - 1) Modifier.clickable(onClick = aufNaechste) else Modifier),
-            contentAlignment = Alignment.Center
-        ) {
-            AllgemeinSymbol(
-                AllgemeinesSymbol.PFEIL_RECHTS,
-                Modifier.size(16.dp).rotate(90f),
-                if (aktuelleSeite < seitenAnzahl - 1) SeitenFarbe else SeitenFarbeSchwach
-            )
-        }
+    }
+}
+
+@Composable
+private fun DialogKnopf(text: String, hervorgehoben: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(40.dp))
+            .background(if (hervorgehoben) Color(0xFFC62828) else Color(0xFFEBEBEB))
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 34.dp, vertical = 16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text,
+            color = if (hervorgehoben) Color.White else Color(0xFF333333),
+            fontSize = 24.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
+/**
+ * Kurzer Hinweis oben nach einem Update: zeigt, dass die neue Version wirklich läuft. Schließt
+ * sich beim Antippen oder nach ein paar Sekunden von selbst.
+ */
+@Composable
+private fun NeuigkeitenHinweis(text: String, onSchliessen: () -> Unit, modifier: Modifier = Modifier) {
+    val aktuellesSchliessen by rememberUpdatedState(onSchliessen)
+    LaunchedEffect(text) {
+        delay(NEUIGKEITEN_ANZEIGE_MS)
+        aktuellesSchliessen()
+    }
+    Box(
+        modifier = modifier
+            .statusBarsPadding()
+            .padding(top = 24.dp)
+            .widthIn(max = 1100.dp)
+            .shadow(8.dp, RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White)
+            .clickable(role = Role.Button, onClick = onSchliessen)
+            .padding(horizontal = 30.dp, vertical = 18.dp)
+    ) {
+        Text(text, color = Color(0xFF2B2B2B), fontSize = 22.sp, lineHeight = 30.sp)
     }
 }
 
@@ -264,7 +263,11 @@ private fun fuehreSpeicherungAus(zweck: AufnahmeZweck, bitmap: Bitmap, context: 
                 if (uri != null) "Tafelbild gespeichert" else "Speichern fehlgeschlagen",
                 Toast.LENGTH_SHORT
             ).show()
-            AufnahmeZweck.TEILEN -> uri?.let { teileBild(context, it) }
+            AufnahmeZweck.TEILEN -> if (uri != null) {
+                teileBild(context, uri)
+            } else {
+                Toast.makeText(context, "Teilen fehlgeschlagen", Toast.LENGTH_SHORT).show()
+            }
             AufnahmeZweck.ISERV -> Unit
         }
     }
