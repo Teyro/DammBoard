@@ -62,6 +62,7 @@ import de.oejendorferdamm.dammboard.ui.icons.RadiererSymbol
 import de.oejendorferdamm.dammboard.ui.icons.StiftArtSymbol
 import de.oejendorferdamm.dammboard.ui.icons.WerkzeugkastenAktion
 import de.oejendorferdamm.dammboard.ui.icons.WerkzeugkastenSymbol
+import de.oejendorferdamm.dammboard.ui.icons.kontur
 import de.oejendorferdamm.dammboard.ui.icons.symbolRaster
 
 /*
@@ -578,12 +579,12 @@ private fun MusterSymbol(muster: MusterTyp, modifier: Modifier = Modifier) {
                     }
                 }
                 MusterTyp.FUSSBALLFELD -> {
-                    drawRect(SymbolFarbe, topLeft = Offset(w * 0.12f, h * 0.2f), size = Size(w * 0.76f, h * 0.6f), style = Stroke(width = 1.5f))
+                    drawRect(SymbolFarbe, topLeft = Offset(w * 0.12f, h * 0.2f), size = Size(w * 0.76f, h * 0.6f), style = kontur(1.5f))
                     drawLine(SymbolFarbe, Offset(w * 0.5f, h * 0.2f), Offset(w * 0.5f, h * 0.8f), strokeWidth = 1.5f)
-                    drawCircle(SymbolFarbe, radius = w * 0.11f, center = Offset(w * 0.5f, h * 0.5f), style = Stroke(width = 1.5f))
+                    drawCircle(SymbolFarbe, radius = w * 0.11f, center = Offset(w * 0.5f, h * 0.5f), style = kontur(1.5f))
                 }
                 MusterTyp.STUNDENPLAN -> {
-                    drawRect(SymbolFarbe, topLeft = Offset(w * 0.12f, h * 0.18f), size = Size(w * 0.76f, h * 0.64f), style = Stroke(width = 1.5f))
+                    drawRect(SymbolFarbe, topLeft = Offset(w * 0.12f, h * 0.18f), size = Size(w * 0.76f, h * 0.64f), style = kontur(1.5f))
                     drawLine(SymbolFarbe, Offset(w * 0.12f, h * 0.38f), Offset(w * 0.88f, h * 0.38f), strokeWidth = 1.5f)
                     drawLine(SymbolFarbe, Offset(w * 0.4f, h * 0.18f), Offset(w * 0.4f, h * 0.82f), strokeWidth = 1.3f)
                     drawLine(SymbolFarbe, Offset(w * 0.64f, h * 0.18f), Offset(w * 0.64f, h * 0.82f), strokeWidth = 1.3f)

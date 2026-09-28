@@ -70,8 +70,8 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
     LaunchedEffect(Unit) {
         val vorher = speicher.zuletztGestarteteVersion.first()
         if (vorher != BuildConfig.VERSION_NAME) {
-            neuigkeiten = "DammBoard ${BuildConfig.VERSION_NAME} ist installiert – Knöpfe, Abstände und Menüs " +
-                "jetzt wie in der Original-Tafel-App, auf jedem Board gleich groß. (Antippen zum Schließen)"
+            neuigkeiten = "DammBoard ${BuildConfig.VERSION_NAME} ist installiert – gestochen scharfe Symbole auch auf " +
+                "älteren Boards und neu: Tafelfußball über den Würfel-Knopf unten links. (Antippen zum Schließen)"
             speicher.speichereZuletztGestarteteVersion(BuildConfig.VERSION_NAME)
         }
     }

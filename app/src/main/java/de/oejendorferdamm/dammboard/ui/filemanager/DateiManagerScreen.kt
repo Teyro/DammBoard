@@ -48,6 +48,7 @@ import de.oejendorferdamm.dammboard.model.IServEintrag
 import de.oejendorferdamm.dammboard.model.IServZugang
 import de.oejendorferdamm.dammboard.ui.icons.AllgemeinSymbol
 import de.oejendorferdamm.dammboard.ui.icons.AllgemeinesSymbol
+import de.oejendorferdamm.dammboard.ui.icons.kontur
 import de.oejendorferdamm.dammboard.ui.icons.symbolRaster
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -223,7 +224,7 @@ private fun OrdnerSymbol(modifier: Modifier = Modifier) {
             topLeft = Offset(w * 0.06f, h * 0.28f),
             size = androidx.compose.ui.geometry.Size(w * 0.88f, h * 0.6f),
             cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.08f),
-            style = Stroke(width = 2f)
+            style = kontur(2f)
         )
         drawLine(
             color = Akzent,

@@ -11,7 +11,7 @@ Winkelmesser, Zirkel u. a. mit drehbarer Führung und Längenanzeige)
 sowie ein Werkzeugkasten für Hintergrund, geteilte Ansicht,
 Bildschirmfoto und Lupe.
 
-## Funktionen (v0.6.0)
+## Funktionen (v0.7.0)
 
 - Freihand-Zeichnen mit Finger/Stift, mehrere Seiten mit eigener
   Undo/Redo-Historie
@@ -34,6 +34,9 @@ Bildschirmfoto und Lupe.
   (1920×1080) und werden proportional auf den Bildschirm übertragen –
   unabhängig davon, welche Pixeldichte ein Board meldet. Die Größe ist
   zusätzlich einstellbar ("Kompakt" bis "Sehr groß")
+- **Tafelspiel Fußball** (Würfel-Knopf unten links): Spielfeld über
+  die ganze Tafel, Ball zum Werfen oder Anschießen per Tippen, Tore
+  werden automatisch gezählt, Punkte links/rechts auch von Hand
 - Die Zurück-Taste des Boards schließt erst Panels und fragt vor dem
   Beenden nach, statt den Tafelinhalt sofort zu verwerfen
 

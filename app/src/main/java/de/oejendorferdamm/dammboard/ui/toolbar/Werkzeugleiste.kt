@@ -10,11 +10,9 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -30,15 +28,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -53,7 +48,7 @@ import kotlin.math.roundToInt
 
 /*
  * Untere Leiste wie in der Original-Tafel-App: über die ganze Bildschirmbreite verteilt,
- *   links:  Beenden, Menü, Teilen
+ *   links:  Beenden, Menü, Teilen, Tafelspiel (Würfel)
  *   Mitte:  die sieben Werkzeuge (Stift … Werkzeugkasten)
  *   rechts: Papierkorb, Rückgängig, Wiederholen und die Seiten-Pille (+  <  1/1  >)
  * Das Panel eines Werkzeugs erscheint direkt über dessen Knopf, mit einem kleinen Zeiger.
@@ -110,6 +105,7 @@ fun TafelBedienung(
     onSchliessen: () -> Unit,
     onMenu: () -> Unit,
     onTeilen: () -> Unit,
+    onSpiel: () -> Unit,
     onIServ: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -122,7 +118,7 @@ fun TafelBedienung(
     Layout(
         modifier = modifier.fillMaxSize().navigationBarsPadding(),
         content = {
-            LinkeGruppe(zeigeUpdatePunkt, onSchliessen, onMenu, onTeilen, Modifier.layoutId(ID_LINKS))
+            LinkeGruppe(zeigeUpdatePunkt, onSchliessen, onMenu, onTeilen, onSpiel, Modifier.layoutId(ID_LINKS))
             WerkzeugGruppe(state, Modifier.layoutId(ID_WERKZEUGE))
             RechteGruppe(state, Modifier.layoutId(ID_RECHTS))
             PanelEinblendung(sichtbar = offen != null, animiert = animiert, modifier = Modifier.layoutId(ID_PANEL)) {
@@ -213,6 +209,7 @@ private fun LinkeGruppe(
     onSchliessen: () -> Unit,
     onMenu: () -> Unit,
     onTeilen: () -> Unit,
+    onSpiel: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(KnopfAbstand), verticalAlignment = Alignment.CenterVertically) {
@@ -234,6 +231,9 @@ private fun LinkeGruppe(
         }
         RundKnopf("Teilen", onTeilen) {
             AllgemeinSymbol(AllgemeinesSymbol.TEILEN, Modifier.size(LeistenSymbol), SymbolFarbe)
+        }
+        RundKnopf("Tafelspiel", onSpiel) {
+            AllgemeinSymbol(AllgemeinesSymbol.WUERFEL, Modifier.size(LeistenSymbol), SymbolFarbe)
         }
     }
 }
@@ -351,65 +351,4 @@ private fun PillenKnopf(
         contentAlignment = Alignment.Center,
         content = inhalt
     )
-}
-
-/** Merker für die Ziehgeste der Seitenleiste (kein Compose-State nötig). */
-private class Zugweg {
-    var summe = 0f
-}
-
-/**
- * Seitenanzeige am rechten Bildschirmrand: aktuelle Seite / Seitenzahl, dazu Pfeile – und
- * senkrechtes Ziehen über die Leiste blättert weiter (hoch = nächste Seite).
- */
-@Composable
-fun SeitenLeiste(state: TafelState, modifier: Modifier = Modifier) {
-    val aktiv = state.aktiveSeite
-    val anzahl = state.seiten.size
-    val zug = remember { Zugweg() }
-    Column(
-        modifier = modifier
-            .width(64.dp)
-            .clip(RoundedCornerShape(32.dp))
-            .background(KnopfFarbe)
-            .pointerInput(Unit) {
-                val schwelle = 60.dp.toPx()
-                detectVerticalDragGestures(
-                    onDragStart = { zug.summe = 0f },
-                    onVerticalDrag = { change, betrag ->
-                        change.consume()
-                        zug.summe += betrag
-                        while (zug.summe <= -schwelle) {
-                            state.naechsteSeite()
-                            zug.summe += schwelle
-                        }
-                        while (zug.summe >= schwelle) {
-                            state.vorherigeSeite()
-                            zug.summe -= schwelle
-                        }
-                    },
-                    onDragEnd = { zug.summe = 0f },
-                    onDragCancel = { zug.summe = 0f }
-                )
-            }
-            .padding(vertical = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        PillenKnopf("Seite zurück", onClick = { state.vorherigeSeite() }, aktiviert = aktiv > 0, groesse = 58.dp) {
-            AllgemeinSymbol(
-                AllgemeinesSymbol.PFEIL_LINKS, Modifier.size(28.dp).rotate(90f),
-                if (aktiv > 0) SymbolFarbe else SymbolFarbeSchwach
-            )
-        }
-        Text("${aktiv + 1}", color = TextFarbe, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-        Box(Modifier.width(28.dp).height(2.dp).background(SymbolFarbeSchwach))
-        Text("$anzahl", color = TextFarbeSchwach, fontSize = 22.sp)
-        PillenKnopf("Seite vor", onClick = { state.naechsteSeite() }, aktiviert = aktiv < anzahl - 1, groesse = 58.dp) {
-            AllgemeinSymbol(
-                AllgemeinesSymbol.PFEIL_RECHTS, Modifier.size(28.dp).rotate(90f),
-                if (aktiv < anzahl - 1) SymbolFarbe else SymbolFarbeSchwach
-            )
-        }
-    }
 }

@@ -46,7 +46,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import de.oejendorferdamm.dammboard.model.AnimationsModus
 import de.oejendorferdamm.dammboard.ui.canvas.TafelCanvas
-import de.oejendorferdamm.dammboard.ui.toolbar.SeitenLeiste
+import de.oejendorferdamm.dammboard.ui.spiel.TafelFussball
 import de.oejendorferdamm.dammboard.ui.toolbar.TafelBedienung
 import de.oejendorferdamm.dammboard.ui.toolbar.faengtBeruehrungen
 import kotlinx.coroutines.CoroutineScope
@@ -78,12 +78,14 @@ fun TafelScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var zeigeBeendenAbfrage by remember { mutableStateOf(false) }
+    var zeigeSpiel by remember { mutableStateOf(false) }
 
     // Die Zurück-Taste (viele Boards haben sie am Rahmen) schließt erst Panel/Lupe und fragt dann
     // nach – vorher beendete sie die App sofort, und der ganze Tafelinhalt war weg.
     BackHandler {
         when {
             zeigeBeendenAbfrage -> zeigeBeendenAbfrage = false
+            zeigeSpiel -> zeigeSpiel = false
             state.offenesPanel != null -> state.schliessePanel()
             state.lupeAktiv -> state.lupeAktiv = false
             else -> zeigeBeendenAbfrage = true
@@ -137,15 +139,18 @@ fun TafelScreen(
                     onSchliessen = { zeigeBeendenAbfrage = true },
                     onMenu = onOeffneEinstellungen,
                     onTeilen = { state.aufnahmeAnfrage = AufnahmeZweck.TEILEN },
+                    onSpiel = {
+                        state.schliessePanel()
+                        zeigeSpiel = true
+                    },
                     onIServ = { state.aufnahmeAnfrage = AufnahmeZweck.ISERV }
                 )
 
-                SeitenLeiste(
-                    state = state,
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .padding(end = 12.dp)
-                )
+                // Tafelspiel liegt über allem und fängt alle Berührungen ab; die Tafel darunter
+                // bleibt unverändert erhalten.
+                if (zeigeSpiel) {
+                    TafelFussball(onSchliessen = { zeigeSpiel = false })
+                }
 
                 if (neuigkeiten != null) {
                     NeuigkeitenHinweis(

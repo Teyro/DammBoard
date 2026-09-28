@@ -173,6 +173,21 @@ def main():
         tippe_mitte_von("Vorherige Seite")
         time.sleep(0.8)
 
+    # Tafelspiel: Fußballfeld öffnen, Ball Richtung rechtes Tor werfen, Punkt von Hand
+    if tippe_mitte_von("Tafelspiel"):
+        time.sleep(1.5)
+        screenshot("11a_spiel.png")
+        mitte_x, mitte_y = int(breite * 0.5), int(hoehe * 0.56)
+        adb("shell", "input", "swipe", str(mitte_x), str(mitte_y), str(int(breite * 0.8)), str(mitte_y), "120")
+        time.sleep(0.4)
+        screenshot("11b_spiel_wurf.png")
+        time.sleep(2.5)
+        tippe_mitte_von("Punkt für Links")
+        time.sleep(0.8)
+        screenshot("11c_spiel_punkte.png")
+        tippe_mitte_von("Spiel schließen")
+        time.sleep(1)
+
     # Zurück-Taste: darf die App nicht sofort beenden, sondern muss nachfragen
     adb("shell", "input", "keyevent", "KEYCODE_BACK")
     time.sleep(1)

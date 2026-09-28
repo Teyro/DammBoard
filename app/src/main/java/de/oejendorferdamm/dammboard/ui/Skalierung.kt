@@ -33,7 +33,7 @@ const val VORBILD_HOEHE = 1080f
  * Platzbedarf der unteren Leiste in Vorbild-Pixeln bei Größe 100 %: drei Knopfgruppen plus
  * Mindestabstände dazwischen. Größer als hier Platz ist, wird die Oberfläche nie gemacht.
  */
-const val LEISTE_MINDESTBREITE = 1500f
+const val LEISTE_MINDESTBREITE = 1585f
 
 /** Echte Bildschirmpixel pro Vorbild-Pixel. Das Gerät wird immer quer betrachtet. */
 fun pixelProVorbildPixel(breitePx: Int, hoehePx: Int): Float {

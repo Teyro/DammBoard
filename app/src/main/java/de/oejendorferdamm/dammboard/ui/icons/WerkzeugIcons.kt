@@ -5,16 +5,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.asAndroidPath
+import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.graphics.drawscope.scale
 import de.oejendorferdamm.dammboard.model.FormTyp
 import de.oejendorferdamm.dammboard.model.GeometrieWerkzeug
 import de.oejendorferdamm.dammboard.model.RadiererGroesse
@@ -24,44 +26,114 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /*
- * Alle Symbole werden von Hand gezeichnet, in einem virtuellen 24×24-Raster (wie bei den
- * üblichen Material-Symbolen) und dann auf die echte Symbolgröße skaliert. Linienstärken und
- * Radien beziehen sich deshalb auf dieses Raster und wachsen mit der Symbolgröße mit – auf
- * jedem Bildschirm gleich kräftig. Die Formen der Leisten-Symbole sind der Original-Tafel-App
- * nachempfunden (Umriss-Symbole in Dunkelgrau).
+ * Alle Symbole werden von Hand gezeichnet, beschrieben in einem virtuellen 24×24-Raster (wie
+ * die üblichen Material-Symbole). Umgerechnet wird aber NICHT per Skalierung der Zeichenfläche:
+ * Android 8 rendert Formen unter einer Skalierung klein und zieht das Bild dann hoch – auf den
+ * alten CTOUCH-Boards sahen die Knöpfe dadurch unscharf aus. Stattdessen rechnet [Raster] jede
+ * Form vorher in echte Bildschirmpixel um und zeichnet sie in voller Auflösung.
  */
 
 private const val SYMBOL_RASTER = 24f
 
-private val strichelung = PathEffect.dashPathEffect(floatArrayOf(3.0f, 2.4f), 0f)
-private val punktierung = PathEffect.dashPathEffect(floatArrayOf(0.01f, 2.7f), 0f)
+private val STRICHELUNG = floatArrayOf(3.0f, 2.4f)
+private val PUNKTIERUNG = floatArrayOf(0.01f, 2.7f)
 
-/** Zeichnet [zeichnen] im virtuellen Symbolraster (w/h = Rastermaße) und skaliert es auf die echte Größe. */
-internal fun DrawScope.symbolRaster(zeichnen: DrawScope.(w: Float, h: Float) -> Unit) {
-    val faktor = size.minDimension / SYMBOL_RASTER
-    if (faktor <= 0f) return
-    val w = size.width / faktor
-    val h = size.height / faktor
-    scale(scale = faktor, pivot = Offset.Zero) {
-        this.zeichnen(w, h)
+/** Zeichenstil im Raster: gefüllt oder als Linie (Maße in Rastereinheiten). */
+internal sealed interface Stil
+internal object Fuellen : Stil
+internal class Linie(
+    val breite: Float,
+    val cap: StrokeCap = StrokeCap.Round,
+    val join: StrokeJoin = StrokeJoin.Round,
+    val muster: FloatArray? = null
+) : Stil
+
+internal fun kontur(breite: Float, muster: FloatArray? = null): Linie =
+    Linie(breite, cap = if (muster != null && muster !== PUNKTIERUNG) StrokeCap.Butt else StrokeCap.Round, muster = muster)
+
+/**
+ * Zeichnet im 24er-Raster, rechnet aber jede Form direkt in Bildschirmpixel um (siehe oben).
+ * Bietet dieselben Grundformen wie DrawScope, damit die Symbole gut lesbar bleiben.
+ */
+internal class Raster(private val flaeche: DrawScope, einheit: Float, val w: Float, val h: Float) {
+    private val matrix = android.graphics.Matrix().apply { setScale(einheit, einheit) }
+    private var faktor = einheit
+
+    private fun mitTransformation(extraFaktor: Float, aendere: android.graphics.Matrix.() -> Unit, block: Raster.() -> Unit) {
+        val vorher = android.graphics.Matrix(matrix)
+        val vorherFaktor = faktor
+        matrix.aendere()
+        faktor *= extraFaktor
+        block()
+        matrix.set(vorher)
+        faktor = vorherFaktor
     }
+
+    fun rotate(degrees: Float, pivot: Offset, block: Raster.() -> Unit) =
+        mitTransformation(1f, { preRotate(degrees, pivot.x, pivot.y) }, block)
+
+    fun scale(scale: Float, pivot: Offset, block: Raster.() -> Unit) =
+        mitTransformation(scale, { preScale(scale, scale, pivot.x, pivot.y) }, block)
+
+    fun drawPath(pfad: Path, color: Color, style: Stil = Fuellen) {
+        val echt = android.graphics.Path(pfad.asAndroidPath())
+        echt.transform(matrix)
+        val composePfad = echt.asComposePath()
+        when (style) {
+            is Fuellen -> flaeche.drawPath(composePfad, color)
+            is Linie -> flaeche.drawPath(
+                composePfad, color,
+                style = Stroke(
+                    width = style.breite * faktor, cap = style.cap, join = style.join,
+                    pathEffect = style.muster?.let { m -> PathEffect.dashPathEffect(FloatArray(m.size) { m[it] * faktor }, 0f) }
+                )
+            )
+        }
+    }
+
+    fun drawLine(color: Color, start: Offset, end: Offset, strokeWidth: Float, cap: StrokeCap = StrokeCap.Round) =
+        drawPath(Path().apply { moveTo(start.x, start.y); lineTo(end.x, end.y) }, color, Linie(strokeWidth, cap = cap))
+
+    fun drawCircle(color: Color, radius: Float, center: Offset, style: Stil = Fuellen) =
+        drawPath(Path().apply { addOval(Rect(center, radius)) }, color, style)
+
+    fun drawOval(color: Color, topLeft: Offset, size: Size, style: Stil = Fuellen) =
+        drawPath(Path().apply { addOval(Rect(topLeft, size)) }, color, style)
+
+    fun drawRect(color: Color, topLeft: Offset, size: Size, style: Stil = Fuellen) =
+        drawPath(Path().apply { addRect(Rect(topLeft, size)) }, color, style)
+
+    fun drawRoundRect(color: Color, topLeft: Offset, size: Size, cornerRadius: CornerRadius, style: Stil = Fuellen) =
+        drawPath(Path().apply { addRoundRect(RoundRect(Rect(topLeft, size), cornerRadius)) }, color, style)
+
+    fun drawArc(
+        color: Color, startAngle: Float, sweepAngle: Float, useCenter: Boolean,
+        topLeft: Offset, size: Size, style: Stil = Fuellen
+    ) = drawPath(
+        Path().apply {
+            if (useCenter) moveTo(topLeft.x + size.width / 2, topLeft.y + size.height / 2)
+            arcTo(Rect(topLeft, size), startAngle, sweepAngle, forceMoveTo = !useCenter)
+            if (useCenter) close()
+        },
+        color, style
+    )
 }
 
-private fun DrawScope.linie(a: Offset, b: Offset, tint: Color, breite: Float = 1.9f, gestrichelt: Boolean = false) {
-    if (!gestrichelt) {
-        drawLine(color = tint, start = a, end = b, strokeWidth = breite, cap = StrokeCap.Round)
-        return
-    }
-    // Gestrichelt als Pfad (Android 8 ignoriert Strichelungen bei drawLine) und mit geraden
-    // Enden – runde Enden würden die kleinen Lücken im Symbol zudecken.
-    val pfad = Path().apply {
-        moveTo(a.x, a.y)
-        lineTo(b.x, b.y)
-    }
-    drawPath(pfad, tint, style = Stroke(width = breite, cap = StrokeCap.Butt, pathEffect = strichelung))
+/** Stellt ein [Raster] für diese Zeichenfläche bereit (w/h = Rastermaße der Fläche). */
+internal fun DrawScope.symbolRaster(zeichnen: Raster.(w: Float, h: Float) -> Unit) {
+    val einheit = size.minDimension / SYMBOL_RASTER
+    if (einheit <= 0f) return
+    val raster = Raster(this, einheit, size.width / einheit, size.height / einheit)
+    raster.zeichnen(raster.w, raster.h)
 }
 
-private fun kontur(breite: Float) = Stroke(width = breite, cap = StrokeCap.Round, join = StrokeJoin.Round)
+private fun Raster.linie(a: Offset, b: Offset, tint: Color, breite: Float = 1.9f, gestrichelt: Boolean = false) {
+    // Gestrichelt mit geraden Enden – runde Enden würden die kleinen Lücken im Symbol zudecken.
+    drawPath(
+        Path().apply { moveTo(a.x, a.y); lineTo(b.x, b.y) }, tint,
+        if (gestrichelt) kontur(breite, STRICHELUNG) else Linie(breite)
+    )
+}
 
 // ---------------------------------------------------------------------------------------------
 // Werkzeuge der unteren Leiste
@@ -88,7 +160,7 @@ fun WerkzeugSymbol(werkzeug: Werkzeug, modifier: Modifier = Modifier, tint: Colo
 }
 
 /** Schlanker Bleistift, Spitze unten links. */
-private fun DrawScope.stiftUmriss(tint: Color, halbeBreite: Float) {
+private fun Raster.stiftUmriss(tint: Color, halbeBreite: Float) {
     val spitze = Offset(4.4f, 19.6f)
     val ende = Offset(18.8f, 5.2f)
     val achse = ende - spitze
@@ -114,13 +186,13 @@ private fun DrawScope.stiftUmriss(tint: Color, halbeBreite: Float) {
 }
 
 /** Umrandetes Quadrat, darüber ein ausgefüllter Kreis – wie im Original. */
-private fun DrawScope.formenSymbol(tint: Color) {
+private fun Raster.formenSymbol(tint: Color) {
     drawRect(tint, topLeft = Offset(3.6f, 3.6f), size = Size(10.6f, 10.6f), style = kontur(1.8f))
     drawCircle(tint, radius = 5.3f, center = Offset(15.8f, 15.8f))
 }
 
 /** Schräg liegender Radiergummi, die untere Hälfte ausgefüllt. */
-private fun DrawScope.radiererForm(tint: Color) {
+private fun Raster.radiererForm(tint: Color) {
     rotate(degrees = -40f, pivot = Offset(12f, 11.5f)) {
         drawRoundRect(
             tint, topLeft = Offset(4.4f, 8.2f), size = Size(6.8f, 6.6f),
@@ -134,10 +206,10 @@ private fun DrawScope.radiererForm(tint: Color) {
 }
 
 /** Gepunktete Schlinge mit kleinem Knoten unten. */
-private fun DrawScope.lassoSymbol(tint: Color) {
+private fun Raster.lassoSymbol(tint: Color) {
     drawOval(
         tint, topLeft = Offset(2.4f, 3.4f), size = Size(19.2f, 11.2f),
-        style = Stroke(width = 2.0f, cap = StrokeCap.Round, pathEffect = punktierung)
+        style = kontur(2.0f, PUNKTIERUNG)
     )
     drawCircle(tint, radius = 1.7f, center = Offset(11.2f, 16.2f), style = kontur(1.4f))
     val schwanz = Path().apply {
@@ -148,7 +220,7 @@ private fun DrawScope.lassoSymbol(tint: Color) {
 }
 
 /** Geodreieck mit Lineal daneben. */
-private fun DrawScope.geometrieSymbol(tint: Color) {
+private fun Raster.geometrieSymbol(tint: Color) {
     val aussen = Path().apply {
         moveTo(3.4f, 4.4f); lineTo(3.4f, 20.6f); lineTo(15.8f, 20.6f); close()
     }
@@ -165,7 +237,7 @@ private fun DrawScope.geometrieSymbol(tint: Color) {
 }
 
 /** Abgerundetes Quadrat, unten rechts offen, mit ausgefülltem Mauszeiger. */
-private fun DrawScope.auswahlSymbol(tint: Color) {
+private fun Raster.auswahlSymbol(tint: Color) {
     val rahmen = Path().apply {
         moveTo(18f, 10.6f)
         lineTo(18f, 6.6f)
@@ -192,7 +264,7 @@ private fun DrawScope.auswahlSymbol(tint: Color) {
 }
 
 /** Koffer mit Griff und Schloss. */
-private fun DrawScope.koffer(tint: Color) {
+private fun Raster.koffer(tint: Color) {
     drawRoundRect(
         tint, topLeft = Offset(3f, 7.6f), size = Size(18f, 12.6f),
         cornerRadius = CornerRadius(2f), style = kontur(1.7f)
@@ -219,7 +291,7 @@ private fun DrawScope.koffer(tint: Color) {
 // ---------------------------------------------------------------------------------------------
 
 enum class AllgemeinesSymbol {
-    SCHLIESSEN, MENUE, TEILEN, PAPIERKORB, RUECKGAENGIG, WIEDERHOLEN, PLUS, PFEIL_LINKS, PFEIL_RECHTS
+    SCHLIESSEN, MENUE, TEILEN, PAPIERKORB, RUECKGAENGIG, WIEDERHOLEN, PLUS, PFEIL_LINKS, PFEIL_RECHTS, WUERFEL
 }
 
 @Composable
@@ -269,6 +341,15 @@ fun AllgemeinSymbol(symbol: AllgemeinesSymbol, modifier: Modifier = Modifier, ti
                     Path().apply { moveTo(15f, 4.6f); lineTo(7.6f, 12f); lineTo(15f, 19.4f) },
                     tint, style = kontur(2.2f)
                 )
+                AllgemeinesSymbol.WUERFEL -> {
+                    drawRoundRect(
+                        tint, topLeft = Offset(3.4f, 3.4f), size = Size(17.2f, 17.2f),
+                        cornerRadius = CornerRadius(3.6f), style = kontur(1.8f)
+                    )
+                    for ((x, y) in listOf(8f to 8f, 16f to 8f, 12f to 12f, 8f to 16f, 16f to 16f)) {
+                        drawCircle(tint, radius = 1.6f, center = Offset(x, y))
+                    }
+                }
                 AllgemeinesSymbol.PFEIL_RECHTS -> drawPath(
                     Path().apply { moveTo(9f, 4.6f); lineTo(16.4f, 12f); lineTo(9f, 19.4f) },
                     tint, style = kontur(2.2f)
@@ -355,14 +436,7 @@ fun FormSymbol(typ: FormTyp, modifier: Modifier = Modifier, tint: Color = Color.
                         moveTo(w * 0.16f, h * 0.8f)
                         quadraticTo(w * 0.3f, h * 0.2f, w * 0.82f, h * 0.24f)
                     }
-                    drawPath(
-                        pfad, tint,
-                        style = Stroke(
-                            width = 1.7f,
-                            cap = if (gestrichelt) StrokeCap.Butt else StrokeCap.Round,
-                            pathEffect = if (gestrichelt) strichelung else null
-                        )
-                    )
+                    drawPath(pfad, tint, style = if (gestrichelt) kontur(1.7f, STRICHELUNG) else kontur(1.7f))
                     pfeilSpitze(Offset(w * 0.82f, h * 0.24f), Offset(w * 0.6f, h * 0.16f), tint)
                 }
             }
@@ -370,7 +444,7 @@ fun FormSymbol(typ: FormTyp, modifier: Modifier = Modifier, tint: Color = Color.
     }
 }
 
-private fun DrawScope.pfeilSpitze(spitze: Offset, ansatz: Offset, tint: Color) {
+private fun Raster.pfeilSpitze(spitze: Offset, ansatz: Offset, tint: Color) {
     val laenge = 6f
     val winkel = atan2(ansatz.y - spitze.y, ansatz.x - spitze.x)
     val a1 = winkel + Math.PI.toFloat() * 0.2f
@@ -379,7 +453,7 @@ private fun DrawScope.pfeilSpitze(spitze: Offset, ansatz: Offset, tint: Color) {
     linie(spitze, spitze + Offset(cos(a2) * laenge, sin(a2) * laenge), tint, 1.7f)
 }
 
-private fun DrawScope.pfeilSymbol(w: Float, h: Float, tint: Color, doppelt: Boolean, gestrichelt: Boolean) {
+private fun Raster.pfeilSymbol(w: Float, h: Float, tint: Color, doppelt: Boolean, gestrichelt: Boolean) {
     val start = Offset(w * 0.16f, h * 0.84f)
     val ende = Offset(w * 0.84f, h * 0.16f)
     linie(start, ende, tint, 1.7f, gestrichelt)
