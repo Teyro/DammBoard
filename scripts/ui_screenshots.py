@@ -119,6 +119,10 @@ def handballen_wischen(x_anteil, y_von, y_bis):
     mx, my = b["ABS_MT_POSITION_X"], b["ABS_MT_POSITION_Y"]
     hat_flaeche = "ABS_MT_TOUCH_MAJOR" in b
     print(f"Touchscreen {geraet}: {b}")
+    diag = adb("shell", "dumpsys", "input", check=False).stdout
+    for zeile in diag.splitlines():
+        if any(k in zeile for k in ("RawSurface", "Raw", "XScale", "YScale", "Orientation", "SurfaceWidth", "SurfaceHeight", "Calibration", "touch.size", "SizeScale", "DeviceMode", "Viewport")):
+            print("INPUT:", zeile.strip()[:160])
     finger = [0] if hat_flaeche else [-0.03, 0.0, 0.03]
     befehle = []
     def ev(typ, code, wert):
