@@ -109,21 +109,34 @@ def touch_geraet():
     return ergebnis
 
 
+def touch_abbildung():
+    """Rechnet Bildschirm-Anteile (0..1 der sichtbaren Oberfläche) in Rohwerte des Touchscreens um.
+    Nötig, weil 'wm size' die Oberfläche in einen Ausschnitt des physischen Displays legt."""
+    import re
+    diag = adb("shell", "dumpsys", "input", check=False).stdout
+    sw = int(re.search(r"SurfaceWidth: (\d+)px", diag).group(1))
+    sh = int(re.search(r"SurfaceHeight: (\d+)px", diag).group(1))
+    m = re.search(r"physicalFrame=\[(-?\d+), (-?\d+), (-?\d+), (-?\d+)\], deviceSize=\[(\d+), (\d+)\]", diag)
+    links, oben, rechts, unten, dw, dh = (int(g) for g in m.groups())
+    print(f"Touch-Abbildung: surface {sw}x{sh}, frame {links},{oben},{rechts},{unten}, device {dw}x{dh}")
+    def roh(xa, ya, mx, my):
+        px = (links + xa * (rechts - links)) * sw / dw
+        py = (oben + ya * (unten - oben)) * sh / dh
+        return int(px / sw * mx), int(py / sh * my)
+    return roh
+
+
 def handballen_wischen(x_anteil, y_von, y_bis):
-    """Legt eine "Hand" (eine große Berührungsfläche, ersatzweise drei Finger) auf und wischt senkrecht."""
+    """Legt eine "Hand" auf und wischt senkrecht. Der Emulator meldet keine Kontaktfläche
+    (SizeScale 0) – deshalb drei Finger nebeneinander, der Ersatzweg der Erkennung."""
     info = touch_geraet()
     if not info:
         print("WARNUNG: kein Touchscreen für sendevent gefunden")
         return
     geraet, b = info
     mx, my = b["ABS_MT_POSITION_X"], b["ABS_MT_POSITION_Y"]
-    hat_flaeche = "ABS_MT_TOUCH_MAJOR" in b
-    print(f"Touchscreen {geraet}: {b}")
-    diag = adb("shell", "dumpsys", "input", check=False).stdout
-    for zeile in diag.splitlines():
-        if any(k in zeile for k in ("RawSurface", "Raw", "XScale", "YScale", "Orientation", "SurfaceWidth", "SurfaceHeight", "Calibration", "touch.size", "SizeScale", "DeviceMode", "Viewport")):
-            print("INPUT:", zeile.strip()[:160])
-    finger = [0] if hat_flaeche else [-0.03, 0.0, 0.03]
+    roh = touch_abbildung()
+    finger = [-0.02, 0.0, 0.02]
     befehle = []
     def ev(typ, code, wert):
         befehle.append(f"sendevent {geraet} {typ} {code} {wert}")
@@ -131,13 +144,12 @@ def handballen_wischen(x_anteil, y_von, y_bis):
     for s in range(schritte + 1):
         y = y_von + (y_bis - y_von) * s / schritte
         for i, dx in enumerate(finger):
+            rx, ry = roh(x_anteil + dx, y, mx, my)
             ev(3, 47, i)
             if s == 0:
                 ev(3, 57, 100 + i)
-            ev(3, 53, int((x_anteil + dx) * mx))
-            ev(3, 54, int(y * my))
-            if hat_flaeche:
-                ev(3, 48, int(min(b["ABS_MT_TOUCH_MAJOR"], 0.08 * mx)))
+            ev(3, 53, rx)
+            ev(3, 54, ry)
         if s == 0:
             ev(1, 330, 1)
         ev(0, 0, 0)
