@@ -91,6 +91,60 @@ def sichere_logcat():
         subprocess.run(["adb", "logcat", "-d"], stdout=datei)
 
 
+def touch_geraet():
+    """Findet den (virtuellen) Touchscreen und seine Wertebereiche über getevent -pl."""
+    ausgabe = adb("shell", "getevent", "-pl", check=False).stdout
+    geraet, bereiche, ergebnis = None, {}, None
+    for zeile in ausgabe.splitlines():
+        if zeile.startswith("add device"):
+            if geraet and "ABS_MT_POSITION_X" in bereiche:
+                ergebnis = ergebnis or (geraet, dict(bereiche))
+            geraet, bereiche = zeile.split(":", 1)[1].strip(), {}
+        for achse in ("ABS_MT_POSITION_X", "ABS_MT_POSITION_Y", "ABS_MT_TOUCH_MAJOR"):
+            if achse in zeile and "max" in zeile:
+                teile = zeile.replace(",", " ").split()
+                bereiche[achse] = int(teile[teile.index("max") + 1])
+    if geraet and "ABS_MT_POSITION_X" in bereiche:
+        ergebnis = ergebnis or (geraet, dict(bereiche))
+    return ergebnis
+
+
+def handballen_wischen(x_anteil, y_von, y_bis):
+    """Legt eine "Hand" (eine große Berührungsfläche, ersatzweise drei Finger) auf und wischt senkrecht."""
+    info = touch_geraet()
+    if not info:
+        print("WARNUNG: kein Touchscreen für sendevent gefunden")
+        return
+    geraet, b = info
+    mx, my = b["ABS_MT_POSITION_X"], b["ABS_MT_POSITION_Y"]
+    hat_flaeche = "ABS_MT_TOUCH_MAJOR" in b
+    print(f"Touchscreen {geraet}: {b}")
+    finger = [0] if hat_flaeche else [-0.03, 0.0, 0.03]
+    befehle = []
+    def ev(typ, code, wert):
+        befehle.append(f"sendevent {geraet} {typ} {code} {wert}")
+    schritte = 12
+    for s in range(schritte + 1):
+        y = y_von + (y_bis - y_von) * s / schritte
+        for i, dx in enumerate(finger):
+            ev(3, 47, i)
+            if s == 0:
+                ev(3, 57, 100 + i)
+            ev(3, 53, int((x_anteil + dx) * mx))
+            ev(3, 54, int(y * my))
+            if hat_flaeche:
+                ev(3, 48, int(min(b["ABS_MT_TOUCH_MAJOR"], 0.08 * mx)))
+        if s == 0:
+            ev(1, 330, 1)
+        ev(0, 0, 0)
+    for i, _ in enumerate(finger):
+        ev(3, 47, i)
+        ev(3, 57, 4294967295)
+    ev(1, 330, 0)
+    ev(0, 0, 0)
+    adb("shell", " ; ".join(befehle), check=False)
+
+
 def main():
     os.makedirs(AUSGABE_ORDNER, exist_ok=True)
     adb("shell", "am", "start", "-n", f"{PAKET}/.MainActivity")
@@ -146,6 +200,18 @@ def main():
     if tippe_mitte_von("Rückgängig"):
         time.sleep(0.5)
         screenshot("09_rueckgaengig.png")
+
+    # Mit dem Handballen wischen – bei gewähltem Stift, es darf NICHT gezeichnet werden.
+    if tippe_mitte_von("Stift"):
+        time.sleep(0.5)
+        tippe_mitte_von("Stift")
+        time.sleep(0.5)
+    handballen_wischen(0.45, 0.12, 0.5)
+    time.sleep(0.8)
+    screenshot("09c_handballen.png")
+    if tippe_mitte_von("Rückgängig"):
+        time.sleep(0.5)
+        screenshot("09d_handballen_rueckgaengig.png")
 
     # Gestrichelte Linie und gestrichelter Pfeil (auf Android 8 früher durchgezogen)
     if tippe_mitte_von("Formen"):
