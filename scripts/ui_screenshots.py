@@ -100,7 +100,7 @@ def touch_geraet():
             if geraet and "ABS_MT_POSITION_X" in bereiche:
                 ergebnis = ergebnis or (geraet, dict(bereiche))
             geraet, bereiche = zeile.split(":", 1)[1].strip(), {}
-        for achse in ("ABS_MT_POSITION_X", "ABS_MT_POSITION_Y", "ABS_MT_TOUCH_MAJOR"):
+        for achse in ("ABS_MT_POSITION_X", "ABS_MT_POSITION_Y", "ABS_MT_TOUCH_MAJOR", "ABS_MT_PRESSURE"):
             if achse in zeile and "max" in zeile:
                 teile = zeile.replace(",", " ").split()
                 bereiche[achse] = int(teile[teile.index("max") + 1])
@@ -150,6 +150,10 @@ def handballen_wischen(x_anteil, y_von, y_bis):
                 ev(3, 57, 100 + i)
             ev(3, 53, rx)
             ev(3, 54, ry)
+            if "ABS_MT_PRESSURE" in b:
+                ev(3, 58, max(1, b["ABS_MT_PRESSURE"] // 2))
+            if "ABS_MT_TOUCH_MAJOR" in b:
+                ev(3, 48, 50)
         if s == 0:
             ev(1, 330, 1)
         ev(0, 0, 0)
@@ -158,7 +162,8 @@ def handballen_wischen(x_anteil, y_von, y_bis):
         ev(3, 57, 4294967295)
     ev(1, 330, 0)
     ev(0, 0, 0)
-    adb("shell", " ; ".join(befehle), check=False)
+    r = adb("shell", " ; ".join(befehle), check=False)
+    print("sendevent:", len(befehle), "Befehle, Fehler:", (r.stderr or r.stdout or "")[:200])
 
 
 def main():
