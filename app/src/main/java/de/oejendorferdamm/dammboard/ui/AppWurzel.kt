@@ -56,6 +56,8 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
     val autoUpdatePruefung by speicher.autoUpdatePruefung.collectAsState(initial = true)
     val zeichenPraezision by speicher.zeichenPraezision.collectAsState(initial = 0.7f)
     val hintergrundMerken by speicher.hintergrundMerken.collectAsState(initial = false)
+    val handballenRadieren by speicher.handballenRadieren.collectAsState(initial = true)
+    val handballenEmpfindlichkeit by speicher.handballenEmpfindlichkeit.collectAsState(initial = 0.5f)
     val gespeicherterHintergrund by speicher.gespeicherterHintergrund.collectAsState(initial = null)
 
     val tafelState = rememberTafelState()
@@ -135,6 +137,8 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
             animationsModus = animationsModus,
             oberflaechenFaktor = symbolGroesse.skalierung,
             zeichenPraezision = zeichenPraezision,
+            handballenRadieren = handballenRadieren,
+            handballenEmpfindlichkeit = handballenEmpfindlichkeit,
             zeigeUpdatePunkt = updateInfo != null,
             neuigkeiten = neuigkeiten,
             onNeuigkeitenGelesen = { neuigkeiten = null },
@@ -155,6 +159,8 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
                 updateBereitsAktuell = updateBereitsAktuell,
                 zeichenPraezision = zeichenPraezision,
                 hintergrundMerken = hintergrundMerken,
+                handballenRadieren = handballenRadieren,
+                handballenEmpfindlichkeit = handballenEmpfindlichkeit,
                 onZugangSpeichern = { neu -> scope.launch { speicher.speichereIServZugang(neu) } },
                 onModusGeaendert = { neu -> scope.launch { speicher.speichereAnimationsModus(neu) } },
                 onSymbolGroesseGeaendert = { neu -> scope.launch { speicher.speichereSymbolGroesse(neu) } },
@@ -162,6 +168,8 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
                 onUpdatePruefungAnfordern = { scope.launch { pruefeAufUpdate() } },
                 onZeichenPraezisionGeaendert = { neu -> scope.launch { speicher.speichereZeichenPraezision(neu) } },
                 onHintergrundMerkenGeaendert = { neu -> scope.launch { speicher.speichereHintergrundMerken(neu) } },
+                onHandballenRadierenGeaendert = { neu -> scope.launch { speicher.speichereHandballenRadieren(neu) } },
+                onHandballenEmpfindlichkeitGeaendert = { neu -> scope.launch { speicher.speichereHandballenEmpfindlichkeit(neu) } },
                 onZurueck = { bildschirm = Bildschirm.Brett }
             )
         }

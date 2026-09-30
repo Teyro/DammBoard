@@ -32,7 +32,11 @@ import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.motionEventSpy
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import de.oejendorferdamm.dammboard.model.BoardItem
@@ -227,11 +231,14 @@ private class EbenenCache {
 }
 
 /** Zeichenfläche der Tafel: Rendering aller Seiteninhalte plus vollständige Gesten-Steuerung pro Werkzeug. */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun TafelCanvas(
     state: TafelState,
     modifier: Modifier = Modifier,
     zeichenPraezision: Float = 0.7f,
+    handballenRadieren: Boolean = true,
+    handballenEmpfindlichkeit: Float = 0.5f,
     onAufnahme: (AufnahmeZweck, android.graphics.Bitmap) -> Unit
 ) {
     val seite = state.seite
@@ -254,6 +261,12 @@ fun TafelCanvas(
         onAufnahme(zweck, graphicsLayer.toImageBitmap().asAndroidBitmap())
         state.aufnahmeAnfrage = null
     }
+
+    // Wischen mit dem Handballen (siehe Handballen.kt): funktioniert mit jedem Werkzeug.
+    val handballen = remember { HandballenErkennung() }
+    handballen.empfindlichkeit = handballenEmpfindlichkeit
+    handballen.xdpi = LocalContext.current.resources.displayMetrics.xdpi
+    var handAnzeige by remember { mutableStateOf<Pair<Offset, Float>?>(null) }
 
     val laufenderStrich = remember { LaufenderStrich() }
     var formVorschau by remember { mutableStateOf<Pair<Offset, Offset>?>(null) }
@@ -570,6 +583,52 @@ fun TafelCanvas(
                     if (state.offenesPanel != null) state.schliessePanel()
                 }
             }
+            // Handballen: sieht jede Berührung VOR den Werkzeugen (PointerEventPass.Initial). Liegt
+            // eine Hand auf, wird ab dort gewischt und die Berührung verbraucht – ein gerade
+            // begonnener Strich des Werkzeugs bricht dadurch ab, statt als Schmiererei stehen zu bleiben.
+            .motionEventSpy { handballen.verarbeite(it) }
+            .pointerInput(handballenRadieren, seite, state.lupeAktiv) {
+                if (!handballenRadieren || state.lupeAktiv) return@pointerInput
+                awaitPointerEventScope {
+                    var wischt = false
+                    var letzteMitte: Offset? = null
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        handballen.bildschirmBreitePx = size.width.toFloat()
+                        val gedrueckt = event.changes.filter { it.pressed }
+                        if (!wischt && gedrueckt.isNotEmpty() && handballen.handAufgelegt) {
+                            wischt = true
+                            letzteMitte = null
+                        }
+                        if (!wischt) continue
+                        event.changes.forEach { it.consume() }
+                        if (gedrueckt.isEmpty()) {
+                            wischt = false
+                            letzteMitte = null
+                            handAnzeige = null
+                            seite.radierenAbschliessen()
+                            continue
+                        }
+                        val mitte = Offset(
+                            gedrueckt.sumOf { it.position.x.toDouble() }.toFloat() / gedrueckt.size,
+                            gedrueckt.sumOf { it.position.y.toDouble() }.toFloat() / gedrueckt.size
+                        )
+                        val p = pixelFaktorFuer(size.width.toFloat(), size.height.toFloat())
+                        val spanne = gedrueckt.maxOf { (it.position - mitte).getDistance() }
+                        val radius = maxOf(handballen.groessteBeruehrungPx * 0.6f, spanne + 20f * p, 45f * p)
+                            .coerceAtMost(260f * p)
+                        // Auch bei schnellem Wischen lückenlos: Zwischenpunkte entlang des Wegs.
+                        val von = letzteMitte ?: mitte
+                        val schritte = maxOf(1, kotlin.math.ceil((mitte - von).getDistance() / (radius * 0.5f)).toInt())
+                        for (s in 1..schritte) {
+                            val t = s.toFloat() / schritte
+                            seite.radiereBeruehrte(Offset(von.x + (mitte.x - von.x) * t, von.y + (mitte.y - von.y) * t), radius)
+                        }
+                        letzteMitte = mitte
+                        handAnzeige = mitte to radius
+                    }
+                }
+            }
             .then(gesteModifier)
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -664,6 +723,12 @@ fun TafelCanvas(
 
             if (state.werkzeug == Werkzeug.GEOMETRIE && state.geometrieWerkzeug != GeometrieWerkzeug.ZIRKEL) {
                 zeichneGeometrieFuehrung(state.geometrieWerkzeug, geometrieZentrum(size), state.geometrieFuehrung.winkelGrad)
+            }
+
+            // Wo gerade mit der Hand gewischt wird: heller "Schwamm" als Rückmeldung.
+            handAnzeige?.let { (mitte, radius) ->
+                drawCircle(Color.White.copy(alpha = 0.18f), radius = radius, center = mitte)
+                drawCircle(Color.White.copy(alpha = 0.55f), radius = radius, center = mitte, style = Stroke(width = 2.5f * p))
             }
         }
     }

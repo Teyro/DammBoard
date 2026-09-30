@@ -84,6 +84,8 @@ fun EinstellungenScreen(
     updateBereitsAktuell: Boolean,
     zeichenPraezision: Float,
     hintergrundMerken: Boolean,
+    handballenRadieren: Boolean,
+    handballenEmpfindlichkeit: Float,
     onZugangSpeichern: (IServZugang) -> Unit,
     onModusGeaendert: (AnimationsModus) -> Unit,
     onSymbolGroesseGeaendert: (SymbolGroesse) -> Unit,
@@ -91,6 +93,8 @@ fun EinstellungenScreen(
     onUpdatePruefungAnfordern: () -> Unit,
     onZeichenPraezisionGeaendert: (Float) -> Unit,
     onHintergrundMerkenGeaendert: (Boolean) -> Unit,
+    onHandballenRadierenGeaendert: (Boolean) -> Unit,
+    onHandballenEmpfindlichkeitGeaendert: (Float) -> Unit,
     onZurueck: () -> Unit
 ) {
     var serverUrl by remember(aktuellerZugang) { mutableStateOf(aktuellerZugang.serverUrl) }
@@ -174,8 +178,12 @@ fun EinstellungenScreen(
             ErweiterteEinstellungen(
                 zeichenPraezision = zeichenPraezision,
                 hintergrundMerken = hintergrundMerken,
+                handballenRadieren = handballenRadieren,
+                handballenEmpfindlichkeit = handballenEmpfindlichkeit,
                 onZeichenPraezisionGeaendert = onZeichenPraezisionGeaendert,
-                onHintergrundMerkenGeaendert = onHintergrundMerkenGeaendert
+                onHintergrundMerkenGeaendert = onHintergrundMerkenGeaendert,
+                onHandballenRadierenGeaendert = onHandballenRadierenGeaendert,
+                onHandballenEmpfindlichkeitGeaendert = onHandballenEmpfindlichkeitGeaendert
             )
 
             Spacer(Modifier.height(26.dp))
@@ -374,8 +382,12 @@ private fun UpdateAbschnitt(
 private fun ErweiterteEinstellungen(
     zeichenPraezision: Float,
     hintergrundMerken: Boolean,
+    handballenRadieren: Boolean,
+    handballenEmpfindlichkeit: Float,
     onZeichenPraezisionGeaendert: (Float) -> Unit,
-    onHintergrundMerkenGeaendert: (Boolean) -> Unit
+    onHintergrundMerkenGeaendert: (Boolean) -> Unit,
+    onHandballenRadierenGeaendert: (Boolean) -> Unit,
+    onHandballenEmpfindlichkeitGeaendert: (Float) -> Unit
 ) {
     Text("Erweitert", color = Textfarbe, fontSize = 15.sp, fontWeight = FontWeight.Bold)
     Spacer(Modifier.height(4.dp))
@@ -418,6 +430,44 @@ private fun ErweiterteEinstellungen(
             onCheckedChange = onHintergrundMerkenGeaendert,
             colors = SwitchDefaults.colors(checkedTrackColor = Akzent)
         )
+    }
+
+    Spacer(Modifier.height(14.dp))
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+            Text("Mit dem Handballen wischen", color = Textfarbe, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                "Wie an einer echten Tafel: Handballen oder flache Hand auflegen und wischen – das " +
+                    "Darunterliegende wird weggewischt, egal welches Werkzeug gerade gewählt ist.",
+                color = TextfarbeSchwach, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp)
+            )
+        }
+        Switch(
+            checked = handballenRadieren,
+            onCheckedChange = onHandballenRadierenGeaendert,
+            colors = SwitchDefaults.colors(checkedTrackColor = Akzent)
+        )
+    }
+    if (handballenRadieren) {
+        Text(
+            "Empfindlichkeit – weiter links, falls beim normalen Schreiben aus Versehen gewischt " +
+                "wird; weiter rechts, falls die Hand nicht erkannt wird.",
+            color = TextfarbeSchwach, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp, bottom = 4.dp)
+        )
+        var empfindlichkeit by remember(handballenEmpfindlichkeit) { mutableFloatStateOf(handballenEmpfindlichkeit) }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("Nur große Hand", color = TextfarbeSchwach, fontSize = 10.sp)
+            Slider(
+                value = empfindlichkeit,
+                onValueChange = { empfindlichkeit = it },
+                onValueChangeFinished = { onHandballenEmpfindlichkeitGeaendert(empfindlichkeit) },
+                valueRange = 0f..1f,
+                steps = 9,
+                colors = SliderDefaults.colors(thumbColor = Akzent, activeTrackColor = Akzent),
+                modifier = Modifier.weight(1f).padding(horizontal = 6.dp)
+            )
+            Text("Empfindlich", color = TextfarbeSchwach, fontSize = 10.sp)
+        }
     }
 }
 

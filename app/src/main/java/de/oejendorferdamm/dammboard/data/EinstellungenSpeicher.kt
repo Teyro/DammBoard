@@ -33,6 +33,8 @@ private object Schluessel {
     val AUTO_UPDATE_PRUEFUNG = booleanPreferencesKey("auto_update_pruefung")
     val ZEICHEN_PRAEZISION = floatPreferencesKey("zeichen_praezision")
     val HINTERGRUND_MERKEN = booleanPreferencesKey("hintergrund_merken")
+    val HANDBALLEN_RADIEREN = booleanPreferencesKey("handballen_radieren")
+    val HANDBALLEN_EMPFINDLICHKEIT = floatPreferencesKey("handballen_empfindlichkeit")
     val HINTERGRUND_FARBE = intPreferencesKey("hintergrund_farbe")
     val HINTERGRUND_MUSTER = stringPreferencesKey("hintergrund_muster")
     val ZULETZT_GESTARTETE_VERSION = stringPreferencesKey("zuletzt_gestartete_version")
@@ -127,6 +129,28 @@ class EinstellungenSpeicher(private val context: Context) {
     suspend fun speichereZeichenPraezision(wert: Float) {
         context.einstellungenDataStore.edit { prefs ->
             prefs[Schluessel.ZEICHEN_PRAEZISION] = wert.coerceIn(0f, 1f)
+        }
+    }
+
+    /** Wischen mit dem Handballen (siehe ui/canvas/Handballen.kt) – standardmäßig an. */
+    val handballenRadieren: Flow<Boolean> = context.einstellungenDataStore.data.map { prefs ->
+        prefs[Schluessel.HANDBALLEN_RADIEREN] ?: true
+    }
+
+    suspend fun speichereHandballenRadieren(aktiv: Boolean) {
+        context.einstellungenDataStore.edit { prefs ->
+            prefs[Schluessel.HANDBALLEN_RADIEREN] = aktiv
+        }
+    }
+
+    /** 0 = nur eindeutig große Flächen gelten als Hand, 1 = sehr empfindlich. */
+    val handballenEmpfindlichkeit: Flow<Float> = context.einstellungenDataStore.data.map { prefs ->
+        prefs[Schluessel.HANDBALLEN_EMPFINDLICHKEIT] ?: 0.5f
+    }
+
+    suspend fun speichereHandballenEmpfindlichkeit(wert: Float) {
+        context.einstellungenDataStore.edit { prefs ->
+            prefs[Schluessel.HANDBALLEN_EMPFINDLICHKEIT] = wert.coerceIn(0f, 1f)
         }
     }
 
