@@ -119,6 +119,44 @@ data class StrichItem(
     internal val grenzen: Pair<Offset, Offset> by lazy(LazyThreadSafetyMode.NONE) { grenzenVon(punkte) }
 }
 
+/**
+ * Die Teile dieses Strichs, die außerhalb des Kreises (punkt, radius) liegen – jeweils als
+ * eigener Strich. Damit die Schnittkante der Radiererform folgt und nicht zwischen zwei weit
+ * auseinanderliegenden Messpunkten "springt", werden Abschnitte in der Nähe des Radierers
+ * vorher fein unterteilt.
+ */
+internal fun StrichItem.ohneBereich(punkt: Offset, radius: Float, neueId: () -> Long): List<StrichItem> {
+    val reichweite = radius + breite / 2
+    val fein = ArrayList<Offset>(punkte.size + 16)
+    val schrittweite = maxOf(1f, radius / 6f)
+    for (i in punkte.indices) {
+        val p = punkte[i]
+        if (i > 0) {
+            val a = punkte[i - 1]
+            val laenge = hypot(p.x - a.x, p.y - a.y)
+            if (laenge > schrittweite && abstandZuStrecke(punkt, a, p) <= reichweite + laenge) {
+                val n = kotlin.math.ceil(laenge / schrittweite).toInt()
+                for (k in 1 until n) {
+                    val t = k.toFloat() / n
+                    fein.add(Offset(a.x + (p.x - a.x) * t, a.y + (p.y - a.y) * t))
+                }
+            }
+        }
+        fein.add(p)
+    }
+    val stuecke = mutableListOf<StrichItem>()
+    var aktuell = ArrayList<Offset>()
+    fun abschliessen() {
+        if (aktuell.size >= 2) stuecke.add(StrichItem(neueId(), aktuell, farbe, breite, gestrichelt))
+        aktuell = ArrayList()
+    }
+    for (p in fein) {
+        if (hypot(p.x - punkt.x, p.y - punkt.y) <= reichweite) abschliessen() else aktuell.add(p)
+    }
+    abschliessen()
+    return stuecke
+}
+
 data class FormItem(
     override val id: Long,
     val typ: FormTyp,
@@ -153,7 +191,10 @@ class Seite(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)) {
 
     private val rueckgaengigStapel = mutableStateListOf<Aktion>()
     private val wiederholenStapel = mutableStateListOf<Aktion>()
-    private val ausstehendRadiert = mutableListOf<BoardItem>()
+    // Laufende Radier-Geste: welche ursprünglichen Elemente sie entfernt hat und welche
+    // Reststücke (aufgeschnittene Striche) sie neu erzeugt hat – für EINEN Rückgängig-Schritt.
+    private val ausstehendEntfernt = mutableListOf<BoardItem>()
+    private val ausstehendNeu = LinkedHashMap<Long, BoardItem>()
 
     val kannRueckgaengig get() = rueckgaengigStapel.isNotEmpty()
     val kannWiederholen get() = wiederholenStapel.isNotEmpty()
@@ -162,21 +203,54 @@ class Seite(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)) {
     private data class Hinzugefuegt(val hinzugefuegteItems: List<BoardItem>) : Aktion
     private data class Entfernt(val entfernteItems: List<BoardItem>) : Aktion
     private data class Verschoben(val ids: List<Long>, val delta: Offset) : Aktion
+    private data class Ersetzt(val entfernteItems: List<BoardItem>, val neueItems: List<BoardItem>) : Aktion
 
-    /** Entfernt sofort alle Elemente unter dem Radierer; die Aktion wird erst bei [radierenAbschliessen] auf den Undo-Stapel gelegt. */
-    fun radiereBeruehrte(punkt: Offset, radius: Float) {
+    /**
+     * Radiert wie ein Schwamm: Freihand-Striche werden nur dort entfernt, wo der Radierer sie
+     * berührt – der Rest des Strichs bleibt als eigene Stücke stehen. Formen und Beschriftungen
+     * verschwinden weiterhin als Ganzes. Die Aktion kommt erst bei [radierenAbschliessen] (für
+     * die ganze Geste als EIN Schritt) auf den Undo-Stapel.
+     */
+    fun radiereBeruehrte(punkt: Offset, radius: Float, neueId: () -> Long) {
         val treffer = items.filter { it.beruehrtVon(punkt, radius) }
         if (treffer.isEmpty()) return
-        entferne(treffer)
-        ausstehendRadiert.addAll(treffer)
+        val ersatz = HashMap<Long, List<BoardItem>>(treffer.size * 2)
+        for (item in treffer) {
+            ersatz[item.id] = if (item is StrichItem) item.ohneBereich(punkt, radius, neueId) else emptyList()
+        }
+        val neu = ArrayList<BoardItem>(items.size + treffer.size)
+        for (item in items) {
+            val stuecke = ersatz[item.id]
+            if (stuecke == null) {
+                neu.add(item)
+                continue
+            }
+            // An derselben Stelle der Liste einsetzen: die Stücke bleiben so über/unter dem, was
+            // der Strich vorher überdeckt hat.
+            neu.addAll(stuecke)
+            if (ausstehendNeu.remove(item.id) == null) ausstehendEntfernt.add(item)
+            stuecke.forEach { ausstehendNeu[it.id] = it }
+        }
+        items.clear()
+        items.addAll(neu)
         versionsZaehler++
     }
 
+    /** Wie [radiereBeruehrte], aber lückenlos entlang einer Strecke (für schnelles Wischen). */
+    fun radiereStrecke(von: Offset, bis: Offset, radius: Float, neueId: () -> Long) {
+        val schritte = maxOf(1, kotlin.math.ceil(hypot(bis.x - von.x, bis.y - von.y) / (radius * 0.5f)).toInt())
+        for (s in 1..schritte) {
+            val t = s.toFloat() / schritte
+            radiereBeruehrte(Offset(von.x + (bis.x - von.x) * t, von.y + (bis.y - von.y) * t), radius, neueId)
+        }
+    }
+
     fun radierenAbschliessen() {
-        if (ausstehendRadiert.isEmpty()) return
-        rueckgaengigStapel.add(Entfernt(ausstehendRadiert.toList()))
+        if (ausstehendEntfernt.isEmpty() && ausstehendNeu.isEmpty()) return
+        rueckgaengigStapel.add(Ersetzt(ausstehendEntfernt.toList(), ausstehendNeu.values.toList()))
         wiederholenStapel.clear()
-        ausstehendRadiert.clear()
+        ausstehendEntfernt.clear()
+        ausstehendNeu.clear()
     }
 
     fun hinzufuegen(item: BoardItem) {
@@ -226,6 +300,11 @@ class Seite(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)) {
                 verschiebeItems(aktion.ids, -aktion.delta)
                 wiederholenStapel.add(aktion)
             }
+            is Ersetzt -> {
+                entferne(aktion.neueItems)
+                items.addAll(aktion.entfernteItems)
+                wiederholenStapel.add(aktion)
+            }
         }
         versionsZaehler++
     }
@@ -243,6 +322,11 @@ class Seite(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)) {
             }
             is Verschoben -> {
                 verschiebeItems(aktion.ids, aktion.delta)
+                rueckgaengigStapel.add(aktion)
+            }
+            is Ersetzt -> {
+                entferne(aktion.entfernteItems)
+                items.addAll(aktion.neueItems)
                 rueckgaengigStapel.add(aktion)
             }
         }

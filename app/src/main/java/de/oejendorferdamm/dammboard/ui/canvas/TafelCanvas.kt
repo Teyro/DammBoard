@@ -321,10 +321,12 @@ fun TafelCanvas(
                 )
 
                 Werkzeug.RADIERER -> detectDragGestures(
-                    onDragStart = { seite.radiereBeruehrte(it, state.radiererGroesse.radius * pf()) },
+                    onDragStart = { seite.radiereBeruehrte(it, state.radiererGroesse.radius * pf(), ::naechsteId) },
                     onDrag = { change, _ ->
                         change.consume()
-                        seite.radiereBeruehrte(change.position, state.radiererGroesse.radius * pf())
+                        // Entlang des ganzen Wegs seit dem letzten Bewegungsschritt, sonst bleiben
+                        // bei schnellem Wischen Reste stehen (es wird ja nur noch stückweise radiert).
+                        seite.radiereStrecke(change.previousPosition, change.position, state.radiererGroesse.radius * pf(), ::naechsteId)
                     },
                     onDragEnd = { seite.radierenAbschliessen() },
                     onDragCancel = { seite.radierenAbschliessen() }
@@ -622,7 +624,7 @@ fun TafelCanvas(
                         val schritte = maxOf(1, kotlin.math.ceil((mitte - von).getDistance() / (radius * 0.5f)).toInt())
                         for (s in 1..schritte) {
                             val t = s.toFloat() / schritte
-                            seite.radiereBeruehrte(Offset(von.x + (mitte.x - von.x) * t, von.y + (mitte.y - von.y) * t), radius)
+                            seite.radiereBeruehrte(Offset(von.x + (mitte.x - von.x) * t, von.y + (mitte.y - von.y) * t), radius, ::naechsteId)
                         }
                         letzteMitte = mitte
                         handAnzeige = mitte to radius
