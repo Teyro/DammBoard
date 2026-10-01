@@ -252,6 +252,19 @@ def main():
                 adb("shell", "input", "swipe", str(int(breite * 0.15)), str(y), str(int(breite * 0.55)), str(y), "500")
                 time.sleep(0.8)
         screenshot("09b_gestrichelt.png")
+        # Ein Kreis dazu, dann quer durch Linie, Pfeil und Kreis wischen: stückweise weg.
+        if tippe_mitte_von("Formen"):
+            time.sleep(0.8)
+            if tippe_mitte_von("Kreis"):
+                tippe_mitte_von("Formen")
+                time.sleep(0.5)
+                adb("shell", "input", "swipe", str(int(breite * 0.62)), str(int(hoehe * 0.3)), str(int(breite * 0.82)), str(int(hoehe * 0.65)), "500")
+                time.sleep(0.8)
+        handballen_wischen(0.35, 0.48, 0.75)
+        time.sleep(0.5)
+        handballen_wischen(0.72, 0.25, 0.75)
+        time.sleep(0.8)
+        screenshot("09e_formen_stueckweise.png")
 
     # Seiten: neue Seite anlegen (Pille zeigt 2/2), dann zurückblättern
     if tippe_mitte_von("Seite hinzufügen"):

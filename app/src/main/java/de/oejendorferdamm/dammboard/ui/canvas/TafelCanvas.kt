@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -239,6 +240,7 @@ fun TafelCanvas(
     zeichenPraezision: Float = 0.7f,
     handballenRadieren: Boolean = true,
     handballenEmpfindlichkeit: Float = 0.5f,
+    radierenStueckweise: Boolean = true,
     onAufnahme: (AufnahmeZweck, android.graphics.Bitmap) -> Unit
 ) {
     val seite = state.seite
@@ -321,12 +323,12 @@ fun TafelCanvas(
                 )
 
                 Werkzeug.RADIERER -> detectDragGestures(
-                    onDragStart = { seite.radiereBeruehrte(it, state.radiererGroesse.radius * pf(), ::naechsteId) },
+                    onDragStart = { seite.radiereBeruehrte(it, state.radiererGroesse.radius * pf(), ::naechsteId, radierenStueckweise) },
                     onDrag = { change, _ ->
                         change.consume()
                         // Entlang des ganzen Wegs seit dem letzten Bewegungsschritt, sonst bleiben
                         // bei schnellem Wischen Reste stehen (es wird ja nur noch stückweise radiert).
-                        seite.radiereStrecke(change.previousPosition, change.position, state.radiererGroesse.radius * pf(), ::naechsteId)
+                        seite.radiereStrecke(change.previousPosition, change.position, state.radiererGroesse.radius * pf(), ::naechsteId, radierenStueckweise)
                     },
                     onDragEnd = { seite.radierenAbschliessen() },
                     onDragCancel = { seite.radierenAbschliessen() }
@@ -624,7 +626,7 @@ fun TafelCanvas(
                         val schritte = maxOf(1, kotlin.math.ceil((mitte - von).getDistance() / (radius * 0.5f)).toInt())
                         for (s in 1..schritte) {
                             val t = s.toFloat() / schritte
-                            seite.radiereBeruehrte(Offset(von.x + (mitte.x - von.x) * t, von.y + (mitte.y - von.y) * t), radius, ::naechsteId)
+                            seite.radiereBeruehrte(Offset(von.x + (mitte.x - von.x) * t, von.y + (mitte.y - von.y) * t), radius, ::naechsteId, radierenStueckweise)
                         }
                         letzteMitte = mitte
                         handAnzeige = mitte to radius
@@ -967,7 +969,24 @@ private fun DrawScope.zeichneMarkierung(item: BoardItem) {
     )
 }
 
+/**
+ * Zeichnet eine Form – mit weggewischten Stellen in einer eigenen Ebene, in der diese Stellen
+ * danach ausgestanzt werden (BlendMode.Clear wirkt so nur auf die Form, nicht auf die Tafel).
+ */
 private fun DrawScope.zeichneForm(form: FormItem) {
+    if (form.radiert.isEmpty()) {
+        zeichneFormInhalt(form)
+        return
+    }
+    val (a, b) = form.begrenzendesRechteck()
+    val rand = maxOf(form.randBreite * 4f, 40f * pixelFaktor)
+    drawContext.canvas.saveLayer(Rect(a.x - rand, a.y - rand, b.x + rand, b.y + rand), androidx.compose.ui.graphics.Paint())
+    zeichneFormInhalt(form)
+    form.radiert.forEach { drawCircle(Color.Black, radius = it.radius, center = it.mitte, blendMode = BlendMode.Clear) }
+    drawContext.canvas.restore()
+}
+
+private fun DrawScope.zeichneFormInhalt(form: FormItem) {
     val topLeft = Offset(minOf(form.start.x, form.ende.x), minOf(form.start.y, form.ende.y))
     val w = kotlin.math.abs(form.ende.x - form.start.x)
     val h = kotlin.math.abs(form.ende.y - form.start.y)

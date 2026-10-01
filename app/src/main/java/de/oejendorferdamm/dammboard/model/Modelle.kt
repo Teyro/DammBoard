@@ -157,6 +157,9 @@ internal fun StrichItem.ohneBereich(punkt: Offset, radius: Float, neueId: () -> 
     return stuecke
 }
 
+/** Eine weggewischte Stelle in einer Form: dort wird die Form beim Zeichnen ausgespart. */
+data class RadierStelle(val mitte: Offset, val radius: Float)
+
 data class FormItem(
     override val id: Long,
     val typ: FormTyp,
@@ -165,8 +168,40 @@ data class FormItem(
     val randFarbe: Color,
     val fuellFarbe: Color?,
     val randBreite: Float,
-    val gestrichelt: Boolean
+    val gestrichelt: Boolean,
+    /** Stückweise weggewischte Stellen (siehe Seite.radiereBeruehrte). */
+    val radiert: List<RadierStelle> = emptyList()
 ) : BoardItem
+
+private val LINIENFORMEN = setOf(
+    FormTyp.LINIE, FormTyp.LINIE_GESTRICHELT, FormTyp.PFEIL, FormTyp.PFEIL_GESTRICHELT,
+    FormTyp.DOPPELPFEIL, FormTyp.DOPPELPFEIL_GESTRICHELT, FormTyp.FREIHANDPFEIL, FormTyp.FREIHANDPFEIL_GESTRICHELT
+)
+
+/**
+ * Die Form mit einer zusätzlich weggewischten Stelle – oder null, wenn danach praktisch nichts
+ * mehr von ihr zu sehen ist (dann verschwindet sie ganz). Gewischt wird wie mit einem Schwamm:
+ * die Form wird beim Zeichnen an diesen Stellen ausgespart (TafelCanvas.zeichneForm).
+ */
+internal fun FormItem.mitRadierStelle(punkt: Offset, radius: Float, neueId: () -> Long): FormItem? {
+    // Schon (fast) genau hier gewischt: nichts Neues – spart Arbeit beim Zeichnen.
+    if (radiert.any { hypot(it.mitte.x - punkt.x, it.mitte.y - punkt.y) < it.radius * 0.2f && it.radius >= radius * 0.9f }) return this
+    val stellen = radiert + RadierStelle(punkt, radius)
+    fun bedeckt(p: Offset) = stellen.any { hypot(p.x - it.mitte.x, p.y - it.mitte.y) <= it.radius }
+    val probe = if (typ in LINIENFORMEN) {
+        (0..20).map { i -> Offset(start.x + (ende.x - start.x) * i / 20f, start.y + (ende.y - start.y) * i / 20f) }
+    } else {
+        // Raster über die Form; ohne Füllung zählt nur der Randbereich.
+        val (a, b) = begrenzendesRechteck()
+        val w = b.x - a.x
+        val h = b.y - a.y
+        (0..8).flatMap { ix -> (0..8).map { iy -> Offset(a.x + w * ix / 8f, a.y + h * iy / 8f) to (ix in 1..7 && iy in 1..7) } }
+            .filter { (_, innen) -> fuellFarbe != null || !innen }
+            .map { it.first }
+    }
+    if (probe.all(::bedeckt)) return null
+    return copy(id = neueId(), radiert = stellen)
+}
 
 data class LaengenEtikett(
     override val id: Long,
@@ -211,13 +246,23 @@ class Seite(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)) {
      * verschwinden weiterhin als Ganzes. Die Aktion kommt erst bei [radierenAbschliessen] (für
      * die ganze Geste als EIN Schritt) auf den Undo-Stapel.
      */
-    fun radiereBeruehrte(punkt: Offset, radius: Float, neueId: () -> Long) {
+    fun radiereBeruehrte(punkt: Offset, radius: Float, neueId: () -> Long, stueckweise: Boolean = true) {
         val treffer = items.filter { it.beruehrtVon(punkt, radius) }
         if (treffer.isEmpty()) return
         val ersatz = HashMap<Long, List<BoardItem>>(treffer.size * 2)
         for (item in treffer) {
-            ersatz[item.id] = if (item is StrichItem) item.ohneBereich(punkt, radius, neueId) else emptyList()
+            ersatz[item.id] = when {
+                !stueckweise -> emptyList() // Einstellung "Ganze Linie oder Form"
+                item is StrichItem -> item.ohneBereich(punkt, radius, neueId)
+                item is FormItem -> {
+                    val neu = item.mitRadierStelle(punkt, radius, neueId)
+                    if (neu === item) continue // nichts geändert
+                    listOfNotNull(neu)
+                }
+                else -> emptyList()
+            }
         }
+        if (ersatz.isEmpty()) return
         val neu = ArrayList<BoardItem>(items.size + treffer.size)
         for (item in items) {
             val stuecke = ersatz[item.id]
@@ -237,11 +282,11 @@ class Seite(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)) {
     }
 
     /** Wie [radiereBeruehrte], aber lückenlos entlang einer Strecke (für schnelles Wischen). */
-    fun radiereStrecke(von: Offset, bis: Offset, radius: Float, neueId: () -> Long) {
+    fun radiereStrecke(von: Offset, bis: Offset, radius: Float, neueId: () -> Long, stueckweise: Boolean = true) {
         val schritte = maxOf(1, kotlin.math.ceil(hypot(bis.x - von.x, bis.y - von.y) / (radius * 0.5f)).toInt())
         for (s in 1..schritte) {
             val t = s.toFloat() / schritte
-            radiereBeruehrte(Offset(von.x + (bis.x - von.x) * t, von.y + (bis.y - von.y) * t), radius, neueId)
+            radiereBeruehrte(Offset(von.x + (bis.x - von.x) * t, von.y + (bis.y - von.y) * t), radius, neueId, stueckweise)
         }
     }
 
@@ -351,7 +396,10 @@ class Seite(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)) {
             if (item.id !in ids) continue
             items[i] = when (item) {
                 is StrichItem -> item.copy(punkte = item.punkte.map { it + delta })
-                is FormItem -> item.copy(start = item.start + delta, ende = item.ende + delta)
+                is FormItem -> item.copy(
+                    start = item.start + delta, ende = item.ende + delta,
+                    radiert = item.radiert.map { it.copy(mitte = it.mitte + delta) }
+                )
                 is LaengenEtikett -> item.copy(position = item.position + delta)
             }
         }

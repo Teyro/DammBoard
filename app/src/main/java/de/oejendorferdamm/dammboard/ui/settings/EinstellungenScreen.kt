@@ -86,6 +86,7 @@ fun EinstellungenScreen(
     hintergrundMerken: Boolean,
     handballenRadieren: Boolean,
     handballenEmpfindlichkeit: Float,
+    radierenStueckweise: Boolean,
     onZugangSpeichern: (IServZugang) -> Unit,
     onModusGeaendert: (AnimationsModus) -> Unit,
     onSymbolGroesseGeaendert: (SymbolGroesse) -> Unit,
@@ -95,6 +96,7 @@ fun EinstellungenScreen(
     onHintergrundMerkenGeaendert: (Boolean) -> Unit,
     onHandballenRadierenGeaendert: (Boolean) -> Unit,
     onHandballenEmpfindlichkeitGeaendert: (Float) -> Unit,
+    onRadierenStueckweiseGeaendert: (Boolean) -> Unit,
     onZurueck: () -> Unit
 ) {
     var serverUrl by remember(aktuellerZugang) { mutableStateOf(aktuellerZugang.serverUrl) }
@@ -180,10 +182,12 @@ fun EinstellungenScreen(
                 hintergrundMerken = hintergrundMerken,
                 handballenRadieren = handballenRadieren,
                 handballenEmpfindlichkeit = handballenEmpfindlichkeit,
+                radierenStueckweise = radierenStueckweise,
                 onZeichenPraezisionGeaendert = onZeichenPraezisionGeaendert,
                 onHintergrundMerkenGeaendert = onHintergrundMerkenGeaendert,
                 onHandballenRadierenGeaendert = onHandballenRadierenGeaendert,
-                onHandballenEmpfindlichkeitGeaendert = onHandballenEmpfindlichkeitGeaendert
+                onHandballenEmpfindlichkeitGeaendert = onHandballenEmpfindlichkeitGeaendert,
+                onRadierenStueckweiseGeaendert = onRadierenStueckweiseGeaendert
             )
 
             Spacer(Modifier.height(26.dp))
@@ -384,10 +388,12 @@ private fun ErweiterteEinstellungen(
     hintergrundMerken: Boolean,
     handballenRadieren: Boolean,
     handballenEmpfindlichkeit: Float,
+    radierenStueckweise: Boolean,
     onZeichenPraezisionGeaendert: (Float) -> Unit,
     onHintergrundMerkenGeaendert: (Boolean) -> Unit,
     onHandballenRadierenGeaendert: (Boolean) -> Unit,
-    onHandballenEmpfindlichkeitGeaendert: (Float) -> Unit
+    onHandballenEmpfindlichkeitGeaendert: (Float) -> Unit,
+    onRadierenStueckweiseGeaendert: (Boolean) -> Unit
 ) {
     Text("Erweitert", color = Textfarbe, fontSize = 15.sp, fontWeight = FontWeight.Bold)
     Spacer(Modifier.height(4.dp))
@@ -430,6 +436,25 @@ private fun ErweiterteEinstellungen(
             onCheckedChange = onHintergrundMerkenGeaendert,
             colors = SwitchDefaults.colors(checkedTrackColor = Akzent)
         )
+    }
+
+    Spacer(Modifier.height(14.dp))
+    Text("Radierer und Wischen", color = Textfarbe, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+    Text(
+        "Stückweise: nur das, worüber gewischt wird, verschwindet – wie mit einem Schwamm, auch bei " +
+            "Formen. Ganz: eine berührte Linie oder Form verschwindet komplett.",
+        color = TextfarbeSchwach, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp, bottom = 6.dp)
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(Color.White),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        ModusKnopf("Stückweise", ausgewaehlt = radierenStueckweise, modifier = Modifier.weight(1f)) {
+            onRadierenStueckweiseGeaendert(true)
+        }
+        ModusKnopf("Ganze Linie / Form", ausgewaehlt = !radierenStueckweise, modifier = Modifier.weight(1f)) {
+            onRadierenStueckweiseGeaendert(false)
+        }
     }
 
     Spacer(Modifier.height(14.dp))

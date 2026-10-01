@@ -69,6 +69,7 @@ fun TafelScreen(
     zeichenPraezision: Float,
     handballenRadieren: Boolean,
     handballenEmpfindlichkeit: Float,
+    radierenStueckweise: Boolean,
     zeigeUpdatePunkt: Boolean,
     neuigkeiten: String?,
     onNeuigkeitenGelesen: () -> Unit,
@@ -126,7 +127,8 @@ fun TafelScreen(
             modifier = Modifier.fillMaxSize(),
             zeichenPraezision = zeichenPraezision,
             handballenRadieren = handballenRadieren,
-            handballenEmpfindlichkeit = handballenEmpfindlichkeit
+            handballenEmpfindlichkeit = handballenEmpfindlichkeit,
+            radierenStueckweise = radierenStueckweise
         ) { zweck, bitmap ->
             when (zweck) {
                 AufnahmeZweck.SPEICHERN, AufnahmeZweck.TEILEN -> starteSpeicherung(zweck, bitmap)

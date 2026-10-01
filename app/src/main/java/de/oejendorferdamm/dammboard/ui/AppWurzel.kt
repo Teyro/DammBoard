@@ -58,6 +58,7 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
     val hintergrundMerken by speicher.hintergrundMerken.collectAsState(initial = false)
     val handballenRadieren by speicher.handballenRadieren.collectAsState(initial = true)
     val handballenEmpfindlichkeit by speicher.handballenEmpfindlichkeit.collectAsState(initial = 0.5f)
+    val radierenStueckweise by speicher.radierenStueckweise.collectAsState(initial = true)
     val gespeicherterHintergrund by speicher.gespeicherterHintergrund.collectAsState(initial = null)
 
     val tafelState = rememberTafelState()
@@ -139,6 +140,7 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
             zeichenPraezision = zeichenPraezision,
             handballenRadieren = handballenRadieren,
             handballenEmpfindlichkeit = handballenEmpfindlichkeit,
+            radierenStueckweise = radierenStueckweise,
             zeigeUpdatePunkt = updateInfo != null,
             neuigkeiten = neuigkeiten,
             onNeuigkeitenGelesen = { neuigkeiten = null },
@@ -161,6 +163,7 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
                 hintergrundMerken = hintergrundMerken,
                 handballenRadieren = handballenRadieren,
                 handballenEmpfindlichkeit = handballenEmpfindlichkeit,
+                radierenStueckweise = radierenStueckweise,
                 onZugangSpeichern = { neu -> scope.launch { speicher.speichereIServZugang(neu) } },
                 onModusGeaendert = { neu -> scope.launch { speicher.speichereAnimationsModus(neu) } },
                 onSymbolGroesseGeaendert = { neu -> scope.launch { speicher.speichereSymbolGroesse(neu) } },
@@ -170,6 +173,7 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
                 onHintergrundMerkenGeaendert = { neu -> scope.launch { speicher.speichereHintergrundMerken(neu) } },
                 onHandballenRadierenGeaendert = { neu -> scope.launch { speicher.speichereHandballenRadieren(neu) } },
                 onHandballenEmpfindlichkeitGeaendert = { neu -> scope.launch { speicher.speichereHandballenEmpfindlichkeit(neu) } },
+                onRadierenStueckweiseGeaendert = { neu -> scope.launch { speicher.speichereRadierenStueckweise(neu) } },
                 onZurueck = { bildschirm = Bildschirm.Brett }
             )
         }

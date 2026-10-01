@@ -35,6 +35,7 @@ private object Schluessel {
     val HINTERGRUND_MERKEN = booleanPreferencesKey("hintergrund_merken")
     val HANDBALLEN_RADIEREN = booleanPreferencesKey("handballen_radieren")
     val HANDBALLEN_EMPFINDLICHKEIT = floatPreferencesKey("handballen_empfindlichkeit")
+    val RADIEREN_STUECKWEISE = booleanPreferencesKey("radieren_stueckweise")
     val HINTERGRUND_FARBE = intPreferencesKey("hintergrund_farbe")
     val HINTERGRUND_MUSTER = stringPreferencesKey("hintergrund_muster")
     val ZULETZT_GESTARTETE_VERSION = stringPreferencesKey("zuletzt_gestartete_version")
@@ -151,6 +152,17 @@ class EinstellungenSpeicher(private val context: Context) {
     suspend fun speichereHandballenEmpfindlichkeit(wert: Float) {
         context.einstellungenDataStore.edit { prefs ->
             prefs[Schluessel.HANDBALLEN_EMPFINDLICHKEIT] = wert.coerceIn(0f, 1f)
+        }
+    }
+
+    /** An (Standard): Radierer/Handballen wischen nur das Berührte weg. Aus: die ganze Linie/Form. */
+    val radierenStueckweise: Flow<Boolean> = context.einstellungenDataStore.data.map { prefs ->
+        prefs[Schluessel.RADIEREN_STUECKWEISE] ?: true
+    }
+
+    suspend fun speichereRadierenStueckweise(aktiv: Boolean) {
+        context.einstellungenDataStore.edit { prefs ->
+            prefs[Schluessel.RADIEREN_STUECKWEISE] = aktiv
         }
     }
 
