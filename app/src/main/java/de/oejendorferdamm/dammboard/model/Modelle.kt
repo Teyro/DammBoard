@@ -21,7 +21,13 @@ val TafelGrau = Color(0xFFB9BDB8)
 val HintergrundOptionen = listOf(TafelGruen, TafelSchwarz, TafelWeiss, TafelGrau)
 
 /** Musterüberlagerung für den Tafelhintergrund (zusätzlich zur reinen Farbe). */
-enum class MusterTyp { KEIN, LINIERT, KARIERT, GEPUNKTET, NOTENLINIEN, FUSSBALLFELD, STUNDENPLAN }
+enum class MusterTyp {
+    KEIN, LINIERT, KARIERT, GEPUNKTET, NOTENLINIEN, FUSSBALLFELD, STUNDENPLAN,
+    // Grundschule: Schreiblineaturen, Hundertertafel, Zahlenstrahl
+    LINEATUR_1, LINEATUR_2, LINEATUR_3, HUNDERTERTAFEL, ZAHLENSTRAHL,
+    // Stumme Karten (Umrisse aus assets/karten, siehe ui/canvas/Karten.kt)
+    KARTE_DEUTSCHLAND, KARTE_HAMBURG, KARTE_WELT
+}
 
 data class HintergrundStil(val farbe: Color, val muster: MusterTyp = MusterTyp.KEIN)
 
@@ -36,7 +42,16 @@ enum class Werkzeug {
     STIFT, FORMEN, RADIERER, LASSO, GEOMETRIE, AUSWAHL, WERKZEUGKASTEN
 }
 
+/** FEIN = Stift, LEUCHT = Textmarker (halbdurchsichtig). */
 enum class StiftArt { FEIN, LEUCHT }
+
+/** Durchsichtigkeit des Textmarkers. */
+const val TEXTMARKER_DECKKRAFT = 0.42f
+
+/** Was das Formen-Werkzeug gerade setzt: eine Form, einen Stempel oder ein Textfeld. */
+enum class FormModus { FORM, STEMPEL, TEXT }
+
+enum class StempelArt { HAKEN, KREUZ, STERN, HERZ, FRAGE, AUSRUF, DAUMEN, LACHEN, NACHDENKEN, SUPER }
 
 enum class FormTyp {
     DREIECK_RECHTS, DREIECK, KREIS, ELLIPSE, QUADRAT,
@@ -69,6 +84,11 @@ fun BoardItem.begrenzendesRechteck(): Pair<Offset, Offset> = when (this) {
     is FormItem -> Offset(min(start.x, ende.x), min(start.y, ende.y)) to
         Offset(max(start.x, ende.x), max(start.y, ende.y))
     is LaengenEtikett -> position to position
+    is TextItem -> position to Offset(position.x + breite, position.y + hoehe)
+    is StempelItem -> {
+        val halbeBreite = if (art == StempelArt.SUPER) groesse else groesse / 2
+        Offset(mitte.x - halbeBreite, mitte.y - groesse / 2) to Offset(mitte.x + halbeBreite, mitte.y + groesse / 2)
+    }
 }
 
 private fun abstandZuStrecke(p: Offset, a: Offset, b: Offset): Float {
@@ -105,6 +125,29 @@ fun BoardItem.beruehrtVon(punkt: Offset, radius: Float): Boolean = when (this) {
             punkt.y >= min.y - radius && punkt.y <= max.y + radius
     }
     is LaengenEtikett -> hypot(punkt.x - position.x, punkt.y - position.y) <= radius
+    is TextItem, is StempelItem -> {
+        val (min, max) = begrenzendesRechteck()
+        punkt.x >= min.x - radius && punkt.x <= max.x + radius &&
+            punkt.y >= min.y - radius && punkt.y <= max.y + radius
+    }
+}
+
+/** Dasselbe Element um [delta] verschoben. */
+fun BoardItem.verschoben(delta: Offset): BoardItem = when (this) {
+    is StrichItem -> copy(punkte = punkte.map { it + delta })
+    is FormItem -> copy(start = start + delta, ende = ende + delta, radiert = radiert.map { it.copy(mitte = it.mitte + delta) })
+    is LaengenEtikett -> copy(position = position + delta)
+    is TextItem -> copy(position = position + delta)
+    is StempelItem -> copy(mitte = mitte + delta)
+}
+
+/** Dasselbe Element mit neuer ID (für Kopieren, Seite duplizieren, Wiederherstellen). */
+fun BoardItem.mitId(neueId: Long): BoardItem = when (this) {
+    is StrichItem -> copy(id = neueId)
+    is FormItem -> copy(id = neueId)
+    is LaengenEtikett -> copy(id = neueId)
+    is TextItem -> copy(id = neueId)
+    is StempelItem -> copy(id = neueId)
 }
 
 data class StrichItem(
@@ -209,12 +252,34 @@ data class LaengenEtikett(
     val text: String
 ) : BoardItem
 
+/** Textfeld (über die Tastatur geschrieben). [position] = linke obere Ecke, Maße beim Anlegen gemessen. */
+data class TextItem(
+    override val id: Long,
+    val position: Offset,
+    val text: String,
+    val farbe: Color,
+    val groesse: Float,
+    val breite: Float,
+    val hoehe: Float
+) : BoardItem
+
+data class StempelItem(
+    override val id: Long,
+    val mitte: Offset,
+    val art: StempelArt,
+    val groesse: Float,
+    val farbe: Color
+) : BoardItem
+
 /** Eine Seite der Tafel: eigener Inhalt, eigener Hintergrund, eigene Undo/Redo-Historie. */
 class Seite(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)) {
     val items: SnapshotStateList<BoardItem> = mutableStateListOf()
     val ausgewaehlteIds: SnapshotStateList<Long> = mutableStateListOf()
     val hintergrund = mutableStateOf(hintergrundStart)
     val geteilteAnsicht = mutableStateOf(false)
+
+    /** Geöffnetes Arbeitsblatt (Dateiname im Ordner "blaetter", siehe ui/Arbeitsblatt.kt) oder null. */
+    val hintergrundBild = mutableStateOf<String?>(null)
 
     /**
      * Zählt jede inhaltliche Änderung an [items]. Die Zeichenfläche nutzt das, um fertige
@@ -303,6 +368,59 @@ class Seite(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)) {
         rueckgaengigStapel.add(Hinzugefuegt(listOf(item)))
         wiederholenStapel.clear()
         versionsZaehler++
+    }
+
+    /** Mehrere Elemente auf einmal – ein Rückgängig-Schritt (Einfügen, Duplizieren). */
+    fun hinzufuegenAlle(neu: List<BoardItem>) {
+        if (neu.isEmpty()) return
+        items.addAll(neu)
+        rueckgaengigStapel.add(Hinzugefuegt(neu))
+        wiederholenStapel.clear()
+        versionsZaehler++
+    }
+
+    /** Ersetzt ein Element an seiner Stelle (z. B. ein bearbeitetes Textfeld) – rückgängig machbar. */
+    fun ersetze(alt: BoardItem, neu: BoardItem) {
+        val index = items.indexOfFirst { it.id == alt.id }
+        if (index < 0) return
+        items[index] = neu
+        rueckgaengigStapel.add(Ersetzt(listOf(alt), listOf(neu)))
+        wiederholenStapel.clear()
+        versionsZaehler++
+    }
+
+    /** Inhalt ohne Rückgängig-Schritt setzen – nur beim Wiederherstellen/Duplizieren einer Seite. */
+    fun setzeInhalt(neu: List<BoardItem>) {
+        items.clear()
+        items.addAll(neu)
+        versionsZaehler++
+    }
+
+    /** Gemeinsames Begrenzungsrechteck der ausgewählten Elemente oder null. */
+    fun auswahlGrenzen(): Pair<Offset, Offset>? {
+        if (ausgewaehlteIds.isEmpty()) return null
+        val ids = ausgewaehlteIds.toHashSet()
+        var minX = Float.MAX_VALUE; var minY = Float.MAX_VALUE
+        var maxX = -Float.MAX_VALUE; var maxY = -Float.MAX_VALUE
+        var gefunden = false
+        items.forEach { item ->
+            if (item.id in ids) {
+                gefunden = true
+                val (a, b) = item.begrenzendesRechteck()
+                minX = min(minX, a.x); minY = min(minY, a.y)
+                maxX = max(maxX, b.x); maxY = max(maxY, b.y)
+            }
+        }
+        return if (gefunden) Offset(minX, minY) to Offset(maxX, maxY) else null
+    }
+
+    /** Eigenständige Kopie (neue IDs, eigene Historie) – für "Seite duplizieren". */
+    fun kopie(neueId: () -> Long): Seite {
+        val neu = Seite(hintergrund.value)
+        neu.geteilteAnsicht.value = geteilteAnsicht.value
+        neu.hintergrundBild.value = hintergrundBild.value
+        neu.setzeInhalt(items.map { it.mitId(neueId()) })
+        return neu
     }
 
     fun allesLoeschen() {
@@ -394,14 +512,7 @@ class Seite(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)) {
         for (i in items.indices) {
             val item = items[i]
             if (item.id !in ids) continue
-            items[i] = when (item) {
-                is StrichItem -> item.copy(punkte = item.punkte.map { it + delta })
-                is FormItem -> item.copy(
-                    start = item.start + delta, ende = item.ende + delta,
-                    radiert = item.radiert.map { it.copy(mitte = it.mitte + delta) }
-                )
-                is LaengenEtikett -> item.copy(position = item.position + delta)
-            }
+            items[i] = item.verschoben(delta)
         }
     }
 
@@ -424,3 +535,16 @@ class Seite(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)) {
         wiederholenStapel.clear()
     }
 }
+
+/**
+ * Unveränderlicher Schnappschuss einer Seite – zum Zeichnen außerhalb des UI-Threads (PDF,
+ * Vorschaubilder, automatische Sicherung), ohne dass die Tafel dabei gesperrt werden muss.
+ */
+data class SeitenAbbild(
+    val items: List<BoardItem>,
+    val hintergrund: HintergrundStil,
+    val geteilt: Boolean,
+    val bild: String?
+)
+
+fun Seite.abbild(): SeitenAbbild = SeitenAbbild(items.toList(), hintergrund.value, geteilteAnsicht.value, hintergrundBild.value)

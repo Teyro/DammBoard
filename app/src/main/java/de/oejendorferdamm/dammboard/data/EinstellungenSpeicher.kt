@@ -39,6 +39,8 @@ private object Schluessel {
     val HINTERGRUND_FARBE = intPreferencesKey("hintergrund_farbe")
     val HINTERGRUND_MUSTER = stringPreferencesKey("hintergrund_muster")
     val ZULETZT_GESTARTETE_VERSION = stringPreferencesKey("zuletzt_gestartete_version")
+    val TAFEL_SICHERN = booleanPreferencesKey("tafel_sichern")
+    val FORM_ERKENNUNG = booleanPreferencesKey("form_erkennung")
 }
 
 /**
@@ -164,6 +166,24 @@ class EinstellungenSpeicher(private val context: Context) {
         context.einstellungenDataStore.edit { prefs ->
             prefs[Schluessel.RADIEREN_STUECKWEISE] = aktiv
         }
+    }
+
+    /** Tafel automatisch sichern und beim nächsten Start wiederherstellen – standardmäßig an. */
+    val tafelSichern: Flow<Boolean> = context.einstellungenDataStore.data.map { prefs ->
+        prefs[Schluessel.TAFEL_SICHERN] ?: true
+    }
+
+    suspend fun speichereTafelSichern(aktiv: Boolean) {
+        context.einstellungenDataStore.edit { prefs -> prefs[Schluessel.TAFEL_SICHERN] = aktiv }
+    }
+
+    /** Stift am Strichende kurz halten = saubere Form – standardmäßig an. */
+    val formErkennung: Flow<Boolean> = context.einstellungenDataStore.data.map { prefs ->
+        prefs[Schluessel.FORM_ERKENNUNG] ?: true
+    }
+
+    suspend fun speichereFormErkennung(aktiv: Boolean) {
+        context.einstellungenDataStore.edit { prefs -> prefs[Schluessel.FORM_ERKENNUNG] = aktiv }
     }
 
     /** Aus: jede neue Seite beginnt wieder auf dem bekannten grünen Tafelhintergrund. An: die

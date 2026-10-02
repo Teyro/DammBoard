@@ -45,7 +45,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import de.oejendorferdamm.dammboard.model.FormModus
 import de.oejendorferdamm.dammboard.model.FormTyp
+import de.oejendorferdamm.dammboard.model.StempelArt
+import de.oejendorferdamm.dammboard.model.StempelItem
+import de.oejendorferdamm.dammboard.ui.HelferArt
+import de.oejendorferdamm.dammboard.ui.canvas.zeichneStempel
 import de.oejendorferdamm.dammboard.model.GeometrieWerkzeug
 import de.oejendorferdamm.dammboard.model.HintergrundOptionen
 import de.oejendorferdamm.dammboard.model.MusterTyp
@@ -72,16 +77,29 @@ import de.oejendorferdamm.dammboard.ui.icons.symbolRaster
  */
 
 /** Lasso und Auswahl haben kein Panel – alle anderen Werkzeuge schon. */
+/** Die neuen Funktionen hinter "Extras" im Werkzeugkasten. */
+enum class ExtraAktion(val titel: String, val symbol: WerkzeugkastenAktion) {
+    PDF("PDF", WerkzeugkastenAktion.PDF),
+    ARBEITSBLATT("Arbeitsblatt", WerkzeugkastenAktion.ARBEITSBLATT),
+    ABDECKEN("Abdecken", WerkzeugkastenAktion.ABDECKEN),
+    TIMER("Timer", WerkzeugkastenAktion.TIMER),
+    WUERFEL("Würfel", WerkzeugkastenAktion.WUERFEL),
+    ZUFALLSNAME("Zufallsname", WerkzeugkastenAktion.ZUFALLSNAME),
+    GRUPPEN("Gruppen", WerkzeugkastenAktion.GRUPPEN),
+    LAUTSTAERKE("Lautstärke", WerkzeugkastenAktion.LAUTSTAERKE),
+    LERNUHR("Lernuhr", WerkzeugkastenAktion.LERNUHR)
+}
+
 internal fun hatPanel(werkzeug: Werkzeug): Boolean = werkzeug != Werkzeug.LASSO && werkzeug != Werkzeug.AUSWAHL
 
 @Composable
-internal fun PanelInhalt(panel: Werkzeug, state: TafelState, onIServ: () -> Unit) {
+internal fun PanelInhalt(panel: Werkzeug, state: TafelState, onIServ: () -> Unit, onExtra: (ExtraAktion) -> Unit) {
     when (panel) {
         Werkzeug.STIFT -> StiftPanel(state)
         Werkzeug.FORMEN -> FormenPanel(state)
         Werkzeug.RADIERER -> RadiererPanel(state)
         Werkzeug.GEOMETRIE -> GeometriePanel(state)
-        Werkzeug.WERKZEUGKASTEN -> WerkzeugkastenPanel(state, onIServ)
+        Werkzeug.WERKZEUGKASTEN -> WerkzeugkastenPanel(state, onIServ, onExtra)
         Werkzeug.LASSO, Werkzeug.AUSWAHL -> Unit
     }
 }
@@ -107,7 +125,7 @@ private fun StiftPanel(state: TafelState) {
             AuswahlKreis(fein, onClick = { state.stiftArt = StiftArt.FEIN }, groesse = 54.dp, beschreibung = "Stift fein") {
                 StiftArtSymbol(fein = true, modifier = Modifier.size(34.dp), tint = SymbolFarbe)
             }
-            AuswahlKreis(!fein, onClick = { state.stiftArt = StiftArt.LEUCHT }, groesse = 54.dp, beschreibung = "Marker") {
+            AuswahlKreis(!fein, onClick = { state.stiftArt = StiftArt.LEUCHT }, groesse = 54.dp, beschreibung = "Textmarker") {
                 StiftArtSymbol(fein = false, modifier = Modifier.size(34.dp), tint = SymbolFarbe)
             }
         }
@@ -117,14 +135,38 @@ private fun StiftPanel(state: TafelState) {
             onWertGeaendert = { neu -> if (fein) state.stiftBreiteFein = neu else state.stiftBreiteLeucht = neu },
             modifier = Modifier.width(40.dp).height(ReglerHoehe)
         )
-        FarbAuswahl(
-            ausgewaehlt = state.stiftFarbe,
-            onFarbe = { state.stiftFarbe = it },
-            spalten = 3,
-            feld = StiftFarbFeld,
-            luecke = StiftFarbLuecke,
-            zeigeVerlauf = true
-        )
+        // Geteilte Tafel: jede Hälfte hat ihre eigene Farbe (zwei Kinder gleichzeitig).
+        val geteilt = state.seite.geteilteAnsicht.value
+        val rechts = geteilt && state.aktiveHaelfte == 1
+        Column {
+            if (geteilt) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 8.dp)) {
+                    HaelftenKnopf("Linke Hälfte", !rechts) { state.aktiveHaelfte = 0 }
+                    HaelftenKnopf("Rechte Hälfte", rechts) { state.aktiveHaelfte = 1 }
+                }
+            }
+            FarbAuswahl(
+                ausgewaehlt = if (rechts) state.stiftFarbeRechts else state.stiftFarbe,
+                onFarbe = { if (rechts) state.stiftFarbeRechts = it else state.stiftFarbe = it },
+                spalten = 3,
+                feld = StiftFarbFeld,
+                luecke = StiftFarbLuecke,
+                zeigeVerlauf = true
+            )
+        }
+    }
+}
+
+@Composable
+private fun HaelftenKnopf(text: String, aktiv: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (aktiv) PanelAuswahl else Color.White)
+            .clickable(role = Role.RadioButton, onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+    ) {
+        Text(text, color = TextFarbe, fontSize = 13.sp, maxLines = 1)
     }
 }
 
@@ -214,7 +256,7 @@ private fun formBeschreibung(typ: FormTyp): String = when (typ) {
 private fun FormenPanel(state: TafelState) {
     Column(Modifier.width(470.dp)) {
         Row(Modifier.fillMaxWidth()) {
-            listOf("2D", "3D", "Anpassen", "Farbe").forEachIndexed { index, titel ->
+            listOf("2D", "Stempel", "Anpassen", "Farbe").forEachIndexed { index, titel ->
                 val aktiv = state.formTabIndex == index
                 Box(
                     modifier = Modifier
@@ -238,11 +280,7 @@ private fun FormenPanel(state: TafelState) {
         Spacer(Modifier.height(14.dp))
         when (state.formTabIndex) {
             0 -> Formen2D(state)
-            1 -> Text(
-                "3D-Formen folgen in einer späteren Version.",
-                color = TextFarbeSchwach, fontSize = 16.sp,
-                modifier = Modifier.padding(vertical = 24.dp)
-            )
+            1 -> StempelReiter(state)
             2 -> FormenAnpassen(state)
             else -> FarbAuswahl(
                 ausgewaehlt = state.formFuellFarbe ?: Color.Transparent,
@@ -263,7 +301,11 @@ private fun Formen2D(state: TafelState) {
             FormenGitter.chunked(5).forEach { zeile ->
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     zeile.forEach { typ ->
-                        AuswahlKreis(state.formTyp == typ, onClick = { state.formTyp = typ }, groesse = 48.dp, beschreibung = formBeschreibung(typ)) {
+                        AuswahlKreis(
+                            state.formModus == FormModus.FORM && state.formTyp == typ,
+                            onClick = { state.formTyp = typ; state.formModus = FormModus.FORM },
+                            groesse = 48.dp, beschreibung = formBeschreibung(typ)
+                        ) {
                             FormSymbol(typ, Modifier.size(30.dp), SymbolFarbe)
                         }
                     }
@@ -330,6 +372,78 @@ private fun FormenAnpassen(state: TafelState) {
                 colors = SwitchDefaults.colors(checkedTrackColor = SymbolFarbe)
             )
         }
+    }
+}
+
+// ---------- Stempel & Text ----------
+
+private fun stempelBeschreibung(art: StempelArt): String = when (art) {
+    StempelArt.HAKEN -> "Haken"
+    StempelArt.KREUZ -> "Kreuz"
+    StempelArt.STERN -> "Stern"
+    StempelArt.HERZ -> "Herz"
+    StempelArt.FRAGE -> "Fragezeichen"
+    StempelArt.AUSRUF -> "Ausrufezeichen"
+    StempelArt.DAUMEN -> "Daumen hoch"
+    StempelArt.LACHEN -> "Lachendes Gesicht"
+    StempelArt.NACHDENKEN -> "Nachdenkliches Gesicht"
+    StempelArt.SUPER -> "Super"
+}
+
+@Composable
+private fun StempelReiter(state: TafelState) {
+    val textModus = state.formModus == FormModus.TEXT
+    Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+        Column {
+            val eintraege: List<StempelArt?> = StempelArt.entries + listOf(null) // null = Textfeld
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                eintraege.chunked(4).forEach { zeile ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        zeile.forEach { art ->
+                            if (art == null) {
+                                AuswahlKreis(textModus, onClick = { state.formModus = FormModus.TEXT }, groesse = 52.dp, beschreibung = "Textfeld") {
+                                    Text("T", color = SymbolFarbe, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+                                }
+                            } else {
+                                AuswahlKreis(
+                                    state.formModus == FormModus.STEMPEL && state.stempelArt == art,
+                                    onClick = { state.stempelArt = art; state.formModus = FormModus.STEMPEL },
+                                    groesse = 52.dp,
+                                    beschreibung = stempelBeschreibung(art)
+                                ) {
+                                    Canvas(Modifier.size(36.dp)) {
+                                        zeichneStempel(
+                                            StempelItem(-1, center, art, if (art == StempelArt.SUPER) size.width * 0.5f else size.width * 0.95f, SymbolFarbe)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(if (textModus) "Schriftgröße" else "Stempelgröße", color = TextFarbeSchwach, fontSize = 15.sp)
+            Slider(
+                value = if (textModus) state.textGroesse else state.stempelGroesse,
+                onValueChange = { if (textModus) state.textGroesse = it else state.stempelGroesse = it },
+                valueRange = if (textModus) 30f..160f else 50f..240f,
+                modifier = Modifier.width(220.dp),
+                colors = SliderDefaults.colors(thumbColor = SymbolFarbe, activeTrackColor = SymbolFarbe)
+            )
+            Text(
+                if (textModus) "Auf die Tafel tippen, um zu schreiben. Vorhandenen Text antippen zum Ändern." else "Auf die Tafel tippen, um zu stempeln.",
+                color = TextFarbeSchwach, fontSize = 13.sp, modifier = Modifier.width(220.dp)
+            )
+        }
+        FarbAuswahl(
+            ausgewaehlt = state.stempelFarbe,
+            onFarbe = { state.stempelFarbe = it },
+            spalten = 4,
+            feld = 36.dp,
+            luecke = 6.dp,
+            zeigeVerlauf = false
+        )
     }
 }
 
@@ -423,13 +537,15 @@ private fun GeometriePanel(state: TafelState) {
 // ---------- Werkzeugkasten ----------
 
 @Composable
-private fun WerkzeugkastenPanel(state: TafelState, onIServ: () -> Unit) {
+private fun WerkzeugkastenPanel(state: TafelState, onIServ: () -> Unit, onExtra: (ExtraAktion) -> Unit) {
     var zeigeHintergrundAuswahl by remember { mutableStateOf(false) }
+    var zeigeExtras by remember { mutableStateOf(false) }
 
     Column {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             WerkzeugkastenEintrag("Hintergrund", WerkzeugkastenAktion.HINTERGRUND, aktiv = zeigeHintergrundAuswahl) {
                 zeigeHintergrundAuswahl = !zeigeHintergrundAuswahl
+                zeigeExtras = false
             }
             WerkzeugkastenEintrag("Bild teilen", WerkzeugkastenAktion.BILD_TEILEN, aktiv = state.seite.geteilteAnsicht.value) {
                 state.seite.geteilteAnsicht.value = !state.seite.geteilteAnsicht.value
@@ -445,6 +561,31 @@ private fun WerkzeugkastenPanel(state: TafelState, onIServ: () -> Unit) {
             WerkzeugkastenEintrag("IServ", WerkzeugkastenAktion.ISERV) {
                 state.schliessePanel()
                 onIServ()
+            }
+            WerkzeugkastenEintrag("Extras", WerkzeugkastenAktion.EXTRAS, aktiv = zeigeExtras) {
+                zeigeExtras = !zeigeExtras
+                zeigeHintergrundAuswahl = false
+            }
+        }
+        if (zeigeExtras) {
+            Spacer(Modifier.height(14.dp))
+            Box(Modifier.width(596.dp).height(1.dp).background(PanelLinie))
+            Spacer(Modifier.height(10.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                ExtraAktion.entries.chunked(5).forEach { zeile ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        zeile.forEach { aktion ->
+                            val offen = when (aktion) {
+                                ExtraAktion.ABDECKEN -> state.vorhang != null
+                                else -> helferFuer(aktion)?.let { it in state.offeneHelfer } ?: false
+                            }
+                            WerkzeugkastenEintrag(aktion.titel, aktion.symbol, aktiv = offen) {
+                                state.schliessePanel()
+                                onExtra(aktion)
+                            }
+                        }
+                    }
+                }
             }
         }
         if (zeigeHintergrundAuswahl) {
@@ -477,10 +618,30 @@ private fun WerkzeugkastenPanel(state: TafelState, onIServ: () -> Unit) {
                 MusterTyp.GEPUNKTET to "Gepunktet",
                 MusterTyp.NOTENLINIEN to "Noten",
                 MusterTyp.FUSSBALLFELD to "Fußball",
-                MusterTyp.STUNDENPLAN to "Stundenplan"
+                MusterTyp.STUNDENPLAN to "Stundenplan",
+                MusterTyp.LINEATUR_1 to "Lineatur 1",
+                MusterTyp.LINEATUR_2 to "Lineatur 2",
+                MusterTyp.LINEATUR_3 to "Lineatur 3",
+                MusterTyp.HUNDERTERTAFEL to "100er-Tafel",
+                MusterTyp.ZAHLENSTRAHL to "Zahlenstrahl",
+                MusterTyp.KARTE_DEUTSCHLAND to "Deutschland",
+                MusterTyp.KARTE_HAMBURG to "Hamburg",
+                MusterTyp.KARTE_WELT to "Welt"
             )
+            if (state.seite.hintergrundBild.value != null) {
+                Box(
+                    modifier = Modifier
+                        .padding(bottom = 8.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(Color.White)
+                        .clickable(role = Role.Button) { state.seite.hintergrundBild.value = null }
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                ) {
+                    Text("Arbeitsblatt von dieser Seite entfernen", color = TextFarbe, fontSize = 14.sp)
+                }
+            }
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                musterOptionen.chunked(4).forEach { zeile ->
+                musterOptionen.chunked(5).forEach { zeile ->
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         zeile.forEach { (muster, label) ->
                             MusterKnopf(
@@ -589,7 +750,63 @@ private fun MusterSymbol(muster: MusterTyp, modifier: Modifier = Modifier) {
                     drawLine(SymbolFarbe, Offset(w * 0.4f, h * 0.18f), Offset(w * 0.4f, h * 0.82f), strokeWidth = 1.3f)
                     drawLine(SymbolFarbe, Offset(w * 0.64f, h * 0.18f), Offset(w * 0.64f, h * 0.82f), strokeWidth = 1.3f)
                 }
+                MusterTyp.LINEATUR_1, MusterTyp.LINEATUR_2 -> {
+                    val band = if (muster == MusterTyp.LINEATUR_1) 0.17f else 0.12f
+                    val y0 = 0.5f - band * 1.5f
+                    drawRect(SymbolFarbeSchwach, topLeft = Offset(w * 0.1f, h * (y0 + band)), size = Size(w * 0.8f, h * band))
+                    for (i in 0..3) drawLine(SymbolFarbe, Offset(w * 0.1f, h * (y0 + i * band)), Offset(w * 0.9f, h * (y0 + i * band)), strokeWidth = if (i == 2) 1.8f else 1.1f)
+                }
+                MusterTyp.LINEATUR_3 -> {
+                    for (y in listOf(0.38f, 0.72f)) {
+                        drawLine(SymbolFarbe, Offset(w * 0.1f, h * (y - 0.12f)), Offset(w * 0.9f, h * (y - 0.12f)), strokeWidth = 1f)
+                        drawLine(SymbolFarbe, Offset(w * 0.1f, h * y), Offset(w * 0.9f, h * y), strokeWidth = 1.8f)
+                    }
+                }
+                MusterTyp.HUNDERTERTAFEL -> {
+                    for (i in 0..4) {
+                        val a = 0.14f + i * 0.18f
+                        val dick = if (i == 0 || i == 4) 1.6f else 1f
+                        drawLine(SymbolFarbe, Offset(w * a, h * 0.14f), Offset(w * a, h * 0.86f), strokeWidth = dick)
+                        drawLine(SymbolFarbe, Offset(w * 0.14f, h * a), Offset(w * 0.86f, h * a), strokeWidth = dick)
+                    }
+                }
+                MusterTyp.ZAHLENSTRAHL -> {
+                    drawLine(SymbolFarbe, Offset(w * 0.08f, h * 0.55f), Offset(w * 0.92f, h * 0.55f), strokeWidth = 1.6f)
+                    for (i in 0..6) {
+                        val x = 0.12f + i * 0.12f
+                        val lang = i % 3 == 0
+                        drawLine(SymbolFarbe, Offset(w * x, h * (if (lang) 0.4f else 0.47f)), Offset(w * x, h * (if (lang) 0.7f else 0.63f)), strokeWidth = 1.2f)
+                    }
+                }
+                MusterTyp.KARTE_WELT -> {
+                    drawCircle(SymbolFarbe, radius = w * 0.36f, center = Offset(w * 0.5f, h * 0.5f), style = kontur(1.5f))
+                    drawOval(SymbolFarbe, topLeft = Offset(w * 0.33f, h * 0.14f), size = Size(w * 0.34f, h * 0.72f), style = kontur(1.2f))
+                    drawLine(SymbolFarbe, Offset(w * 0.14f, h * 0.5f), Offset(w * 0.86f, h * 0.5f), strokeWidth = 1.2f)
+                    drawLine(SymbolFarbe, Offset(w * 0.5f, h * 0.14f), Offset(w * 0.5f, h * 0.86f), strokeWidth = 1.2f)
+                }
+                MusterTyp.KARTE_DEUTSCHLAND, MusterTyp.KARTE_HAMBURG -> {
+                    // Landkarten-Symbol (gefaltete Karte)
+                    val karte = androidx.compose.ui.graphics.Path().apply {
+                        moveTo(w * 0.12f, h * 0.24f); lineTo(w * 0.37f, h * 0.16f); lineTo(w * 0.63f, h * 0.24f); lineTo(w * 0.88f, h * 0.16f)
+                        lineTo(w * 0.88f, h * 0.76f); lineTo(w * 0.63f, h * 0.84f); lineTo(w * 0.37f, h * 0.76f); lineTo(w * 0.12f, h * 0.84f); close()
+                    }
+                    drawPath(karte, SymbolFarbe, style = kontur(1.4f))
+                    drawLine(SymbolFarbe, Offset(w * 0.37f, h * 0.16f), Offset(w * 0.37f, h * 0.76f), strokeWidth = 1.1f)
+                    drawLine(SymbolFarbe, Offset(w * 0.63f, h * 0.24f), Offset(w * 0.63f, h * 0.84f), strokeWidth = 1.1f)
+                    if (muster == MusterTyp.KARTE_HAMBURG) drawCircle(SymbolFarbe, radius = w * 0.07f, center = Offset(w * 0.5f, h * 0.48f))
+                }
             }
         }
     }
+}
+
+/** Welcher schwebende Helfer zu einer Extra-Aktion gehört (für die Markierung "ist offen"). */
+internal fun helferFuer(aktion: ExtraAktion): HelferArt? = when (aktion) {
+    ExtraAktion.TIMER -> HelferArt.TIMER
+    ExtraAktion.WUERFEL -> HelferArt.WUERFEL
+    ExtraAktion.ZUFALLSNAME -> HelferArt.ZUFALLSNAME
+    ExtraAktion.GRUPPEN -> HelferArt.GRUPPEN
+    ExtraAktion.LAUTSTAERKE -> HelferArt.LAUTSTAERKE
+    ExtraAktion.LERNUHR -> HelferArt.LERNUHR
+    else -> null
 }

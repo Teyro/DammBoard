@@ -598,7 +598,10 @@ fun LinienStilSymbol(gestrichelt: Boolean, modifier: Modifier = Modifier, tint: 
     }
 }
 
-enum class WerkzeugkastenAktion { HINTERGRUND, BILD_TEILEN, BILDSCHIRMFOTO, LUPE, ISERV }
+enum class WerkzeugkastenAktion {
+    HINTERGRUND, BILD_TEILEN, BILDSCHIRMFOTO, LUPE, ISERV,
+    EXTRAS, PDF, ARBEITSBLATT, ABDECKEN, TIMER, WUERFEL, ZUFALLSNAME, GRUPPEN, LAUTSTAERKE, LERNUHR
+}
 
 @Composable
 fun WerkzeugkastenSymbol(aktion: WerkzeugkastenAktion, modifier: Modifier = Modifier, tint: Color = Color.Black) {
@@ -659,6 +662,85 @@ fun WerkzeugkastenSymbol(aktion: WerkzeugkastenAktion, modifier: Modifier = Modi
                     linie(Offset(12f, 16.4f), Offset(12f, 10.6f), tint, 1.6f)
                     linie(Offset(9.8f, 12.8f), Offset(12f, 10.6f), tint, 1.6f)
                     linie(Offset(14.2f, 12.8f), Offset(12f, 10.6f), tint, 1.6f)
+                }
+                WerkzeugkastenAktion.EXTRAS -> {
+                    // Vier Kacheln, eine davon als Plus
+                    drawRoundRect(tint, Offset(3.5f, 3.5f), Size(7.2f, 7.2f), CornerRadius(1.6f), kontur(1.6f))
+                    drawRoundRect(tint, Offset(13.3f, 3.5f), Size(7.2f, 7.2f), CornerRadius(1.6f), kontur(1.6f))
+                    drawRoundRect(tint, Offset(3.5f, 13.3f), Size(7.2f, 7.2f), CornerRadius(1.6f), kontur(1.6f))
+                    linie(Offset(16.9f, 13.4f), Offset(16.9f, 20.4f), tint, 1.7f)
+                    linie(Offset(13.4f, 16.9f), Offset(20.4f, 16.9f), tint, 1.7f)
+                }
+                WerkzeugkastenAktion.PDF -> {
+                    val blatt = Path().apply {
+                        moveTo(5.5f, 2.8f); lineTo(14.6f, 2.8f); lineTo(18.6f, 6.8f); lineTo(18.6f, 21.2f); lineTo(5.5f, 21.2f); close()
+                    }
+                    drawPath(blatt, tint, kontur(1.6f))
+                    // zweites Blatt dahinter = "alle Seiten"
+                    drawPath(Path().apply { moveTo(20.8f, 8.4f); lineTo(20.8f, 23f); lineTo(8f, 23f) }, tint, kontur(1.3f))
+                    linie(Offset(8.4f, 11f), Offset(15.6f, 11f), tint, 1.3f)
+                    linie(Offset(8.4f, 14.2f), Offset(15.6f, 14.2f), tint, 1.3f)
+                    linie(Offset(8.4f, 17.4f), Offset(13f, 17.4f), tint, 1.3f)
+                }
+                WerkzeugkastenAktion.ARBEITSBLATT -> {
+                    drawRoundRect(tint, Offset(4.5f, 2.8f), Size(15f, 18.4f), CornerRadius(1.2f), kontur(1.6f))
+                    // Pfeil ins Blatt hinein (öffnen)
+                    linie(Offset(12f, 7f), Offset(12f, 15.6f), tint, 1.7f)
+                    linie(Offset(8.8f, 12.4f), Offset(12f, 15.6f), tint, 1.7f)
+                    linie(Offset(15.2f, 12.4f), Offset(12f, 15.6f), tint, 1.7f)
+                    linie(Offset(8f, 18.2f), Offset(16f, 18.2f), tint, 1.4f)
+                }
+                WerkzeugkastenAktion.ABDECKEN -> {
+                    drawRoundRect(tint, Offset(3f, 4f), Size(18f, 16f), CornerRadius(1.4f), kontur(1.5f))
+                    drawRect(tint, Offset(3.8f, 11f), Size(16.4f, 8.2f))
+                    linie(Offset(9.5f, 11f), Offset(14.5f, 11f), Color.White, 1.4f)
+                }
+                WerkzeugkastenAktion.TIMER -> {
+                    drawCircle(tint, 8f, Offset(12f, 13.4f), kontur(1.7f))
+                    linie(Offset(12f, 13.4f), Offset(12f, 8.6f), tint, 1.7f)
+                    linie(Offset(12f, 13.4f), Offset(15.2f, 15.4f), tint, 1.7f)
+                    linie(Offset(9.6f, 2.8f), Offset(14.4f, 2.8f), tint, 1.7f)
+                    linie(Offset(12f, 2.8f), Offset(12f, 5.2f), tint, 1.5f)
+                }
+                WerkzeugkastenAktion.WUERFEL -> {
+                    drawRoundRect(tint, Offset(4f, 4f), Size(16f, 16f), CornerRadius(3.4f), kontur(1.7f))
+                    for ((x, y) in listOf(8.4f to 8.4f, 15.6f to 15.6f, 12f to 12f, 15.6f to 8.4f, 8.4f to 15.6f)) {
+                        drawCircle(tint, 1.4f, Offset(x, y))
+                    }
+                }
+                WerkzeugkastenAktion.ZUFALLSNAME -> {
+                    drawCircle(tint, 3.6f, Offset(10f, 8f), kontur(1.6f))
+                    drawArc(tint, 200f, 140f, false, Offset(3f, 13.4f), Size(14f, 12f), kontur(1.6f))
+                    // Fragezeichen daneben
+                    drawArc(tint, 180f, 250f, false, Offset(16.2f, 4.2f), Size(5f, 5f), kontur(1.4f))
+                    linie(Offset(18.7f, 9.2f), Offset(18.7f, 11.2f), tint, 1.4f)
+                    drawCircle(tint, 0.9f, Offset(18.7f, 14f))
+                }
+                WerkzeugkastenAktion.GRUPPEN -> {
+                    for ((x, y) in listOf(7f to 7.5f, 17f to 7.5f, 12f to 15.5f)) {
+                        drawCircle(tint, 2.4f, Offset(x, y - 1.6f), kontur(1.4f))
+                        drawArc(tint, 200f, 140f, false, Offset(x - 4.4f, y + 1.4f), Size(8.8f, 7f), kontur(1.4f))
+                    }
+                }
+                WerkzeugkastenAktion.LAUTSTAERKE -> {
+                    // Ampel
+                    drawRoundRect(tint, Offset(7.4f, 2.6f), Size(9.2f, 18.8f), CornerRadius(2.6f), kontur(1.6f))
+                    drawCircle(tint, 2f, Offset(12f, 6.6f), kontur(1.3f))
+                    drawCircle(tint, 2f, Offset(12f, 12f), kontur(1.3f))
+                    drawCircle(tint, 2f, Offset(12f, 17.4f))
+                }
+                WerkzeugkastenAktion.LERNUHR -> {
+                    drawCircle(tint, 9f, Offset(12f, 12f), kontur(1.7f))
+                    for (i in 0 until 12) {
+                        val w = Math.toRadians(i * 30.0)
+                        val innen = if (i % 3 == 0) 6.4f else 7.4f
+                        linie(
+                            Offset(12f + innen * sin(w).toFloat(), 12f - innen * cos(w).toFloat()),
+                            Offset(12f + 8.4f * sin(w).toFloat(), 12f - 8.4f * cos(w).toFloat()), tint, 1f
+                        )
+                    }
+                    linie(Offset(12f, 12f), Offset(12f, 6.4f), tint, 1.5f)
+                    linie(Offset(12f, 12f), Offset(15.4f, 13.6f), tint, 1.9f)
                 }
             }
         }

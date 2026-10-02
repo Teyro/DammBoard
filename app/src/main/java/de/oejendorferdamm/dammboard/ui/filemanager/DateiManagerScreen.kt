@@ -61,9 +61,23 @@ private val TextfarbeSchwach = Color(0xFF8A8880)
 private val Akzent = Color(0xFF3A5C4A)
 private val Fehlerfarbe = Color(0xFFB3261E)
 
-/** Einfacher Dateimanager für den IServ-WebDAV-Speicher: durch Ordner blättern, schnell oder gezielt speichern. */
+/** Was der Dateimanager tun soll: eine Datei speichern oder ein Arbeitsblatt zum Öffnen auswählen. */
+sealed interface DateiModus {
+    class Speichern(val dateiname: String, val mime: String, val daten: suspend () -> ByteArray) : DateiModus
+
+    /** [onDatei] bekommt Name und Inhalt und liefert eine Fehlermeldung oder null bei Erfolg. */
+    class Oeffnen(val onDatei: suspend (String, ByteArray) -> String?) : DateiModus
+}
+
+/** Dateien, die als Arbeitsblatt geöffnet werden können. */
+private fun istArbeitsblatt(name: String): Boolean =
+    listOf(".pdf", ".png", ".jpg", ".jpeg", ".webp").any { name.endsWith(it, ignoreCase = true) }
+
+/** Einfacher Dateimanager für den IServ-WebDAV-Speicher: durch Ordner blättern, schnell oder gezielt speichern bzw. öffnen. */
 @Composable
-fun DateiManagerScreen(zugang: IServZugang, bild: Bitmap?, onFertig: () -> Unit) {
+fun DateiManagerScreen(zugang: IServZugang, modus: DateiModus, onFertig: () -> Unit) {
+    val speichern = modus as? DateiModus.Speichern
+    val oeffnen = modus as? DateiModus.Oeffnen
     val scope = rememberCoroutineScope()
     val client = remember(zugang) { IServClient(zugang) }
 
@@ -89,17 +103,35 @@ fun DateiManagerScreen(zugang: IServZugang, bild: Bitmap?, onFertig: () -> Unit)
         }
     }
 
-    fun hochladenNach(zielPfad: String) {
-        val quelle = bild ?: return
+    fun oeffneDatei(eintrag: IServEintrag) {
+        val ziel = oeffnen ?: return
         hochladend = true
         fehler = null
         erfolg = null
         scope.launch {
-            // PNG-Kodierung eines ganzen Tafelbilds dauert auf alten Geräten (und bei
-            // 4K-Auflösung) spürbar – nicht auf dem UI-Thread, sonst friert die Oberfläche ein.
-            val bytes = withContext(Dispatchers.Default) { bitmapZuPng(quelle) }
-            val dateiname = "DammBoard_${System.currentTimeMillis()}.png"
-            val ergebnis = client.hochladen(zielPfad, dateiname, bytes)
+            client.herunterladen(eintrag.pfad)
+                .onSuccess { bytes ->
+                    val problem = ziel.onDatei(eintrag.name, bytes)
+                    hochladend = false
+                    if (problem == null) onFertig() else fehler = problem
+                }
+                .onFailure {
+                    hochladend = false
+                    fehler = "Öffnen fehlgeschlagen: ${it.message}"
+                }
+        }
+    }
+
+    fun hochladenNach(zielPfad: String) {
+        val quelle = speichern ?: return
+        hochladend = true
+        fehler = null
+        erfolg = null
+        scope.launch {
+            // Das Kodieren (PNG/PDF) dauert auf alten Geräten spürbar – nicht auf dem UI-Thread.
+            val bytes = withContext(Dispatchers.Default) { quelle.daten() }
+            val dateiname = quelle.dateiname
+            val ergebnis = client.hochladen(zielPfad, dateiname, bytes, quelle.mime)
             hochladend = false
             ergebnis.onSuccess {
                 erfolg = "In IServ gespeichert: $dateiname"
@@ -126,7 +158,7 @@ fun DateiManagerScreen(zugang: IServZugang, bild: Bitmap?, onFertig: () -> Unit)
                 .padding(20.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                Text("In IServ speichern", color = Textfarbe, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(if (oeffnen != null) "Arbeitsblatt aus IServ öffnen" else "In IServ speichern", color = Textfarbe, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 Box(
                     modifier = Modifier.size(34.dp).clip(CircleShape).background(Color.White).clickable(onClick = onFertig),
                     contentAlignment = Alignment.Center
@@ -141,14 +173,19 @@ fun DateiManagerScreen(zugang: IServZugang, bild: Bitmap?, onFertig: () -> Unit)
                 return@Column
             }
 
-            Spacer(Modifier.height(10.dp))
-            Button(
-                onClick = { hochladenNach("") },
-                enabled = bild != null && !hochladend,
-                colors = ButtonDefaults.buttonColors(containerColor = Akzent),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Schnell speichern (Hauptordner)")
+            if (speichern != null) {
+                Spacer(Modifier.height(10.dp))
+                Button(
+                    onClick = { hochladenNach("") },
+                    enabled = !hochladend,
+                    colors = ButtonDefaults.buttonColors(containerColor = Akzent),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Schnell speichern (Hauptordner)")
+                }
+            } else {
+                Spacer(Modifier.height(6.dp))
+                Text("PDF oder Bild antippen – jede PDF-Seite wird eine eigene Tafelseite.", color = TextfarbeSchwach, fontSize = 12.sp)
             }
 
             Spacer(Modifier.height(14.dp))
@@ -170,23 +207,38 @@ fun DateiManagerScreen(zugang: IServZugang, bild: Bitmap?, onFertig: () -> Unit)
             Box(modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp, max = 260.dp)) {
                 when {
                     ladend -> CircularProgressIndicator(color = Akzent, modifier = Modifier.align(Alignment.Center).size(28.dp))
-                    eintraege.isEmpty() -> Text("Keine Unterordner", color = TextfarbeSchwach, fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp))
-                    else -> LazyColumn {
-                        items(eintraege.filter { it.istOrdner }) { eintrag ->
-                            OrdnerZeile(eintrag = eintrag, onClick = { ladeOrdner(eintrag.pfad) })
+                    else -> {
+                        val sichtbar = eintraege.filter { it.istOrdner || (oeffnen != null && istArbeitsblatt(it.name)) }
+                        if (sichtbar.isEmpty()) {
+                            Text(if (oeffnen != null) "Keine Ordner oder Arbeitsblätter" else "Keine Unterordner", color = TextfarbeSchwach, fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp))
+                        } else LazyColumn {
+                            items(sichtbar) { eintrag ->
+                                OrdnerZeile(eintrag = eintrag, onClick = {
+                                    if (eintrag.istOrdner) ladeOrdner(eintrag.pfad) else if (!hochladend) oeffneDatei(eintrag)
+                                })
+                            }
                         }
                     }
                 }
             }
 
-            Spacer(Modifier.height(10.dp))
-            Button(
-                onClick = { hochladenNach(pfad) },
-                enabled = bild != null && !hochladend,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3A5C4A)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(if (hochladend) "Speichert …" else "Hier speichern")
+            if (speichern != null) {
+                Spacer(Modifier.height(10.dp))
+                Button(
+                    onClick = { hochladenNach(pfad) },
+                    enabled = !hochladend,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3A5C4A)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (hochladend) "Speichert …" else "Hier speichern")
+                }
+            } else if (hochladend) {
+                Spacer(Modifier.height(10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(color = Akzent, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text("Wird geöffnet …", color = Textfarbe, fontSize = 13.sp)
+                }
             }
 
             fehler?.let {
@@ -210,7 +262,7 @@ private fun OrdnerZeile(eintrag: IServEintrag, onClick: () -> Unit) {
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        OrdnerSymbol(modifier = Modifier.size(20.dp))
+        if (eintrag.istOrdner) OrdnerSymbol(modifier = Modifier.size(20.dp)) else DateiSymbol(modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(10.dp))
         Text(eintrag.name, color = Textfarbe, fontSize = 14.sp)
     }
@@ -249,7 +301,23 @@ private fun OrdnerSymbol(modifier: Modifier = Modifier) {
     } }
 }
 
-private fun bitmapZuPng(bitmap: Bitmap): ByteArray {
+@Composable
+private fun DateiSymbol(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) { symbolRaster { w, h ->
+        drawRect(
+            color = Akzent,
+            topLeft = Offset(w * 0.2f, h * 0.1f),
+            size = androidx.compose.ui.geometry.Size(w * 0.6f, h * 0.8f),
+            style = kontur(2f)
+        )
+        drawLine(color = Akzent, start = Offset(w * 0.32f, h * 0.38f), end = Offset(w * 0.68f, h * 0.38f), strokeWidth = 1.6f)
+        drawLine(color = Akzent, start = Offset(w * 0.32f, h * 0.55f), end = Offset(w * 0.68f, h * 0.55f), strokeWidth = 1.6f)
+        drawLine(color = Akzent, start = Offset(w * 0.32f, h * 0.72f), end = Offset(w * 0.55f, h * 0.72f), strokeWidth = 1.6f)
+    } }
+}
+
+/** PNG eines Tafelbilds (für "In IServ speichern"). */
+fun bitmapZuPng(bitmap: Bitmap): ByteArray {
     val stream = ByteArrayOutputStream()
     bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
     return stream.toByteArray()
