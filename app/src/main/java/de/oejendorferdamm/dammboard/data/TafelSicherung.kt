@@ -19,6 +19,8 @@ import de.oejendorferdamm.dammboard.model.StrichItem
 import de.oejendorferdamm.dammboard.model.TextItem
 import de.oejendorferdamm.dammboard.ui.Arbeitsblaetter
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
@@ -44,13 +46,23 @@ object TafelSicherung {
     private const val TEXT: Byte = 4
     private const val STEMPEL: Byte = 5
 
+    /** Nie zwei Sicherungen gleichzeitig (z. B. nach einer Änderung und beim Ausschalten). */
+    private val sperre = Mutex()
+
+    // Obergrenzen beim Lesen: eine beschädigte Datei darf keinen Absturz auslösen.
+    private const val MAX_SEITEN = 1000
+    private const val MAX_ELEMENTE = 2_000_000
+    private const val MAX_PUNKTE = 5_000_000
+
     private fun datei(context: Context) = File(context.filesDir, "tafel.sicherung")
 
     fun loeschen(context: Context) {
         datei(context).delete()
     }
 
-    suspend fun speichere(context: Context, seiten: List<SeitenAbbild>, aktiv: Int) = withContext(Dispatchers.IO) {
+    suspend fun speichere(context: Context, seiten: List<SeitenAbbild>, aktiv: Int) = sperre.withLock { schreibe(context, seiten, aktiv) }
+
+    private suspend fun schreibe(context: Context, seiten: List<SeitenAbbild>, aktiv: Int) = withContext(Dispatchers.IO) {
         val ziel = datei(context)
         val temp = File(context.filesDir, "tafel.sicherung.neu")
         DataOutputStream(BufferedOutputStream(FileOutputStream(temp), 64 * 1024)).use { aus ->
@@ -84,6 +96,7 @@ object TafelSicherung {
                 if (ein.readInt() != KENNUNG || ein.readInt() > VERSION) return@withContext null
                 val aktiv = ein.readInt()
                 val anzahl = ein.readInt()
+                if (anzahl !in 0..MAX_SEITEN) return@withContext null
                 val seiten = ArrayList<Seite>(anzahl)
                 repeat(anzahl) {
                     val farbe = Color(ein.readInt())
@@ -94,6 +107,7 @@ object TafelSicherung {
                     val bild = ein.readUTF()
                     if (bild.isNotEmpty() && File(Arbeitsblaetter.ordner(context), bild).exists()) seite.hintergrundBild.value = bild
                     val itemAnzahl = ein.readInt()
+                    if (itemAnzahl !in 0..MAX_ELEMENTE) return@withContext null
                     val items = ArrayList<BoardItem>(itemAnzahl)
                     repeat(itemAnzahl) { lies(ein, neueId)?.let(items::add) }
                     seite.setzeInhalt(items)
@@ -102,6 +116,8 @@ object TafelSicherung {
                 if (seiten.isEmpty()) null else seiten to aktiv
             }
         } catch (e: Exception) {
+            null
+        } catch (e: OutOfMemoryError) {
             null
         }
     }
@@ -170,6 +186,7 @@ object TafelSicherung {
                 val breite = ein.readFloat()
                 val gestrichelt = ein.readBoolean()
                 val n = ein.readInt()
+                if (n !in 0..MAX_PUNKTE) throw IllegalStateException("Sicherung beschädigt")
                 val punkte = List(n) { ein.offset() }
                 StrichItem(neueId(), punkte, farbe, breite, gestrichelt)
             }
@@ -182,7 +199,9 @@ object TafelSicherung {
                 val fuellung = Color(ein.readInt())
                 val randBreite = ein.readFloat()
                 val gestrichelt = ein.readBoolean()
-                val radiert = List(ein.readInt()) { RadierStelle(ein.offset(), ein.readFloat()) }
+                val radiertAnzahl = ein.readInt()
+                if (radiertAnzahl !in 0..MAX_PUNKTE) throw IllegalStateException("Sicherung beschädigt")
+                val radiert = List(radiertAnzahl) { RadierStelle(ein.offset(), ein.readFloat()) }
                 val typ = FormTyp.entries.find { it.name == typName } ?: return null
                 FormItem(neueId(), typ, start, ende, rand, if (hatFuellung) fuellung else null, randBreite, gestrichelt, radiert)
             }

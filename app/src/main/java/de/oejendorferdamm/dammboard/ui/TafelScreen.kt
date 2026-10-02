@@ -105,6 +105,8 @@ fun TafelScreen(
             zeigeBlattQuelle -> zeigeBlattQuelle = false
             state.textEingabe != null -> state.textEingabe = null
             state.zeigeSeitenUebersicht -> state.zeigeSeitenUebersicht = false
+            state.vorhang != null -> state.vorhang = null
+            state.offeneHelfer.isNotEmpty() -> state.offeneHelfer.removeAt(state.offeneHelfer.lastIndex)
             zeigeSpiel -> zeigeSpiel = false
             state.offenesPanel != null -> state.schliessePanel()
             state.lupeAktiv -> state.lupeAktiv = false

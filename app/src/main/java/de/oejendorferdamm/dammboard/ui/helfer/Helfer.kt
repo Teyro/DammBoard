@@ -97,10 +97,9 @@ fun HelferEbene(state: TafelState) {
     Box(Modifier.fillMaxSize()) {
         state.offeneHelfer.forEachIndexed { index, art ->
             key(art) {
-                val position = positionen.getOrPut(art) {
-                    with(dichte) { Offset((140 + 70 * index).dp.toPx(), (70 + 50 * index).dp.toPx()) }
-                }
-                val verschieben: (Offset) -> Unit = { delta -> positionen[art] = (positionen[art] ?: Offset.Zero) + delta }
+                val start = with(dichte) { Offset((140 + 70 * index).dp.toPx(), (70 + 50 * index).dp.toPx()) }
+                val position = positionen[art] ?: start
+                val verschieben: (Offset) -> Unit = { delta -> positionen[art] = (positionen[art] ?: start) + delta }
                 val schliessen: () -> Unit = { state.offeneHelfer.remove(art) }
                 val modifier = Modifier.offset { IntOffset(position.x.roundToInt(), position.y.roundToInt()) }
                 when (art) {
@@ -478,7 +477,15 @@ private fun LautstaerkeHelfer(onVerschieben: (Offset) -> Unit, onSchliessen: () 
                     var geglaettet = 0f
                     while (isActive) {
                         val n = aufnahme.read(daten, 0, daten.size)
-                        if (n <= 0) continue
+                        if (n < 0) {
+                            // Mikrofon belegt oder Fehler: nicht im Leerlauf weiterdrehen.
+                            mikrofonFehlt = true
+                            break
+                        }
+                        if (n == 0) {
+                            delay(50)
+                            continue
+                        }
                         var summe = 0.0
                         for (i in 0 until n) summe += daten[i].toDouble() * daten[i]
                         val rms = sqrt(summe / n)

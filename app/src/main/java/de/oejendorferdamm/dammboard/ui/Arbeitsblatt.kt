@@ -33,7 +33,10 @@ private const val MAX_KANTE = 2600
  * Dateinamen. Geladen werden immer nur die gerade gebrauchten Bilder (kleiner Zwischenspeicher).
  */
 object Arbeitsblaetter {
-    private val cache = LruCache<String, ImageBitmap>(3)
+    // Nach Speicherbedarf begrenzt (ein Blatt in voller Größe hat bis zu ~20 MB).
+    private val cache = object : LruCache<String, ImageBitmap>(48 * 1024 * 1024) {
+        override fun sizeOf(key: String, value: ImageBitmap) = value.width * value.height * 4
+    }
 
     fun ordner(context: Context): File = File(context.filesDir, "blaetter").apply { mkdirs() }
 
@@ -116,9 +119,15 @@ object Arbeitsblaetter {
         return speichere(context, weiss).also { weiss.recycle() }
     }
 
-    /** Löscht Blätter, die keine Seite mehr verwendet. */
+    /**
+     * Löscht Blätter, die keine Seite mehr verwendet. Nur ältere Dateien: ein gerade geöffnetes
+     * Arbeitsblatt ist evtl. schon gespeichert, aber noch nicht auf der Tafel angekommen.
+     */
     fun aufraeumen(context: Context, benutzt: Set<String>) {
-        ordner(context).listFiles()?.forEach { if (it.name !in benutzt) it.delete() }
+        val grenze = System.currentTimeMillis() - 60 * 60 * 1000L
+        ordner(context).listFiles()?.forEach {
+            if (it.name !in benutzt && it.lastModified() < grenze) it.delete()
+        }
     }
 }
 

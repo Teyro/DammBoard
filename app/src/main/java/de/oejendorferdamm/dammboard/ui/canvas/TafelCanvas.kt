@@ -236,15 +236,23 @@ private class LaufenderStrich(val farbe: Color, val breite: Float, val minX: Flo
             scope.drawCircle(farbe, radius = breite / 2, center = punkte[0])
             return
         }
-        // Wie in glatterPfad(): das letzte Stück vom letzten Kurvenende zum Finger gerade.
-        val anzeige = Path().apply {
-            addPath(pfad)
-            lineTo(punkte.last().x, punkte.last().y)
+        val stil = Stroke(width = breite, cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round)
+        val letzter = punkte.last()
+        if (farbe.alpha >= 1f) {
+            // Deckend: Kurve und das letzte gerade Stück zum Finger getrennt zeichnen – spart das
+            // Kopieren des ganzen Pfads in jedem Bild (bei langen Strichen spürbar).
+            scope.drawPath(pfad, farbe, style = stil)
+            val n = punkte.size
+            val kurvenEnde = if (n >= 3) Offset((punkte[n - 2].x + letzter.x) / 2f, (punkte[n - 2].y + letzter.y) / 2f) else punkte[0]
+            scope.drawLine(farbe, kurvenEnde, letzter, strokeWidth = breite, cap = StrokeCap.Round)
+        } else {
+            // Textmarker: als EIN Pfad, sonst wäre die Nahtstelle doppelt so dunkel.
+            val anzeige = Path().apply {
+                addPath(pfad)
+                lineTo(letzter.x, letzter.y)
+            }
+            scope.drawPath(anzeige, farbe, style = stil)
         }
-        scope.drawPath(
-            anzeige, farbe,
-            style = Stroke(width = breite, cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round)
-        )
     }
 }
 
@@ -329,9 +337,12 @@ fun TafelCanvas(
     val laufendeStriche = remember { mutableStateListOf<LaufenderStrich>() }
     val context = LocalContext.current
     val bildName = seite.hintergrundBild.value
-    val blattBild by produceState(Arbeitsblaetter.ausCache(bildName), bildName) {
-        value = if (bildName == null) null else Arbeitsblaetter.lade(context, bildName)
+    // Merkt sich, zu welchem Blatt das geladene Bild gehört – sonst stünde beim Blättern kurz
+    // das Arbeitsblatt der vorigen Seite auf der neuen.
+    val geladenesBlatt by produceState<Pair<String, ImageBitmap?>?>(null, bildName) {
+        value = if (bildName == null) null else bildName to Arbeitsblaetter.lade(context, bildName)
     }
+    val blattBild = if (bildName == null) null else geladenesBlatt?.takeIf { it.first == bildName }?.second ?: Arbeitsblaetter.ausCache(bildName)
     var formVorschau by remember { mutableStateOf<Pair<Offset, Offset>?>(null) }
     var zirkelVorschau by remember { mutableStateOf<Pair<Offset, Float>?>(null) }
 
