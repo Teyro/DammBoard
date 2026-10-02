@@ -78,6 +78,28 @@ private fun innenwinkel(vorher: Offset, ecke: Offset, nachher: Offset): Double {
 }
 
 /**
+ * Entfernt "Ecken", die eigentlich mitten auf einer Kante liegen (fast 180°). Das passiert, wenn
+ * der Strich nicht in einer Ecke beginnt: der Startpunkt wäre sonst eine zusätzliche Ecke und aus
+ * einem Rechteck würde ein Fünfeck.
+ */
+private fun ohneGeradeEcken(ecken: List<Offset>): List<Offset> {
+    val liste = ecken.toMutableList()
+    var geaendert = true
+    while (geaendert && liste.size > 3) {
+        geaendert = false
+        for (i in liste.indices) {
+            val winkel = innenwinkel(liste[(i - 1 + liste.size) % liste.size], liste[i], liste[(i + 1) % liste.size])
+            if (winkel > 155.0) {
+                liste.removeAt(i)
+                geaendert = true
+                break
+            }
+        }
+    }
+    return liste
+}
+
+/**
  * Erkennt eine Form in [punkte] und gibt die sauberen Punkte dafür zurück – oder null, wenn
  * nichts Eindeutiges erkannt wurde (dann bleibt der Strich, wie er gezeichnet wurde).
  * [pixelFaktor] gleicht hohe Auflösungen aus (siehe TafelCanvas.pixelFaktorFuer).
@@ -119,7 +141,7 @@ fun erkenneForm(punkte: List<Offset>, pixelFaktor: Float): List<Offset>? {
     val radien = punkte.map { hypot((it.x - cx) / rx, (it.y - cy) / ry) }
     val mittel = radien.average().toFloat()
     val streuung = sqrt(radien.map { (it - mittel) * (it - mittel) }.average()).toFloat()
-    val ecken = vereinfache(ring, 0.07f * diagonale).dropLast(1)
+    val ecken = ohneGeradeEcken(vereinfache(ring, 0.07f * diagonale).dropLast(1))
 
     val wirktRund = streuung < 0.09f || (streuung < 0.13f && ecken.size >= 6)
     if (wirktRund) {

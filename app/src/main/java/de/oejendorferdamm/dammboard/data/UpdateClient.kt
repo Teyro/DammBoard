@@ -18,6 +18,9 @@ private const val ERLAUBTER_DOWNLOAD_PRAEFIX = "https://github.com/Teyro/DammBoa
 /** Obergrenze für die Update-Datei – schützt vor einer endlos großen Antwort. */
 private const val MAX_APK_BYTES = 150L * 1024 * 1024
 
+/** Obergrenze für die Release-Info von GitHub. */
+private const val MAX_INFO_BYTES = 2L * 1024 * 1024
+
 /** Prüft auf GitHub nach der neuesten Version und lädt bei Bedarf die zugehörige APK herunter. */
 class UpdateClient {
     private val client = NetzwerkClient.instance
@@ -32,7 +35,14 @@ class UpdateClient {
                 if (!antwort.isSuccessful) {
                     return@withContext Result.failure(IOException("GitHub antwortete mit HTTP ${antwort.code}"))
                 }
-                val text = antwort.body?.string() ?: return@withContext Result.failure(IOException("Leere Antwort"))
+                val koerper = antwort.body ?: return@withContext Result.failure(IOException("Leere Antwort"))
+                // Die Release-Info ist klein – eine riesige Antwort wird gar nicht erst eingelesen.
+                if (koerper.contentLength() > MAX_INFO_BYTES) return@withContext Result.failure(IOException("Antwort zu groß"))
+                val text = koerper.source().use { quelle ->
+                    quelle.request(MAX_INFO_BYTES + 1)
+                    if (quelle.buffer.size > MAX_INFO_BYTES) throw IOException("Antwort zu groß")
+                    quelle.buffer.readUtf8()
+                }
                 val json = JSONObject(text)
                 val version = json.optString("tag_name", "").removePrefix("v")
                 val changelog = json.optString("body", "")

@@ -50,7 +50,19 @@ internal class HandballenErkennung {
             MotionEvent.ACTION_POINTER_UP -> ev.pointerCount - 1
             else -> ev.pointerCount
         }
-        val hand = gedrueckt > 0 && ((groesste > 0f && groesste >= schwelle()) || gedrueckt >= 3)
+        // Drei oder mehr Finger zählen nur als Hand, wenn sie dicht beieinander liegen – sonst
+        // könnten mehrere Kinder, die gleichzeitig schreiben, aus Versehen etwas wegwischen.
+        val vieleFingerBeieinander = gedrueckt >= 3 && run {
+            var minX = Float.MAX_VALUE; var maxX = -Float.MAX_VALUE
+            var minY = Float.MAX_VALUE; var maxY = -Float.MAX_VALUE
+            for (i in 0 until ev.pointerCount) {
+                minX = minOf(minX, ev.getX(i)); maxX = maxOf(maxX, ev.getX(i))
+                minY = minOf(minY, ev.getY(i)); maxY = maxOf(maxY, ev.getY(i))
+            }
+            val grenze = if (bildschirmBreitePx > 0f) bildschirmBreitePx * 0.18f else 400f
+            maxX - minX < grenze && maxY - minY < grenze
+        }
+        val hand = gedrueckt > 0 && ((groesste > 0f && groesste >= schwelle()) || vieleFingerBeieinander)
         if (hand) gesteWarHand = true
         handAufgelegt = hand
 
