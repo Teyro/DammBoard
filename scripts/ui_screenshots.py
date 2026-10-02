@@ -418,6 +418,10 @@ def neue_funktionen(breite, hoehe):
     time.sleep(1)
     adb("shell", "am", "start", "-n", f"{PAKET}/.MainActivity")
     time.sleep(5)
+    if not laeuft_noch():
+        # Emulator (Android 11) startet die Activity nach force-stop manchmal nicht: über den Launcher
+        adb("shell", "monkey", "-p", PAKET, "-c", "android.intent.category.LAUNCHER", "1", check=False)
+        time.sleep(5)
     screenshot("30_nach_neustart.png")
     if tippe_mitte_von("Seitenübersicht"):
         time.sleep(3)
