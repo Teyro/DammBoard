@@ -10,6 +10,7 @@ import android.util.LruCache
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import de.oejendorferdamm.dammboard.model.HintergrundStil
+import de.oejendorferdamm.dammboard.model.KreidePalette
 import de.oejendorferdamm.dammboard.model.Seite
 import de.oejendorferdamm.dammboard.model.TafelWeiss
 import kotlinx.coroutines.Dispatchers
@@ -127,6 +128,8 @@ object Arbeitsblaetter {
  */
 fun TafelState.arbeitsblaetterEinfuegen(namen: List<String>) {
     if (namen.isEmpty()) return
+    // Weiße Kreide wäre auf dem weißen Blatt unsichtbar: dann zu schwarzem Stift wechseln.
+    if (stiftFarbe == KreidePalette[0]) stiftFarbe = KreidePalette[1]
     var rest = namen
     if (seite.items.isEmpty() && seite.hintergrundBild.value == null) {
         seite.hintergrundBild.value = namen.first()
