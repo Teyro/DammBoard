@@ -87,6 +87,10 @@ fun EinstellungenScreen(
     handballenRadieren: Boolean,
     handballenEmpfindlichkeit: Float,
     radierenStueckweise: Boolean,
+    tafelSichern: Boolean,
+    formErkennung: Boolean,
+    onTafelSichernGeaendert: (Boolean) -> Unit,
+    onFormErkennungGeaendert: (Boolean) -> Unit,
     onZugangSpeichern: (IServZugang) -> Unit,
     onModusGeaendert: (AnimationsModus) -> Unit,
     onSymbolGroesseGeaendert: (SymbolGroesse) -> Unit,
@@ -183,6 +187,10 @@ fun EinstellungenScreen(
                 handballenRadieren = handballenRadieren,
                 handballenEmpfindlichkeit = handballenEmpfindlichkeit,
                 radierenStueckweise = radierenStueckweise,
+                tafelSichern = tafelSichern,
+                formErkennung = formErkennung,
+                onTafelSichernGeaendert = onTafelSichernGeaendert,
+                onFormErkennungGeaendert = onFormErkennungGeaendert,
                 onZeichenPraezisionGeaendert = onZeichenPraezisionGeaendert,
                 onHintergrundMerkenGeaendert = onHintergrundMerkenGeaendert,
                 onHandballenRadierenGeaendert = onHandballenRadierenGeaendert,
@@ -389,6 +397,10 @@ private fun ErweiterteEinstellungen(
     handballenRadieren: Boolean,
     handballenEmpfindlichkeit: Float,
     radierenStueckweise: Boolean,
+    tafelSichern: Boolean,
+    formErkennung: Boolean,
+    onTafelSichernGeaendert: (Boolean) -> Unit,
+    onFormErkennungGeaendert: (Boolean) -> Unit,
     onZeichenPraezisionGeaendert: (Float) -> Unit,
     onHintergrundMerkenGeaendert: (Boolean) -> Unit,
     onHandballenRadierenGeaendert: (Boolean) -> Unit,
@@ -437,6 +449,21 @@ private fun ErweiterteEinstellungen(
             colors = SwitchDefaults.colors(checkedTrackColor = Akzent)
         )
     }
+
+    Spacer(Modifier.height(14.dp))
+    SchalterZeile(
+        "Tafel automatisch sichern",
+        "Alle Seiten werden laufend gesichert. Nach einem Absturz oder dem Ausschalten des Boards ist " +
+            "die Tafel beim nächsten Start wieder da. Neu anfangen: Seitenzahl unten rechts antippen → „Neue leere Tafel“.",
+        tafelSichern, onTafelSichernGeaendert
+    )
+
+    Spacer(Modifier.height(14.dp))
+    SchalterZeile(
+        "Formerkennung",
+        "Stift am Ende eines Strichs kurz still halten: aus Kreis, Linie, Dreieck oder Rechteck wird eine saubere Form.",
+        formErkennung, onFormErkennungGeaendert
+    )
 
     Spacer(Modifier.height(14.dp))
     Text("Radierer und Wischen", color = Textfarbe, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
@@ -493,6 +520,17 @@ private fun ErweiterteEinstellungen(
             )
             Text("Empfindlich", color = TextfarbeSchwach, fontSize = 10.sp)
         }
+    }
+}
+
+@Composable
+private fun SchalterZeile(titel: String, text: String, wert: Boolean, onGeaendert: (Boolean) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+            Text(titel, color = Textfarbe, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Text(text, color = TextfarbeSchwach, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))
+        }
+        Switch(checked = wert, onCheckedChange = onGeaendert, colors = SwitchDefaults.colors(checkedTrackColor = Akzent))
     }
 }
 

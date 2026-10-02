@@ -4,6 +4,34 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import android.graphics.Bitmap
+import android.os.SystemClock
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
+import androidx.compose.ui.input.pointer.PointerId
+import androidx.compose.ui.input.pointer.changedToDown
+import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
+import de.oejendorferdamm.dammboard.model.FormModus
+import de.oejendorferdamm.dammboard.model.HintergrundStil
+import de.oejendorferdamm.dammboard.model.SeitenAbbild
+import de.oejendorferdamm.dammboard.model.StempelItem
+import de.oejendorferdamm.dammboard.model.StiftArt
+import de.oejendorferdamm.dammboard.model.TEXTMARKER_DECKKRAFT
+import de.oejendorferdamm.dammboard.model.TextItem
+import de.oejendorferdamm.dammboard.model.beruehrtVon
+import de.oejendorferdamm.dammboard.model.erkenneForm
+import de.oejendorferdamm.dammboard.ui.Arbeitsblaetter
+import de.oejendorferdamm.dammboard.ui.TextEingabe
+import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -64,7 +92,7 @@ private val markierungsFarbe = Color(0xFF2F80FF)
  * Beschriftungen und Stiftdicken auf einem 4K-Board genauso groß wirken wie auf einem
  * Full-HD-Board, wachsen diese Pixelwerte mit der Auflösung – bis Full HD bleibt alles wie bisher.
  */
-private fun pixelFaktorFuer(breite: Float, hoehe: Float): Float {
+internal fun pixelFaktorFuer(breite: Float, hoehe: Float): Float {
     val lang = maxOf(breite, hoehe)
     val kurz = minOf(breite, hoehe)
     if (kurz <= 0f) return 1f
@@ -118,9 +146,11 @@ private fun DrawScope.geradeLinie(
 }
 
 /** Eine wiederverwendete Paint für Längenbeschriftungen statt einer neuen pro Beschriftung und Frame. */
-private val etikettPinsel = android.graphics.Paint().apply {
-    color = android.graphics.Color.WHITE
-    isAntiAlias = true
+private val etikettPinselJeThread = ThreadLocal.withInitial {
+    android.graphics.Paint().apply {
+        color = android.graphics.Color.WHITE
+        isAntiAlias = true
+    }
 }
 
 private fun punktInPolygon(punkt: Offset, polygon: List<Offset>): Boolean {
@@ -148,10 +178,31 @@ private fun pxNachCm(px: Float, density: Density): Float = px / density.density 
  * aufzubauen – bei langen Strichen war das quadratischer Aufwand und auf alten Boards spürbar.
  * [stand] ist der einzige Compose-State: er löst das Neuzeichnen aus.
  */
-private class LaufenderStrich {
+private class LaufenderStrich(val farbe: Color, val breite: Float, val minX: Float, val maxX: Float) {
     val punkte = ArrayList<Offset>()
     private val pfad = Path()
     private var stand by mutableIntStateOf(0)
+
+    // Für die Formerkennung: wo und seit wann der Finger (fast) stillsteht.
+    var startPunkt = Offset.Zero
+    var bewegt = false
+    var ruhePunkt = Offset.Zero
+    var ruheSeit = 0L
+    var erkannt = false
+
+    /** Ersetzt den Strich komplett (erkannte Form). */
+    fun setzePunkte(neu: List<Offset>) {
+        punkte.clear()
+        punkte.addAll(neu)
+        pfad.reset()
+        pfad.moveTo(neu.first().x, neu.first().y)
+        for (i in 1 until neu.size - 1) {
+            val a = neu[i]
+            val b = neu[i + 1]
+            pfad.quadraticTo(a.x, a.y, (a.x + b.x) / 2f, (a.y + b.y) / 2f)
+        }
+        stand++
+    }
 
     fun beginne(punkt: Offset) {
         punkte.clear()
@@ -179,7 +230,7 @@ private class LaufenderStrich {
         stand++
     }
 
-    fun zeichneIn(scope: DrawScope, farbe: Color, breite: Float) {
+    fun zeichneIn(scope: DrawScope) {
         if (stand == 0 || punkte.isEmpty()) return
         if (punkte.size == 1) {
             scope.drawCircle(farbe, radius = breite / 2, center = punkte[0])
@@ -229,7 +280,11 @@ private class EbenenCache {
     var hoehe = -1
     var hintergrundHash = 0
     var geteilt = false
+    var bildHash = 0
 }
+
+/** Ab so vielen Millisekunden Stillhalten am Strichende wird eine Form erkannt. */
+private const val FORM_HALTEZEIT_MS = 550L
 
 /** Zeichenfläche der Tafel: Rendering aller Seiteninhalte plus vollständige Gesten-Steuerung pro Werkzeug. */
 @OptIn(ExperimentalComposeUiApi::class)
@@ -270,7 +325,13 @@ fun TafelCanvas(
     handballen.xdpi = LocalContext.current.resources.displayMetrics.xdpi
     var handAnzeige by remember { mutableStateOf<Pair<Offset, Float>?>(null) }
 
-    val laufenderStrich = remember { LaufenderStrich() }
+    // Mehrere Finger zeichnen gleichzeitig (z. B. zwei Kinder an der geteilten Tafel).
+    val laufendeStriche = remember { mutableStateListOf<LaufenderStrich>() }
+    val context = LocalContext.current
+    val bildName = seite.hintergrundBild.value
+    val blattBild by produceState(Arbeitsblaetter.ausCache(bildName), bildName) {
+        value = if (bildName == null) null else Arbeitsblaetter.lade(context, bildName)
+    }
     var formVorschau by remember { mutableStateOf<Pair<Offset, Offset>?>(null) }
     var zirkelVorschau by remember { mutableStateOf<Pair<Offset, Float>?>(null) }
 
@@ -293,6 +354,8 @@ fun TafelCanvas(
     } else {
         Modifier.pointerInput(
             state.werkzeug, seite, state.stiftArt, state.stiftFarbe, state.aktuelleStiftBreite,
+            state.stiftFarbeRechts, state.formErkennung, state.formModus, state.stempelArt,
+            state.stempelFarbe, state.stempelGroesse,
             state.formTyp, state.formRandFarbe, state.formFuellFarbe, state.formRandBreite,
             state.radiererGroesse, state.geometrieWerkzeug, state.geometrieGestrichelt, state.zeigeLaenge,
             minPunktAbstandPx
@@ -302,25 +365,94 @@ fun TafelCanvas(
             fun brettGroesse() = Size(size.width.toFloat(), size.height.toFloat())
             fun pf() = pixelFaktorFuer(size.width.toFloat(), size.height.toFloat())
             when (state.werkzeug) {
-                Werkzeug.STIFT -> detectDragGestures(
-                    onDragStart = { laufenderStrich.beginne(it) },
-                    onDrag = { change, _ ->
-                        change.consume()
-                        val letzterPunkt = laufenderStrich.punkte.lastOrNull()
-                        if (letzterPunkt == null || (change.position - letzterPunkt).getDistance() >= minPunktAbstandPx * pf()) {
-                            laufenderStrich.fuegeHinzu(change.position)
+                Werkzeug.STIFT -> awaitEachGesture {
+                    val slop = viewConfiguration.touchSlop
+                    val aktive = HashMap<PointerId, LaufenderStrich>()
+
+                    fun beginne(id: PointerId, position: Offset, zeit: Long) {
+                        val p = pf()
+                        val breite = state.aktuelleStiftBreite * p
+                        val geteilt = seite.geteilteAnsicht.value
+                        val mitteX = size.width / 2f
+                        val rechts = geteilt && position.x > mitteX
+                        if (geteilt) state.aktiveHaelfte = if (rechts) 1 else 0
+                        val grundfarbe = if (rechts) state.stiftFarbeRechts else state.stiftFarbe
+                        val farbe = if (state.stiftArt == StiftArt.LEUCHT) grundfarbe.copy(alpha = TEXTMARKER_DECKKRAFT) else grundfarbe
+                        // Geteilte Tafel: jeder Strich bleibt in seiner Hälfte.
+                        val minX = if (rechts) mitteX + breite / 2 else -Float.MAX_VALUE
+                        val maxX = if (geteilt && !rechts) mitteX - breite / 2 else Float.MAX_VALUE
+                        val strich = LaufenderStrich(farbe, breite, minX, maxX)
+                        val start = Offset(position.x.coerceIn(minX, maxX), position.y)
+                        strich.beginne(start)
+                        strich.startPunkt = start
+                        strich.ruhePunkt = start
+                        strich.ruheSeit = zeit
+                        aktive[id] = strich
+                        laufendeStriche.add(strich)
+                    }
+
+                    fun beende(id: PointerId, uebernehmen: Boolean) {
+                        val strich = aktive.remove(id) ?: return
+                        if (uebernehmen && strich.bewegt && strich.punkte.size > 1) {
+                            seite.hinzufuegen(StrichItem(naechsteId(), strich.punkte.toList(), strich.farbe, strich.breite))
                         }
-                    },
-                    onDragEnd = {
-                        if (laufenderStrich.punkte.size > 1) {
-                            seite.hinzufuegen(
-                                StrichItem(naechsteId(), laufenderStrich.punkte.toList(), state.stiftFarbe, state.aktuelleStiftBreite * pf())
-                            )
+                        strich.beende()
+                        laufendeStriche.remove(strich)
+                    }
+
+                    // Stift am Ende kurz still halten: aus dem Gekrakel wird eine saubere Form.
+                    fun pruefeHalten(jetzt: Long) {
+                        if (!state.formErkennung) return
+                        aktive.values.forEach { strich ->
+                            if (!strich.erkannt && strich.bewegt && jetzt - strich.ruheSeit >= FORM_HALTEZEIT_MS) {
+                                strich.erkannt = true
+                                erkenneForm(strich.punkte, pf())?.let { form -> strich.setzePunkte(form) }
+                            }
                         }
-                        laufenderStrich.beende()
-                    },
-                    onDragCancel = { laufenderStrich.beende() }
-                )
+                    }
+
+                    val erster = awaitFirstDown()
+                    beginne(erster.id, erster.position, erster.uptimeMillis)
+                    erster.consume()
+                    while (aktive.isNotEmpty()) {
+                        val event = withTimeoutOrNull(80L) { awaitPointerEvent() }
+                        if (event == null) {
+                            pruefeHalten(SystemClock.uptimeMillis())
+                            continue
+                        }
+                        for (change in event.changes) {
+                            val strich = aktive[change.id]
+                            if (strich == null) {
+                                if (change.changedToDown() && !change.isConsumed) {
+                                    beginne(change.id, change.position, change.uptimeMillis)
+                                    change.consume()
+                                }
+                                continue
+                            }
+                            when {
+                                // Vom Handballen übernommen: Strich verwerfen.
+                                change.isConsumed -> beende(change.id, uebernehmen = false)
+                                !change.pressed -> beende(change.id, uebernehmen = true)
+                                change.positionChanged() -> {
+                                    change.consume()
+                                    if (strich.erkannt) continue
+                                    val p = pf()
+                                    val position = Offset(change.position.x.coerceIn(strich.minX, strich.maxX), change.position.y)
+                                    if (!strich.bewegt && (position - strich.startPunkt).getDistance() > slop / 2) strich.bewegt = true
+                                    if ((position - strich.ruhePunkt).getDistance() > 10f * p) {
+                                        strich.ruhePunkt = position
+                                        strich.ruheSeit = change.uptimeMillis
+                                    }
+                                    val letzter = strich.punkte.lastOrNull()
+                                    if (letzter == null || (position - letzter).getDistance() >= minPunktAbstandPx * p) {
+                                        strich.fuegeHinzu(position)
+                                    }
+                                }
+                            }
+                        }
+                        pruefeHalten(SystemClock.uptimeMillis())
+                    }
+                }
 
                 Werkzeug.RADIERER -> detectDragGestures(
                     onDragStart = { seite.radiereBeruehrte(it, state.radiererGroesse.radius * pf(), ::naechsteId, radierenStueckweise) },
@@ -334,7 +466,19 @@ fun TafelCanvas(
                     onDragCancel = { seite.radierenAbschliessen() }
                 )
 
-                Werkzeug.FORMEN -> detectDragGestures(
+                Werkzeug.FORMEN -> if (state.formModus == FormModus.STEMPEL) {
+                    detectTapGestures { position ->
+                        seite.hinzufuegen(
+                            StempelItem(naechsteId(), position, state.stempelArt, state.stempelGroesse * pf(), state.stempelFarbe)
+                        )
+                    }
+                } else if (state.formModus == FormModus.TEXT) {
+                    detectTapGestures { position ->
+                        // Auf ein vorhandenes Textfeld getippt: bearbeiten, sonst neues Textfeld.
+                        val vorhanden = seite.items.lastOrNull { it is TextItem && it.beruehrtVon(position, 0f) } as TextItem?
+                        state.textEingabe = TextEingabe(position, vorhanden)
+                    }
+                } else detectDragGestures(
                     onDragStart = { formVorschau = it to it },
                     onDrag = { change, _ ->
                         change.consume()
@@ -359,9 +503,10 @@ fun TafelCanvas(
 
                 Werkzeug.LASSO -> detectDragGestures(
                     onDragStart = { start ->
-                        val (min, max) = ausgewaehlteBegrenzung(seite.items, seite.ausgewaehlteIds)
-                        auswahlModusVerschieben = min != null && max != null &&
-                            start.x in min.x..max.x && start.y in min.y..max.y
+                        val grenzen = seite.auswahlGrenzen()
+                        auswahlModusVerschieben = grenzen != null &&
+                            start.x in grenzen.first.x..grenzen.second.x && start.y in grenzen.first.y..grenzen.second.y
+                        state.auswahlGesteLaeuft = true
                         auswahlStartPunkt = start
                         auswahlLetzterPunkt = start
                         auswahlGesamtDelta = Offset.Zero
@@ -411,12 +556,14 @@ fun TafelCanvas(
                             }
                         }
                         state.lassoPfad = null
+                        state.auswahlGesteLaeuft = false
                         auswahlModusVerschieben = false
                         auswahlLetzterPunkt = null
                         auswahlStartPunkt = null
                     },
                     onDragCancel = {
                         state.lassoPfad = null
+                        state.auswahlGesteLaeuft = false
                         auswahlModusVerschieben = false
                         auswahlLetzterPunkt = null
                         auswahlStartPunkt = null
@@ -425,9 +572,10 @@ fun TafelCanvas(
 
                 Werkzeug.AUSWAHL -> detectDragGestures(
                     onDragStart = { start ->
-                        val (min, max) = ausgewaehlteBegrenzung(seite.items, seite.ausgewaehlteIds)
-                        auswahlModusVerschieben = min != null && max != null &&
-                            start.x in min.x..max.x && start.y in min.y..max.y
+                        val grenzen = seite.auswahlGrenzen()
+                        auswahlModusVerschieben = grenzen != null &&
+                            start.x in grenzen.first.x..grenzen.second.x && start.y in grenzen.first.y..grenzen.second.y
+                        state.auswahlGesteLaeuft = true
                         auswahlStartPunkt = start
                         auswahlLetzterPunkt = start
                         auswahlGesamtDelta = Offset.Zero
@@ -467,12 +615,14 @@ fun TafelCanvas(
                             }
                         }
                         state.auswahlRechteck = null
+                        state.auswahlGesteLaeuft = false
                         auswahlModusVerschieben = false
                         auswahlLetzterPunkt = null
                         auswahlStartPunkt = null
                     },
                     onDragCancel = {
                         state.auswahlRechteck = null
+                        state.auswahlGesteLaeuft = false
                         auswahlModusVerschieben = false
                         auswahlLetzterPunkt = null
                         auswahlStartPunkt = null
@@ -574,6 +724,10 @@ fun TafelCanvas(
     Box(
         modifier = modifier
             .fillMaxSize()
+            .onSizeChanged {
+                state.brettBreite = it.width
+                state.brettHoehe = it.height
+            }
             .drawWithContent {
                 graphicsLayer.record { this@drawWithContent.drawContent() }
                 drawLayer(graphicsLayer)
@@ -646,25 +800,20 @@ fun TafelCanvas(
             val hintergrund = seite.hintergrund.value
             val hintergrundHash = hintergrund.hashCode()
             val geteilt = seite.geteilteAnsicht.value
+            val bild = blattBild
+            val bildHash = System.identityHashCode(bild)
             val p = pixelFaktor
 
             if (ebenenCache.seiteHash != seiteHash || ebenenCache.version != version ||
                 ebenenCache.breite != breitePx || ebenenCache.hoehe != hoehePx ||
-                ebenenCache.hintergrundHash != hintergrundHash || ebenenCache.geteilt != geteilt
+                ebenenCache.hintergrundHash != hintergrundHash || ebenenCache.geteilt != geteilt ||
+                ebenenCache.bildHash != bildHash
             ) {
                 eingebrannteEbene.record {
-                    drawRect(color = hintergrund.farbe)
-                    zeichneMuster(hintergrund.muster, hintergrund.farbe)
-                    if (geteilt) {
-                        geradeLinie(
-                            Color.White.copy(alpha = 0.35f),
-                            Offset(this.size.width / 2, 0f), Offset(this.size.width / 2, this.size.height),
-                            2f * p, gestricheltEffekt(p), cap = StrokeCap.Butt
-                        )
-                    }
-                    seite.items.forEach { item -> zeichneItem(item, pfadCache) }
+                    zeichneSeitenInhalt(seite.items, hintergrund, geteilt, bild, pfadCache)
                     pfadCache.durchgangBeenden()
                 }
+                ebenenCache.bildHash = bildHash
                 ebenenCache.seiteHash = seiteHash
                 ebenenCache.version = version
                 ebenenCache.breite = breitePx
@@ -679,7 +828,7 @@ fun TafelCanvas(
                 seite.items.forEach { item -> if (item.id in ausgewaehltSet) zeichneMarkierung(item) }
             }
 
-            laufenderStrich.zeichneIn(this, state.stiftFarbe, state.aktuelleStiftBreite * p)
+            laufendeStriche.forEach { it.zeichneIn(this) }
 
             formVorschau?.let { (start, ende) ->
                 if (state.werkzeug == Werkzeug.FORMEN) {
@@ -738,21 +887,64 @@ fun TafelCanvas(
     }
 }
 
-private fun ausgewaehlteBegrenzung(items: List<BoardItem>, idListe: List<Long>): Pair<Offset?, Offset?> {
-    if (idListe.isEmpty()) return null to null
-    val ids = idListe.toHashSet()
-    var minX = Float.MAX_VALUE; var minY = Float.MAX_VALUE
-    var maxX = -Float.MAX_VALUE; var maxY = -Float.MAX_VALUE
-    var gefunden = false
-    items.forEach { item ->
-        if (item.id in ids) {
-            gefunden = true
-            val (min, max) = item.begrenzendesRechteck()
-            minX = minOf(minX, min.x); minY = minOf(minY, min.y)
-            maxX = maxOf(maxX, max.x); maxY = maxOf(maxY, max.y)
-        }
+/** Hintergrund, Muster, Arbeitsblatt, Trennlinie und alle Elemente einer Seite. */
+private fun DrawScope.zeichneSeitenInhalt(
+    items: List<BoardItem>,
+    hintergrund: HintergrundStil,
+    geteilt: Boolean,
+    bild: ImageBitmap?,
+    pfadCache: PfadCache?
+) {
+    val p = pixelFaktor
+    drawRect(color = hintergrund.farbe)
+    zeichneMuster(hintergrund.muster, hintergrund.farbe)
+    if (bild != null) zeichneArbeitsblatt(bild)
+    if (geteilt) {
+        geradeLinie(
+            Color.White.copy(alpha = 0.35f),
+            Offset(size.width / 2, 0f), Offset(size.width / 2, size.height),
+            2f * p, gestricheltEffekt(p), cap = StrokeCap.Butt
+        )
     }
-    return if (gefunden) Offset(minX, minY) to Offset(maxX, maxY) else null to null
+    items.forEach { item -> zeichneItem(item, pfadCache) }
+}
+
+/** Arbeitsblatt möglichst groß, mittig und über der Werkzeugleiste. */
+private fun DrawScope.zeichneArbeitsblatt(bild: ImageBitmap) {
+    val p = pixelFaktor
+    val oben = 24f * p
+    val unten = 110f * p
+    val platzB = size.width - 48f * p
+    val platzH = size.height - oben - unten
+    if (platzB <= 0f || platzH <= 0f) return
+    val massstab = minOf(platzB / bild.width, platzH / bild.height)
+    val b = bild.width * massstab
+    val h = bild.height * massstab
+    val x = (size.width - b) / 2
+    val y = oben + (platzH - h) / 2
+    drawRect(Color.Black.copy(alpha = 0.18f), topLeft = Offset(x + 4f * p, y + 4f * p), size = Size(b, h))
+    drawImage(
+        bild,
+        srcOffset = IntOffset.Zero, srcSize = IntSize(bild.width, bild.height),
+        dstOffset = IntOffset(x.roundToInt(), y.roundToInt()), dstSize = IntSize(b.roundToInt(), h.roundToInt()),
+        filterQuality = FilterQuality.High
+    )
+}
+
+/**
+ * Zeichnet eine Seite in ein Bitmap (PDF, Vorschaubilder). [breite]/[hoehe] = Größe der Tafel,
+ * [massstab] verkleinert das Ergebnis. Läuft auch außerhalb des UI-Threads.
+ */
+internal fun rendereSeite(abbild: SeitenAbbild, breite: Int, hoehe: Int, massstab: Float, bild: ImageBitmap?): Bitmap {
+    val bitmap = Bitmap.createBitmap(
+        maxOf(1, (breite * massstab).roundToInt()), maxOf(1, (hoehe * massstab).roundToInt()), Bitmap.Config.ARGB_8888
+    )
+    val leinwand = androidx.compose.ui.graphics.Canvas(bitmap.asImageBitmap())
+    leinwand.scale(massstab, massstab)
+    CanvasDrawScope().draw(Density(1f), LayoutDirection.Ltr, leinwand, Size(breite.toFloat(), hoehe.toFloat())) {
+        zeichneSeitenInhalt(abbild.items, abbild.hintergrund, abbild.geteilt, bild, null)
+    }
+    return bitmap
 }
 
 private fun geometrieZentrum(groesse: Size): Offset = Offset(groesse.width * 0.5f, groesse.height * 0.28f)
@@ -800,6 +992,8 @@ private fun DrawScope.zeichneMuster(muster: MusterTyp, basisFarbe: Color) {
     // Deutlicher als die reinen Schreib-Hilfslinien: für Vorlagen, die auch inhaltlich als
     // Linien gelesen werden sollen (Notenlinien, Spielfeld, Stundenplan-Raster).
     val vorlagenFarbe = if (helligkeit > 0.5f) Color.Black.copy(alpha = 0.32f) else Color.White.copy(alpha = 0.38f)
+    // Beschriftungen (Hundertertafel, Zahlenstrahl, Karten) etwas kräftiger als die Linien.
+    val textFarbe = if (helligkeit > 0.5f) Color.Black.copy(alpha = 0.55f) else Color.White.copy(alpha = 0.6f)
     val p = pixelFaktor
     val abstand = 48f * p
     when (muster) {
@@ -893,6 +1087,13 @@ private fun DrawScope.zeichneMuster(muster: MusterTyp, basisFarbe: Color) {
                 )
             }
         }
+        MusterTyp.LINEATUR_1 -> zeichneLineatur(42f * p, vorlagenFarbe, linienFarbe, p)
+        MusterTyp.LINEATUR_2 -> zeichneLineatur(28f * p, vorlagenFarbe, linienFarbe, p)
+        MusterTyp.LINEATUR_3 -> zeichneLineatur(26f * p, vorlagenFarbe, linienFarbe, p, nurGrundlinie = true)
+        MusterTyp.HUNDERTERTAFEL -> zeichneHundertertafel(vorlagenFarbe, textFarbe, p)
+        MusterTyp.ZAHLENSTRAHL -> zeichneZahlenstrahl(vorlagenFarbe, textFarbe, p)
+        MusterTyp.KARTE_DEUTSCHLAND, MusterTyp.KARTE_HAMBURG, MusterTyp.KARTE_WELT ->
+            zeichneKarte(muster, vorlagenFarbe, textFarbe, p)
         MusterTyp.KEIN -> Unit
     }
 }
@@ -913,10 +1114,13 @@ private fun DrawScope.zeichneItem(item: BoardItem, pfadCache: PfadCache? = null)
         is FormItem -> zeichneForm(item)
         is LaengenEtikett -> {
             val p = pixelFaktor
+            val etikettPinsel = etikettPinselJeThread.get()!!
             etikettPinsel.textSize = 30f * p
             etikettPinsel.setShadowLayer(4f * p, 0f, 0f, android.graphics.Color.BLACK)
             drawContext.canvas.nativeCanvas.drawText(item.text, item.position.x, item.position.y, etikettPinsel)
         }
+        is TextItem -> zeichneText(item)
+        is StempelItem -> zeichneStempel(item)
     }
 }
 

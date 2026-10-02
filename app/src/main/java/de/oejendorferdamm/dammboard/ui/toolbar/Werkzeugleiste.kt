@@ -107,6 +107,7 @@ fun TafelBedienung(
     onTeilen: () -> Unit,
     onSpiel: () -> Unit,
     onIServ: () -> Unit,
+    onExtra: (ExtraAktion) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val merker = remember { PanelMerker() }
@@ -123,7 +124,7 @@ fun TafelBedienung(
             RechteGruppe(state, Modifier.layoutId(ID_RECHTS))
             PanelEinblendung(sichtbar = offen != null, animiert = animiert, modifier = Modifier.layoutId(ID_PANEL)) {
                 if (anzuzeigen != null) {
-                    PanelRahmen { PanelInhalt(anzuzeigen, state, onIServ) }
+                    PanelRahmen { PanelInhalt(anzuzeigen, state, onIServ, onExtra) }
                 }
             }
             PanelEinblendung(sichtbar = offen != null, animiert = animiert, modifier = Modifier.layoutId(ID_ZEIGER)) {
@@ -317,9 +318,15 @@ private fun SeitenPille(state: TafelState) {
                 if (aktiv > 0) SymbolFarbe else SymbolFarbeSchwach
             )
         }
+        // Antippen öffnet die Seitenübersicht.
         Text(
             "${aktiv + 1}/$anzahl",
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .clip(RoundedCornerShape(50))
+                .clickable(role = Role.Button) { state.schliessePanel(); state.zeigeSeitenUebersicht = true }
+                .semantics { contentDescription = "Seitenübersicht" }
+                .padding(vertical = 14.dp),
             color = TextFarbe,
             fontSize = 27.sp,
             textAlign = TextAlign.Center,

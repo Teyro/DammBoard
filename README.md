@@ -11,7 +11,7 @@ Winkelmesser, Zirkel u. a. mit drehbarer Führung und Längenanzeige)
 sowie ein Werkzeugkasten für Hintergrund, geteilte Ansicht,
 Bildschirmfoto und Lupe.
 
-## Funktionen (v0.7.0)
+## Funktionen (v0.9.0)
 
 - Freihand-Zeichnen mit Finger/Stift, mehrere Seiten mit eigener
   Undo/Redo-Historie
@@ -39,6 +39,40 @@ Bildschirmfoto und Lupe.
   werden automatisch gezählt, Punkte links/rechts auch von Hand
 - Die Zurück-Taste des Boards schließt erst Panels und fragt vor dem
   Beenden nach, statt den Tafelinhalt sofort zu verwerfen
+- Wischen mit dem Handballen, Radieren stückweise oder ganz (Einstellung)
+
+### Neu in 0.9.0 (ohne neue Knöpfe in der Leiste)
+
+- **Automatische Sicherung**: alle Seiten werden laufend gesichert und sind
+  nach Absturz oder Ausschalten beim nächsten Start wieder da (abschaltbar)
+- **Seitenübersicht**: Seitenzahl unten rechts antippen – Vorschaubilder,
+  Seiten öffnen, verschieben, duplizieren, löschen, „Neue leere Tafel“
+- **Textmarker** (zweite Stiftart, halbdurchsichtig)
+- **Formerkennung**: Stift am Strichende kurz still halten → saubere Linie,
+  Kreis, Ellipse, Dreieck, Rechteck oder Vieleck (abschaltbar)
+- **Stempel & Text** (Formen → Reiter „Stempel“): Haken, Kreuz, Stern, Herz,
+  ?, !, 👍, 😀, 🤔, „Super!“ und Textfelder per Tastatur (antippen zum Ändern)
+- **Kopieren, Duplizieren, Einfügen** (auch auf andere Seiten) über eine
+  kleine Leiste an der Lasso-/Rechteck-Auswahl
+- **Vorlagen für die Grundschule**: Lineatur 1, 2 und 3/4, Hundertertafel,
+  Zahlenstrahl (0–20 und 0–100) sowie stumme Karten von Deutschland, Hamburg
+  (Bezirke, mit unserer Schule) und der Welt
+- **Werkzeugkasten → Extras**:
+  - **PDF** aller Seiten – in Downloads speichern, teilen oder in IServ ablegen
+  - **Arbeitsblatt** öffnen (PDF oder Bild) vom Board, USB-Stick oder aus IServ;
+    jede PDF-Seite wird eine Tafelseite zum Beschreiben
+  - **Abdecken**: Vorhang, der sich Stück für Stück nach unten aufziehen lässt
+  - **Timer**, **Würfel** (1–3), **Zufallsname**, **Gruppen einteilen**
+    (Namensliste bleibt nur auf dem Board), **Lautstärke-Ampel** (Mikrofon,
+    nichts wird aufgenommen; ohne Mikrofon von Hand schaltbar) und **Lernuhr**
+    mit stellbaren Zeigern
+- **Zwei Kinder gleichzeitig**: mehrere Finger zeichnen gleichzeitig; bei
+  geteilter Tafel („Bild teilen“) bleibt jeder Strich in seiner Hälfte und
+  jede Hälfte hat eine eigene Stiftfarbe
+
+Kartengrundlagen: Natural Earth (gemeinfrei), deutschlandGeoJSON (Unlicense),
+Bezirksgrenzen © Freie und Hansestadt Hamburg, LGV (dl-de/by-2.0) – Details in
+`app/src/main/assets/karten/QUELLEN.txt`.
 
 ## Technik
 

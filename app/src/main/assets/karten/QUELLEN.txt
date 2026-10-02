@@ -1,0 +1,7 @@
+Kartenumrisse (vereinfacht) für die Tafelhintergründe:
+
+welt.txt         Natural Earth, 1:110m Admin 0 Countries – gemeinfrei (public domain), naturalearthdata.com
+deutschland.txt  deutschlandGeoJSON (isellsoap), Bundesländer – Unlicense, github.com/isellsoap/deutschlandGeoJSON
+hamburg.txt      Bezirksgrenzen Hamburg – © Freie und Hansestadt Hamburg, Landesbetrieb Geoinformation und
+                 Vermessung (LGV), Datenlizenz Deutschland Namensnennung 2.0 (dl-de/by-2.0)
+                 Markierung der Schule: Lage laut OpenStreetMap (© OpenStreetMap-Mitwirkende, ODbL)

@@ -3,7 +3,12 @@ package de.oejendorferdamm.dammboard.ui
 import android.graphics.Bitmap
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,6 +31,11 @@ import de.oejendorferdamm.dammboard.ui.filemanager.DateiManagerScreen
 import de.oejendorferdamm.dammboard.ui.settings.EinstellungenScreen
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.collectLatest
+import de.oejendorferdamm.dammboard.data.TafelSicherung
+import de.oejendorferdamm.dammboard.model.abbild
+import de.oejendorferdamm.dammboard.ui.filemanager.DateiModus
+import de.oejendorferdamm.dammboard.ui.filemanager.bitmapZuPng
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -33,11 +43,14 @@ import kotlin.math.roundToInt
 private sealed interface Bildschirm {
     data object Brett : Bildschirm
     data object Einstellungen : Bildschirm
-    data class Dateimanager(val bild: Bitmap) : Bildschirm
+    data class Dateimanager(val modus: DateiModus) : Bildschirm
 }
 
 /** Wie lange nach dem App-Start die automatische Update-Prüfung im Hintergrund läuft. */
 private const val UPDATE_PRUEFUNG_VERZOEGERUNG_MS = 10_000L
+
+/** So lange nach der letzten Änderung wird automatisch gesichert. */
+private const val SICHERUNG_VERZOEGERUNG_MS = 1500L
 
 /** Menüs (Einstellungen, Dateimanager) etwas größer als die Leiste – dort wird mehr gelesen. */
 private const val MENUE_FAKTOR = 1.3f
@@ -60,6 +73,8 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
     val handballenEmpfindlichkeit by speicher.handballenEmpfindlichkeit.collectAsState(initial = 0.5f)
     val radierenStueckweise by speicher.radierenStueckweise.collectAsState(initial = true)
     val gespeicherterHintergrund by speicher.gespeicherterHintergrund.collectAsState(initial = null)
+    val tafelSichern by speicher.tafelSichern.collectAsState(initial = true)
+    val formErkennung by speicher.formErkennung.collectAsState(initial = true)
 
     val tafelState = rememberTafelState()
     var bildschirm by remember { mutableStateOf<Bildschirm>(Bildschirm.Brett) }
@@ -68,13 +83,70 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
     // ganze App und der Tafelinhalt war weg.
     BackHandler(enabled = bildschirm != Bildschirm.Brett) { bildschirm = Bildschirm.Brett }
 
+    LaunchedEffect(formErkennung) { tafelState.formErkennung = formErkennung }
+
+    // Automatische Sicherung: beim Start wiederherstellen, danach kurz nach jeder Änderung sichern.
+    LaunchedEffect(Unit) {
+        val sichern = speicher.tafelSichern.first()
+        if (sichern) {
+            val geladen = TafelSicherung.lade(context.applicationContext, ::naechsteId)
+            // Nur übernehmen, wenn in der Zwischenzeit noch nichts gezeichnet wurde.
+            val unberuehrt = tafelState.seiten.size == 1 && tafelState.seite.items.isEmpty()
+            if (geladen != null && unberuehrt) tafelState.seitenErsetzen(geladen.first, geladen.second)
+        } else {
+            TafelSicherung.loeschen(context.applicationContext)
+        }
+        snapshotFlow {
+            // Alles, was eine Sicherung auslösen soll
+            tafelState.aktiveSeite to tafelState.seiten.map {
+                listOf(it.versionsZaehler, it.hintergrund.value, it.hintergrundBild.value, it.geteilteAnsicht.value)
+            }
+        }
+            .drop(1)
+            .collectLatest {
+                delay(SICHERUNG_VERZOEGERUNG_MS)
+                if (speicher.tafelSichern.first()) {
+                    val abbilder = tafelState.seiten.map { it.abbild() }
+                    try {
+                        TafelSicherung.speichere(context.applicationContext, abbilder, tafelState.aktiveSeite)
+                    } catch (e: Exception) {
+                        // Voller Speicher o. Ä.: beim nächsten Mal wieder versuchen.
+                    }
+                }
+            }
+    }
+    LaunchedEffect(tafelSichern) { if (!tafelSichern) TafelSicherung.loeschen(context.applicationContext) }
+
+    // Sofort sichern, sobald die App in den Hintergrund geht (Board wird ausgeschaltet, andere App).
+    val lebenszyklus = LocalLifecycleOwner.current
+    val sichernAktuell by rememberUpdatedState(tafelSichern)
+    DisposableEffect(lebenszyklus) {
+        val beobachter = LifecycleEventObserver { _, ereignis ->
+            if (ereignis == Lifecycle.Event.ON_STOP && sichernAktuell) {
+                val abbilder = tafelState.seiten.map { it.abbild() }
+                val aktiv = tafelState.aktiveSeite
+                scope.launch {
+                    try {
+                        TafelSicherung.speichere(context.applicationContext, abbilder, aktiv)
+                    } catch (e: Exception) {
+                        // nächster Versuch bei der nächsten Änderung
+                    }
+                }
+            }
+        }
+        lebenszyklus.lifecycle.addObserver(beobachter)
+        onDispose { lebenszyklus.lifecycle.removeObserver(beobachter) }
+    }
+
     // Nach einem Update einmal kurz zeigen, dass die neue Version läuft.
     var neuigkeiten by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
         val vorher = speicher.zuletztGestarteteVersion.first()
         if (vorher != BuildConfig.VERSION_NAME) {
-            neuigkeiten = "DammBoard ${BuildConfig.VERSION_NAME} ist installiert – gestochen scharfe Symbole auch auf " +
-                "älteren Boards und neu: Tafelfußball über den Würfel-Knopf unten links. (Antippen zum Schließen)"
+            neuigkeiten = "DammBoard ${BuildConfig.VERSION_NAME} ist installiert – neu: Werkzeugkasten → Extras (PDF, " +
+                "Arbeitsblatt, Abdecken, Timer, Würfel, Zufallsname, Gruppen, Lautstärke, Lernuhr), Stempel & Text bei den Formen, " +
+                "Textmarker, Formerkennung (Stift kurz halten), Seitenübersicht (Seitenzahl antippen) und automatische Sicherung. " +
+                "(Antippen zum Schließen)"
             speicher.speichereZuletztGestarteteVersion(BuildConfig.VERSION_NAME)
         }
     }
@@ -146,7 +218,30 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
             onNeuigkeitenGelesen = { neuigkeiten = null },
             onSchliessenApp = onAppSchliessen,
             onOeffneEinstellungen = { bildschirm = Bildschirm.Einstellungen },
-            onIServAnfrage = { bitmap -> bildschirm = Bildschirm.Dateimanager(bitmap) }
+            onIServAnfrage = { bitmap ->
+                bildschirm = Bildschirm.Dateimanager(
+                    DateiModus.Speichern("DammBoard_${System.currentTimeMillis()}.png", "image/png") { bitmapZuPng(bitmap) }
+                )
+            },
+            tafelWirdGesichert = tafelSichern,
+            onIServPdf = { datei ->
+                bildschirm = Bildschirm.Dateimanager(DateiModus.Speichern(datei.name, "application/pdf") { datei.readBytes() })
+            },
+            onIServOeffnen = {
+                bildschirm = Bildschirm.Dateimanager(
+                    DateiModus.Oeffnen { name, bytes ->
+                        try {
+                            val namen = Arbeitsblaetter.importiere(context.applicationContext, name) { bytes.inputStream() }
+                            tafelState.arbeitsblaetterEinfuegen(namen)
+                            null
+                        } catch (e: Exception) {
+                            e.message ?: "Datei konnte nicht geöffnet werden"
+                        } catch (e: OutOfMemoryError) {
+                            "Die Datei ist zu groß für dieses Board"
+                        }
+                    }
+                )
+            }
         )
         is Bildschirm.Einstellungen -> VorbildRaster(faktor = symbolGroesse.skalierung * MENUE_FAKTOR) {
             EinstellungenScreen(
@@ -164,6 +259,10 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
                 handballenRadieren = handballenRadieren,
                 handballenEmpfindlichkeit = handballenEmpfindlichkeit,
                 radierenStueckweise = radierenStueckweise,
+                tafelSichern = tafelSichern,
+                formErkennung = formErkennung,
+                onTafelSichernGeaendert = { neu -> scope.launch { speicher.speichereTafelSichern(neu) } },
+                onFormErkennungGeaendert = { neu -> scope.launch { speicher.speichereFormErkennung(neu) } },
                 onZugangSpeichern = { neu -> scope.launch { speicher.speichereIServZugang(neu) } },
                 onModusGeaendert = { neu -> scope.launch { speicher.speichereAnimationsModus(neu) } },
                 onSymbolGroesseGeaendert = { neu -> scope.launch { speicher.speichereSymbolGroesse(neu) } },
@@ -180,7 +279,7 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
         is Bildschirm.Dateimanager -> VorbildRaster(faktor = symbolGroesse.skalierung * MENUE_FAKTOR) {
             DateiManagerScreen(
                 zugang = iservZugang,
-                bild = aktuell.bild,
+                modus = aktuell.modus,
                 onFertig = { bildschirm = Bildschirm.Brett }
             )
         }

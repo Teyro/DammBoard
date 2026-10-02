@@ -5,6 +5,9 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
     <!-- Für die In-App-Aktualisierung: Installation der von GitHub heruntergeladenen Update-APK. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Nur für die Lautstärke-Ampel (Werkzeugkasten → Extras); es wird nichts aufgenommen oder gespeichert. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
     <application
         android:allowBackup="false"

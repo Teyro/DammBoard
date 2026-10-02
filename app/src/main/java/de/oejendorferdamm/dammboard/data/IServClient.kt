@@ -26,6 +26,9 @@ private const val PROPFIND_KOERPER = """<?xml version="1.0" encoding="utf-8"?>
 /** Obergrenze für eine Ordnerliste – schützt vor riesigen oder endlosen Antworten. */
 private const val MAX_ANTWORT_BYTES = 4 * 1024 * 1024
 
+/** Obergrenze für heruntergeladene Arbeitsblätter. */
+private const val MAX_DATEI_BYTES = 60 * 1024 * 1024
+
 /**
  * Eigener Client für IServ: folgt keinen Weiterleitungen von https auf http. Sonst könnte eine
  * manipulierte Weiterleitung dafür sorgen, dass Tafelbilder unverschlüsselt übertragen werden.
@@ -91,16 +94,45 @@ class IServClient(private val zugang: IServZugang) {
         }
     }
 
-    suspend fun hochladen(pfad: String, dateiname: String, bytes: ByteArray): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun hochladen(pfad: String, dateiname: String, bytes: ByteArray, mime: String = "image/png"): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val anfrage = Request.Builder()
                 .url(adresse(pfad, dateiname))
                 .header("Authorization", Credentials.basic(zugang.benutzername, zugang.passwort))
-                .put(bytes.toRequestBody("image/png".toMediaType()))
+                .put(bytes.toRequestBody(mime.toMediaType()))
                 .build()
             iservHttp.newCall(anfrage).execute().use { antwort ->
                 if (antwort.isSuccessful) Result.success(Unit)
                 else Result.failure(IOException("Hochladen fehlgeschlagen: HTTP ${antwort.code}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /** Lädt eine Datei herunter (Arbeitsblatt öffnen) – höchstens [MAX_DATEI_BYTES]. */
+    suspend fun herunterladen(pfad: String): Result<ByteArray> = withContext(Dispatchers.IO) {
+        try {
+            val anfrage = Request.Builder()
+                .url(adresse(pfad.substringBeforeLast('/', ""), pfad.substringAfterLast('/')))
+                .header("Authorization", Credentials.basic(zugang.benutzername, zugang.passwort))
+                .get()
+                .build()
+            iservHttp.newCall(anfrage).execute().use { antwort ->
+                if (!antwort.isSuccessful) return@withContext Result.failure(IOException("Herunterladen fehlgeschlagen: HTTP ${antwort.code}"))
+                val koerper = antwort.body ?: return@withContext Result.failure(IOException("Leere Antwort von IServ"))
+                if (koerper.contentLength() > MAX_DATEI_BYTES) return@withContext Result.failure(IOException("Die Datei ist zu groß (über 60 MB)"))
+                val puffer = ByteArrayOutputStream()
+                koerper.byteStream().use { eingabe ->
+                    val block = ByteArray(64 * 1024)
+                    while (true) {
+                        val anzahl = eingabe.read(block)
+                        if (anzahl == -1) break
+                        puffer.write(block, 0, anzahl)
+                        if (puffer.size() > MAX_DATEI_BYTES) return@withContext Result.failure(IOException("Die Datei ist zu groß (über 60 MB)"))
+                    }
+                }
+                Result.success(puffer.toByteArray())
             }
         } catch (e: Exception) {
             Result.failure(e)

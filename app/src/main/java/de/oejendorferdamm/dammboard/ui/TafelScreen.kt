@@ -48,6 +48,11 @@ import de.oejendorferdamm.dammboard.model.AnimationsModus
 import de.oejendorferdamm.dammboard.ui.canvas.TafelCanvas
 import de.oejendorferdamm.dammboard.ui.spiel.TafelFussball
 import de.oejendorferdamm.dammboard.ui.toolbar.TafelBedienung
+import de.oejendorferdamm.dammboard.ui.toolbar.ExtraAktion
+import de.oejendorferdamm.dammboard.ui.toolbar.helferFuer
+import de.oejendorferdamm.dammboard.ui.helfer.HelferEbene
+import de.oejendorferdamm.dammboard.model.abbild
+import java.io.File
 import de.oejendorferdamm.dammboard.ui.toolbar.faengtBeruehrungen
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -76,6 +81,9 @@ fun TafelScreen(
     onSchliessenApp: () -> Unit,
     onOeffneEinstellungen: () -> Unit,
     onIServAnfrage: (Bitmap) -> Unit,
+    tafelWirdGesichert: Boolean,
+    onIServPdf: (File) -> Unit,
+    onIServOeffnen: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -85,9 +93,18 @@ fun TafelScreen(
 
     // Die Zurück-Taste (viele Boards haben sie am Rahmen) schließt erst Panel/Lupe und fragt dann
     // nach – vorher beendete sie die App sofort, und der ganze Tafelinhalt war weg.
+    var pdfFortschritt by remember { mutableStateOf<String?>(null) }
+    var pdfDatei by remember { mutableStateOf<File?>(null) }
+    var zeigeBlattQuelle by remember { mutableStateOf(false) }
+    var blattLaedt by remember { mutableStateOf(false) }
+
     BackHandler {
         when {
             zeigeBeendenAbfrage -> zeigeBeendenAbfrage = false
+            pdfDatei != null -> pdfDatei = null
+            zeigeBlattQuelle -> zeigeBlattQuelle = false
+            state.textEingabe != null -> state.textEingabe = null
+            state.zeigeSeitenUebersicht -> state.zeigeSeitenUebersicht = false
             zeigeSpiel -> zeigeSpiel = false
             state.offenesPanel != null -> state.schliessePanel()
             state.lupeAktiv -> state.lupeAktiv = false
@@ -121,6 +138,65 @@ fun TafelScreen(
         }
     }
 
+    // Arbeitsblatt vom Gerät oder USB-Stick (Android-Dateiauswahl)
+    val blattAuswahl = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        blattLaedt = true
+        scope.launch {
+            try {
+                state.arbeitsblaetterEinfuegen(Arbeitsblaetter.importiere(context, uri))
+            } catch (e: Exception) {
+                Toast.makeText(context, e.message ?: "Datei konnte nicht geöffnet werden", Toast.LENGTH_LONG).show()
+            } catch (e: OutOfMemoryError) {
+                Toast.makeText(context, "Die Datei ist zu groß für dieses Board", Toast.LENGTH_LONG).show()
+            }
+            blattLaedt = false
+        }
+    }
+
+    // PDF in "Downloads" speichern: auf Android 8/9 vorher nach der Speicherberechtigung fragen.
+    fun pdfSpeichern(datei: File) {
+        scope.launch {
+            val uri = speicherePdfInDownloads(context, datei)
+            Toast.makeText(
+                context,
+                if (uri != null) "PDF gespeichert: Download/DammBoard/${datei.name}" else "Speichern fehlgeschlagen",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+    var wartendesPdf by remember { mutableStateOf<File?>(null) }
+    val pdfErlaubnis = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        val datei = wartendesPdf
+        wartendesPdf = null
+        if (ok && datei != null) pdfSpeichern(datei)
+        else if (!ok) Toast.makeText(context, "Ohne Speicherberechtigung kann das PDF nicht gespeichert werden", Toast.LENGTH_LONG).show()
+    }
+
+    fun extra(aktion: ExtraAktion) {
+        when (aktion) {
+            ExtraAktion.PDF -> {
+                val seiten = state.seiten.map { it.abbild() }
+                pdfFortschritt = "PDF wird erstellt …"
+                scope.launch {
+                    try {
+                        pdfDatei = erstellePdf(context, seiten, state.brettBreite, state.brettHoehe) { fertig ->
+                            pdfFortschritt = "PDF wird erstellt … Seite $fertig von ${seiten.size}"
+                        }
+                    } catch (e: Throwable) {
+                        Toast.makeText(context, "PDF konnte nicht erstellt werden", Toast.LENGTH_LONG).show()
+                    }
+                    pdfFortschritt = null
+                }
+            }
+            ExtraAktion.ARBEITSBLATT -> zeigeBlattQuelle = true
+            ExtraAktion.ABDECKEN -> state.vorhang = if (state.vorhang == null) 0.15f else null
+            else -> helferFuer(aktion)?.let { art ->
+                if (art in state.offeneHelfer) state.offeneHelfer.remove(art) else state.offeneHelfer.add(art)
+            }
+        }
+    }
+
     Box(modifier = modifier.fillMaxSize()) {
         TafelCanvas(
             state = state,
@@ -138,6 +214,9 @@ fun TafelScreen(
 
         VorbildRaster(faktor = oberflaechenFaktor, leisteMussPassen = true) {
             Box(Modifier.fillMaxSize()) {
+                Vorhang(state)
+                AuswahlAktionen(state)
+                HelferEbene(state)
                 TafelBedienung(
                     state = state,
                     animationsModus = animationsModus,
@@ -149,8 +228,66 @@ fun TafelScreen(
                         state.schliessePanel()
                         zeigeSpiel = true
                     },
-                    onIServ = { state.aufnahmeAnfrage = AufnahmeZweck.ISERV }
+                    onIServ = { state.aufnahmeAnfrage = AufnahmeZweck.ISERV },
+                    onExtra = ::extra
                 )
+
+                SeitenUebersicht(state)
+                TextEingabeDialog(state)
+
+                if (zeigeBlattQuelle) {
+                    AuswahlDialog(
+                        titel = "Arbeitsblatt öffnen",
+                        text = "PDF oder Bild als Hintergrund. Jede PDF-Seite wird eine eigene Tafelseite – darauf kann ganz normal geschrieben werden.",
+                        optionen = listOf(
+                            "Vom Board oder USB-Stick" to {
+                                zeigeBlattQuelle = false
+                                try {
+                                    blattAuswahl.launch(arrayOf("application/pdf", "image/*"))
+                                } catch (e: android.content.ActivityNotFoundException) {
+                                    Toast.makeText(context, "Auf diesem Board gibt es keine Dateiauswahl", Toast.LENGTH_LONG).show()
+                                }
+                            },
+                            "Aus IServ" to {
+                                zeigeBlattQuelle = false
+                                onIServOeffnen()
+                            }
+                        ),
+                        onSchliessen = { zeigeBlattQuelle = false }
+                    )
+                }
+
+                pdfDatei?.let { datei ->
+                    AuswahlDialog(
+                        titel = "PDF ist fertig",
+                        text = "${state.seiten.size} ${if (state.seiten.size == 1) "Seite" else "Seiten"} · ${datei.name}",
+                        optionen = listOf(
+                            "In Downloads speichern" to {
+                                pdfDatei = null
+                                val brauchtErlaubnis = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+                                    ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+                                if (brauchtErlaubnis) {
+                                    wartendesPdf = datei
+                                    pdfErlaubnis.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                                } else {
+                                    pdfSpeichern(datei)
+                                }
+                            },
+                            "Teilen …" to {
+                                pdfDatei = null
+                                teilePdf(context, datei)
+                            },
+                            "In IServ speichern" to {
+                                pdfDatei = null
+                                onIServPdf(datei)
+                            }
+                        ),
+                        onSchliessen = { pdfDatei = null }
+                    )
+                }
+
+                pdfFortschritt?.let { WarteHinweis(it) }
+                if (blattLaedt) WarteHinweis("Arbeitsblatt wird geöffnet …")
 
                 // Tafelspiel liegt über allem und fängt alle Berührungen ab; die Tafel darunter
                 // bleibt unverändert erhalten.
@@ -168,6 +305,7 @@ fun TafelScreen(
 
                 if (zeigeBeendenAbfrage) {
                     BeendenAbfrage(
+                        gesichert = tafelWirdGesichert,
                         onAbbrechen = { zeigeBeendenAbfrage = false },
                         onBeenden = {
                             zeigeBeendenAbfrage = false
@@ -185,7 +323,7 @@ fun TafelScreen(
  * Android-Version anders aussehen und nicht mit der Oberfläche mitwachsen.
  */
 @Composable
-private fun BeendenAbfrage(onAbbrechen: () -> Unit, onBeenden: () -> Unit) {
+private fun BeendenAbfrage(gesichert: Boolean, onAbbrechen: () -> Unit, onBeenden: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -205,7 +343,11 @@ private fun BeendenAbfrage(onAbbrechen: () -> Unit, onBeenden: () -> Unit) {
             Text("DammBoard beenden?", color = Color(0xFF2B2B2B), fontSize = 34.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(14.dp))
             Text(
-                "Willst du das Programm wirklich beenden? Nicht gespeicherte Tafelbilder gehen dabei verloren.",
+                if (gesichert) {
+                    "Willst du das Programm wirklich beenden? Die Tafel ist automatisch gesichert und beim nächsten Start wieder da."
+                } else {
+                    "Willst du das Programm wirklich beenden? Nicht gespeicherte Tafelbilder gehen dabei verloren."
+                },
                 color = Color(0xFF555555), fontSize = 24.sp, lineHeight = 32.sp
             )
             Spacer(Modifier.height(30.dp))
