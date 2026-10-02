@@ -123,7 +123,7 @@ internal fun DrawScope.zeichneKarte(typ: MusterTyp, linienFarbe: Color, textFarb
     val pinsel = kartenPinsel.get()!!
     pinsel.color = textFarbe.toArgb()
     pinsel.isFakeBoldText = false
-    pinsel.textSize = (if (typ == MusterTyp.KARTE_HAMBURG) 26f else 19f) * p
+    pinsel.textSize = (if (typ == MusterTyp.KARTE_HAMBURG) 22f else 18f) * p
     val leinwand = drawContext.canvas.nativeCanvas
     daten.beschriftungen.forEach { (pos, name) ->
         val q = punkt(pos.x, pos.y)

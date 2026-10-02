@@ -58,6 +58,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -277,13 +279,15 @@ private fun Wuerfel(wert: Int, modifier: Modifier) {
 private fun NamenBearbeiten(onFertig: () -> Unit) {
     val context = LocalContext.current
     var text by remember { mutableStateOf(Klassenliste.namen.joinToString("\n")) }
+    val fokus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { fokus.requestFocus() }
     Column(Modifier.width(460.dp)) {
         Text("Ein Name pro Zeile. Die Liste bleibt nur auf diesem Board gespeichert.", color = HelferTextSchwach, fontSize = 17.sp)
         Abstand(8)
         OutlinedTextField(
             value = text,
             onValueChange = { text = it },
-            modifier = Modifier.width(460.dp).height(320.dp),
+            modifier = Modifier.width(460.dp).height(320.dp).focusRequester(fokus),
             textStyle = androidx.compose.ui.text.TextStyle(fontSize = 22.sp, color = HelferText),
             colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = HelferAkzent, cursorColor = HelferAkzent)
         )
@@ -537,7 +541,7 @@ private fun LautstaerkeHelfer(onVerschieben: (Offset) -> Unit, onSchliessen: () 
                     Text("Erlaubte Lautstärke", color = HelferTextSchwach, fontSize = 18.sp)
                     Slider(
                         value = grenze, onValueChange = { grenze = it }, valueRange = 0.25f..0.95f,
-                        colors = SliderDefaults.colors(thumbColor = HelferAkzent, activeTrackColor = HelferAkzent)
+                        colors = SliderDefaults.colors(thumbColor = HelferAkzent, activeTrackColor = HelferAkzent, inactiveTrackColor = HelferKnopf)
                     )
                     Text("Leise ← → Laut", color = HelferTextSchwach, fontSize = 16.sp)
                 } else {

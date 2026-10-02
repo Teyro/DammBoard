@@ -319,7 +319,7 @@ def neue_funktionen(breite, hoehe):
     tippe_mitte_von("Lernuhr schließen")
     extra("Zufallsname")
     tippe_text("Namen bearbeiten")
-    time.sleep(1)
+    time.sleep(1.5)
     adb("shell", "input", "text", "Ali")
     adb("shell", "input", "keyevent", "KEYCODE_ENTER")
     adb("shell", "input", "text", "Berta")
@@ -393,9 +393,11 @@ def neue_funktionen(breite, hoehe):
     time.sleep(3)
     screenshot("28b_dateiauswahl.png")
     if not tippe_text("arbeitsblatt_test.pdf"):
-        # Dateiauswahl zeigt evtl. erst "Zuletzt verwendet": über das Menü zu Downloads
+        # Dateiauswahl zeigt erst "Zuletzt verwendet": Seitenmenü öffnen, dann Downloads
+        tippe_mitte_von("Show roots") or tippe_mitte_von("Open navigation drawer")
+        time.sleep(1.5)
         tippe_text("Downloads") or tippe_text("Download")
-        time.sleep(2)
+        time.sleep(2.5)
         tippe_text("arbeitsblatt_test.pdf")
     time.sleep(5)
     screenshot("28c_arbeitsblatt.png")
@@ -464,6 +466,9 @@ def touch_abbildung():
     sh = int(re.search(r"SurfaceHeight: (\d+)px", diag).group(1))
     m = re.search(r"physicalFrame=\[(-?\d+), (-?\d+), (-?\d+), (-?\d+)\], deviceSize=\[(\d+), (\d+)\]", diag)
     links, oben, rechts, unten, dw, dh = (int(g) for g in m.groups())
+    if dw <= 0 or dh <= 0 or rechts <= links:
+        # Ohne 'wm size' meldet Android 11 hier Nullen: Touchscreen = ganze Oberfläche.
+        links, oben, rechts, unten, dw, dh = 0, 0, sw, sh, sw, sh
     print(f"Touch-Abbildung: surface {sw}x{sh}, frame {links},{oben},{rechts},{unten}, device {dw}x{dh}")
     def roh(xa, ya, mx, my):
         px = (links + xa * (rechts - links)) * sw / dw

@@ -26,6 +26,8 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -57,13 +59,15 @@ internal fun HelferKarte(
     hintergrund: Color = HelferFlaeche,
     inhalt: @Composable () -> Unit
 ) {
-    Column(
+    // Eigenes Layout: die Karte ist so breit wie ihr Inhalt; die Titelzeile (mit dem X ganz
+    // rechts) passt sich daran an, statt die Karte über die ganze Tafel zu ziehen.
+    Layout(
         modifier = modifier
             .shadow(14.dp, RoundedCornerShape(16.dp))
             .clip(RoundedCornerShape(16.dp))
             .background(hintergrund)
-            .pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent() } }
-    ) {
+            .pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent() } },
+        content = {
         Row(
             modifier = Modifier
                 .pointerInput(Unit) {
@@ -94,6 +98,17 @@ internal fun HelferKarte(
             }
         }
         Box(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 20.dp, top = 6.dp)) { inhalt() }
+        }
+    ) { teile, grenzen ->
+        val locker = grenzen.copy(minWidth = 0, minHeight = 0)
+        val koerper = teile[1].measure(locker)
+        val titelMindestens = teile[0].minIntrinsicWidth(koerper.height)
+        val breite = maxOf(koerper.width, titelMindestens).coerceAtMost(grenzen.maxWidth)
+        val titel = teile[0].measure(Constraints.fixedWidth(breite))
+        layout(breite, titel.height + koerper.height) {
+            titel.place(0, 0)
+            koerper.place(0, titel.height)
+        }
     }
 }
 

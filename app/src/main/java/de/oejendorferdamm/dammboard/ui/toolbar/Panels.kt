@@ -429,7 +429,7 @@ private fun StempelReiter(state: TafelState) {
                 onValueChange = { if (textModus) state.textGroesse = it else state.stempelGroesse = it },
                 valueRange = if (textModus) 30f..160f else 50f..240f,
                 modifier = Modifier.width(220.dp),
-                colors = SliderDefaults.colors(thumbColor = SymbolFarbe, activeTrackColor = SymbolFarbe)
+                colors = SliderDefaults.colors(thumbColor = SymbolFarbe, activeTrackColor = SymbolFarbe, inactiveTrackColor = PanelLinie)
             )
             Text(
                 if (textModus) "Auf die Tafel tippen, um zu schreiben. Vorhandenen Text antippen zum Ändern." else "Auf die Tafel tippen, um zu stempeln.",
