@@ -565,6 +565,12 @@ def main():
             adb("shell", "input", "swipe", str(int(breite * 0.15)), str(y), str(int(breite * 0.6)), str(y + int(hoehe * 0.05)), "600")
             time.sleep(0.3)
         screenshot("07_striche.png")
+        # Nur antippen (i-Punkt, Ä-Punkte): muss als Punkt stehen bleiben.
+        for k in range(5):
+            adb("shell", "input", "tap", str(int(breite * (0.65 + 0.04 * k))), str(int(hoehe * 0.25)))
+            time.sleep(0.2)
+        time.sleep(0.5)
+        screenshot("07b_punkte.png")
     if tippe_mitte_von("Radierer"):
         time.sleep(0.5)
         tippe_mitte_von("Radierer")

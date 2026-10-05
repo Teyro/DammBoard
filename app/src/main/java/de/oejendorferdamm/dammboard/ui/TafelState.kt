@@ -141,7 +141,12 @@ class TafelState(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)
         }
     }
 
+    /** Wann zuletzt ein offenes Panel geschlossen wurde – ein Tipp, der nur ein Panel schließt, soll keinen Punkt malen. */
+    var panelGeschlossenUm = 0L
+        private set
+
     fun schliessePanel() {
+        if (offenesPanel != null) panelGeschlossenUm = android.os.SystemClock.uptimeMillis()
         offenesPanel = null
     }
 

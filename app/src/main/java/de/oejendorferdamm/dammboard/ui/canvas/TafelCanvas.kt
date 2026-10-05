@@ -186,6 +186,8 @@ private class LaufenderStrich(val farbe: Color, val breite: Float, val minX: Flo
     // Für die Formerkennung: wo und seit wann der Finger (fast) stillsteht.
     var startPunkt = Offset.Zero
     var bewegt = false
+    /** Der Tipp hat (auch) ein offenes Panel geschlossen – dann bleibt kein Punkt stehen. */
+    var schliesstPanel = false
     var ruhePunkt = Offset.Zero
     var ruheSeit = 0L
     var erkannt = false
@@ -293,6 +295,8 @@ private class EbenenCache {
 
 /** Ab so vielen Millisekunden Stillhalten am Strichende wird eine Form erkannt. */
 private const val FORM_HALTEZEIT_MS = 550L
+/** So kurz nach dem Schließen eines Panels gilt ein Tipp noch als "Panel schließen", nicht als Punkt. */
+private const val PANEL_TIPP_MS = 300L
 
 /** Zeichenfläche der Tafel: Rendering aller Seiteninhalte plus vollständige Gesten-Steuerung pro Werkzeug. */
 @OptIn(ExperimentalComposeUiApi::class)
@@ -396,6 +400,8 @@ fun TafelCanvas(
                         val start = Offset(position.x.coerceIn(minX, maxX), position.y)
                         strich.beginne(start)
                         strich.startPunkt = start
+                        strich.schliesstPanel = state.offenesPanel != null ||
+                            SystemClock.uptimeMillis() - state.panelGeschlossenUm < PANEL_TIPP_MS
                         strich.ruhePunkt = start
                         strich.ruheSeit = zeit
                         aktive[id] = strich
@@ -404,9 +410,14 @@ fun TafelCanvas(
 
                     fun beende(id: PointerId, uebernehmen: Boolean) {
                         val strich = aktive.remove(id) ?: return
-                        if (uebernehmen && strich.bewegt && strich.punkte.size > 1) {
-                            seite.hinzufuegen(StrichItem(naechsteId(), strich.punkte.toList(), strich.farbe, strich.breite))
+                        // Nur getippt (i-Punkt, Ä-Punkte, Aufzählungspunkt): als Punkt übernehmen.
+                        val punkte = when {
+                            !uebernehmen -> null
+                            strich.bewegt && strich.punkte.size > 1 -> strich.punkte.toList()
+                            !strich.bewegt && !strich.schliesstPanel -> listOf(strich.startPunkt)
+                            else -> null
                         }
+                        if (punkte != null) seite.hinzufuegen(StrichItem(naechsteId(), punkte, strich.farbe, strich.breite))
                         strich.beende()
                         laufendeStriche.remove(strich)
                     }
