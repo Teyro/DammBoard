@@ -449,7 +449,9 @@ def text_suchen_scrollend(text, versuche=10):
 
 
 def tippe_ersten(*texte):
-    """Tippt den ersten der Texte an, den es gibt (Systemdialoge heißen je nach Version anders)."""
+    """Tippt den ersten sichtbaren der Texte an (Systemdialoge heißen je nach Version anders).
+    Unsichtbare Knoten (z. B. in einer zugeklappten Seitenleiste) werden übergangen."""
+    breite, hoehe = bildschirm_groesse()
     baum = ui_baum()
     if baum is None:
         return False
@@ -457,8 +459,49 @@ def tippe_ersten(*texte):
         for k in baum.iter("node"):
             if (k.get("text") or "") == t or (k.get("content-desc") or "") == t:
                 x1, y1, x2, y2 = [int(z) for z in k.get("bounds", "").replace("][", ",").strip("[]").split(",")]
+                if x1 < 0 or y1 < 0 or x2 > breite or y2 > hoehe or x2 - x1 < 4 or y2 - y1 < 4:
+                    continue
                 adb("shell", "input", "tap", str((x1 + x2) // 2), str((y1 + y2) // 2))
                 return True
+    return False
+
+
+def texte_sichtbar():
+    baum = ui_baum()
+    return set() if baum is None else {(k.get("text") or "") for k in baum.iter("node")}
+
+
+def ordner_im_picker_waehlen(ziel="DammSync"):
+    """Navigiert im System-Ordnerwähler zu Documents/<ziel> und bestätigt."""
+    im_ziel = False
+    for _ in range(8):
+        texte = texte_sichtbar()
+        if im_ziel:
+            # im Zielordner: bestätigen
+            if tippe_ersten("USE THIS FOLDER", "Use this folder", "DIESEN ORDNER VERWENDEN", "Diesen Ordner verwenden", "SELECT", "Auswählen"):
+                time.sleep(2)
+                tippe_ersten("ALLOW", "Allow", "ZULASSEN", "Zulassen")
+                time.sleep(2)
+                return True
+        if ziel in texte and tippe_ersten(ziel):
+            im_ziel = True
+        elif "Documents" in texte and tippe_ersten("Documents"):
+            pass
+        else:
+            tippe_ersten("Show roots", "Stammverzeichnisse anzeigen")
+            time.sleep(1.5)
+            baum = ui_baum()
+            if baum is not None:
+                for k in baum.iter("node"):
+                    t = k.get("text") or ""
+                    if t.startswith("Android SDK") or t.startswith("sdk_gphone") or t in ("Internal storage", "Interner Speicher"):
+                        x1, y1, x2, y2 = [int(z) for z in k.get("bounds", "").replace("][", ",").strip("[]").split(",")]
+                        if y1 > 150:  # Eintrag in der Seitenleiste, nicht der Titel
+                            adb("shell", "input", "tap", str((x1 + x2) // 2), str((y1 + y2) // 2))
+                            break
+        time.sleep(2)
+    print("WARNUNG: Ordner im Ordnerwähler nicht gefunden", file=sys.stderr)
+    adb("shell", "input", "keyevent", "KEYCODE_BACK")
     return False
 
 
@@ -494,27 +537,8 @@ def ueberraschung_und_ordner():
     if tippe_text("Ordner wählen …"):
         time.sleep(3)
         screenshot("33b_ordnerauswahl.png")
-        if not tippe_ersten("DammSync"):
-            # über die Seitenleiste zum Gerätespeicher → Documents
-            tippe_ersten("Show roots", "Stammverzeichnisse anzeigen")
-            time.sleep(1.5)
-            baum = ui_baum()
-            if baum is not None:
-                for k in baum.iter("node"):
-                    t = k.get("text") or ""
-                    if t.startswith("Android SDK") or t.startswith("sdk_gphone") or t in ("Internal storage", "Interner Speicher"):
-                        x1, y1, x2, y2 = [int(z) for z in k.get("bounds", "").replace("][", ",").strip("[]").split(",")]
-                        adb("shell", "input", "tap", str((x1 + x2) // 2), str((y1 + y2) // 2))
-                        break
-            time.sleep(1.5)
-            tippe_ersten("Documents")
-            time.sleep(1.5)
-            tippe_ersten("DammSync")
+        ordner_im_picker_waehlen("DammSync")
         time.sleep(1.5)
-        tippe_ersten("USE THIS FOLDER", "Use this folder", "DIESEN ORDNER VERWENDEN", "Diesen Ordner verwenden", "SELECT", "Auswählen")
-        time.sleep(1.5)
-        tippe_ersten("ALLOW", "Allow", "ZULASSEN", "Zulassen")
-        time.sleep(2.5)
     screenshot("33c_ordner_gewaehlt.png")
     # Tafel speichern
     baum = ui_baum()
