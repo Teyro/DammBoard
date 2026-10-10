@@ -87,7 +87,8 @@ enum class ExtraAktion(val titel: String, val symbol: WerkzeugkastenAktion) {
     ZUFALLSNAME("Zufallsname", WerkzeugkastenAktion.ZUFALLSNAME),
     GRUPPEN("Gruppen", WerkzeugkastenAktion.GRUPPEN),
     LAUTSTAERKE("Lautstärke", WerkzeugkastenAktion.LAUTSTAERKE),
-    LERNUHR("Lernuhr", WerkzeugkastenAktion.LERNUHR)
+    LERNUHR("Lernuhr", WerkzeugkastenAktion.LERNUHR),
+    TAFELN("Tafeln teilen", WerkzeugkastenAktion.TAFELN)
 }
 
 internal fun hatPanel(werkzeug: Werkzeug): Boolean = werkzeug != Werkzeug.LASSO && werkzeug != Werkzeug.AUSWAHL

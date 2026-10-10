@@ -65,20 +65,7 @@ object TafelSicherung {
     private suspend fun schreibe(context: Context, seiten: List<SeitenAbbild>, aktiv: Int) = withContext(Dispatchers.IO) {
         val ziel = datei(context)
         val temp = File(context.filesDir, "tafel.sicherung.neu")
-        DataOutputStream(BufferedOutputStream(FileOutputStream(temp), 64 * 1024)).use { aus ->
-            aus.writeInt(KENNUNG)
-            aus.writeInt(VERSION)
-            aus.writeInt(aktiv)
-            aus.writeInt(seiten.size)
-            seiten.forEach { seite ->
-                aus.writeInt(seite.hintergrund.farbe.toArgb())
-                aus.writeUTF(seite.hintergrund.muster.name)
-                aus.writeBoolean(seite.geteilt)
-                aus.writeUTF(seite.bild ?: "")
-                aus.writeInt(seite.items.size)
-                seite.items.forEach { schreibe(aus, it) }
-            }
-        }
+        DataOutputStream(BufferedOutputStream(FileOutputStream(temp), 64 * 1024)).use { aus -> schreibeInhalt(aus, seiten, aktiv) }
         // Erst vollständig schreiben, dann austauschen: ein Absturz mittendrin zerstört nie die alte Sicherung.
         if (!temp.renameTo(ziel)) {
             ziel.delete()
@@ -92,34 +79,53 @@ object TafelSicherung {
         val quelle = datei(context)
         if (!quelle.exists()) return@withContext null
         try {
-            DataInputStream(BufferedInputStream(FileInputStream(quelle), 64 * 1024)).use { ein ->
-                if (ein.readInt() != KENNUNG || ein.readInt() > VERSION) return@withContext null
-                val aktiv = ein.readInt()
-                val anzahl = ein.readInt()
-                if (anzahl !in 0..MAX_SEITEN) return@withContext null
-                val seiten = ArrayList<Seite>(anzahl)
-                repeat(anzahl) {
-                    val farbe = Color(ein.readInt())
-                    val musterName = ein.readUTF()
-                    val muster = MusterTyp.entries.find { it.name == musterName } ?: MusterTyp.KEIN
-                    val seite = Seite(HintergrundStil(farbe, muster))
-                    seite.geteilteAnsicht.value = ein.readBoolean()
-                    val bild = ein.readUTF()
-                    if (bild.isNotEmpty() && File(Arbeitsblaetter.ordner(context), bild).exists()) seite.hintergrundBild.value = bild
-                    val itemAnzahl = ein.readInt()
-                    if (itemAnzahl !in 0..MAX_ELEMENTE) return@withContext null
-                    val items = ArrayList<BoardItem>(itemAnzahl)
-                    repeat(itemAnzahl) { lies(ein, neueId)?.let(items::add) }
-                    seite.setzeInhalt(items)
-                    seiten.add(seite)
-                }
-                if (seiten.isEmpty()) null else seiten to aktiv
-            }
+            DataInputStream(BufferedInputStream(FileInputStream(quelle), 64 * 1024)).use { ein -> liesInhalt(context, ein, neueId) }
         } catch (e: Exception) {
             null
         } catch (e: OutOfMemoryError) {
             null
         }
+    }
+
+    /** Tafelinhalt (alle Seiten) in einen Strom schreiben – auch für Tafel-Dateien im Sync-Ordner. */
+    fun schreibeInhalt(aus: DataOutputStream, seiten: List<SeitenAbbild>, aktiv: Int) {
+        aus.writeInt(KENNUNG)
+        aus.writeInt(VERSION)
+        aus.writeInt(aktiv)
+        aus.writeInt(seiten.size)
+        seiten.forEach { seite ->
+            aus.writeInt(seite.hintergrund.farbe.toArgb())
+            aus.writeUTF(seite.hintergrund.muster.name)
+            aus.writeBoolean(seite.geteilt)
+            aus.writeUTF(seite.bild ?: "")
+            aus.writeInt(seite.items.size)
+            seite.items.forEach { schreibe(aus, it) }
+        }
+    }
+
+    /** Tafelinhalt lesen; null bei fremden/kaputten Daten. Arbeitsblätter müssen schon im Ordner „blaetter“ liegen. */
+    fun liesInhalt(context: Context, ein: DataInputStream, neueId: () -> Long): Pair<List<Seite>, Int>? {
+        if (ein.readInt() != KENNUNG || ein.readInt() > VERSION) return null
+        val aktiv = ein.readInt()
+        val anzahl = ein.readInt()
+        if (anzahl !in 0..MAX_SEITEN) return null
+        val seiten = ArrayList<Seite>(anzahl)
+        repeat(anzahl) {
+            val farbe = Color(ein.readInt())
+            val musterName = ein.readUTF()
+            val muster = MusterTyp.entries.find { it.name == musterName } ?: MusterTyp.KEIN
+            val seite = Seite(HintergrundStil(farbe, muster))
+            seite.geteilteAnsicht.value = ein.readBoolean()
+            val bild = ein.readUTF()
+            if (bild.isNotEmpty() && File(Arbeitsblaetter.ordner(context), bild).exists()) seite.hintergrundBild.value = bild
+            val itemAnzahl = ein.readInt()
+            if (itemAnzahl !in 0..MAX_ELEMENTE) return null
+            val items = ArrayList<BoardItem>(itemAnzahl)
+            repeat(itemAnzahl) { lies(ein, neueId)?.let(items::add) }
+            seite.setzeInhalt(items)
+            seiten.add(seite)
+        }
+        return if (seiten.isEmpty()) null else seiten to aktiv.coerceIn(0, seiten.size - 1)
     }
 
     private fun DataOutputStream.offset(o: Offset) {

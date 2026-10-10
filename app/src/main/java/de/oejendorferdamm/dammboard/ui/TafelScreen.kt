@@ -47,6 +47,9 @@ import androidx.core.content.ContextCompat
 import de.oejendorferdamm.dammboard.model.AnimationsModus
 import de.oejendorferdamm.dammboard.ui.canvas.TafelCanvas
 import de.oejendorferdamm.dammboard.ui.spiel.TafelFussball
+import de.oejendorferdamm.dammboard.ui.spiel.EmojiUeberraschung
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.mutableLongStateOf
 import de.oejendorferdamm.dammboard.ui.toolbar.TafelBedienung
 import de.oejendorferdamm.dammboard.ui.toolbar.ExtraAktion
 import de.oejendorferdamm.dammboard.ui.toolbar.helferFuer
@@ -84,6 +87,8 @@ fun TafelScreen(
     tafelWirdGesichert: Boolean,
     onIServPdf: (File) -> Unit,
     onIServOeffnen: () -> Unit,
+    onTafeln: () -> Unit = {},
+    ueberraschungen: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -193,6 +198,7 @@ fun TafelScreen(
             }
             ExtraAktion.ARBEITSBLATT -> zeigeBlattQuelle = true
             ExtraAktion.ABDECKEN -> state.vorhang = if (state.vorhang == null) 0.15f else null
+            ExtraAktion.TAFELN -> onTafeln()
             else -> helferFuer(aktion)?.let { art ->
                 if (art in state.offeneHelfer) state.offeneHelfer.remove(art) else state.offeneHelfer.add(art)
             }
@@ -296,6 +302,18 @@ fun TafelScreen(
                 if (zeigeSpiel) {
                     TafelFussball(onSchliessen = { zeigeSpiel = false })
                 }
+
+                // Emoji-Überraschung: nur, wenn eine Weile nicht gemalt wurde
+                val letzteAenderung = remember { mutableLongStateOf(System.currentTimeMillis()) }
+                LaunchedEffect(state) {
+                    snapshotFlow { state.aktiveSeite to state.seite.versionsZaehler }.collect { letzteAenderung.longValue = System.currentTimeMillis() }
+                }
+                EmojiUeberraschung(
+                    aktiv = ueberraschungen && !zeigeSpiel,
+                    letzteAenderung = { letzteAenderung.longValue },
+                    jetztZeigen = state.ueberraschungJetzt,
+                    onGezeigt = { state.ueberraschungJetzt = false }
+                )
 
                 if (neuigkeiten != null) {
                     NeuigkeitenHinweis(

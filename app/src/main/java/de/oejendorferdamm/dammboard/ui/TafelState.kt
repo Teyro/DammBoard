@@ -37,6 +37,13 @@ enum class AufnahmeZweck { SPEICHERN, TEILEN, ISERV }
 /** Kleine Helfer, die über der Tafel schweben (siehe ui/helfer). */
 enum class HelferArt { TIMER, WUERFEL, ZUFALLSNAME, GRUPPEN, LAUTSTAERKE, LERNUHR }
 
+/**
+ * Die Tafel ist mit einer Datei im Sync-Ordner verbunden: Änderungen werden dorthin zurückgeschrieben,
+ * Änderungen von anderen Boards werden geladen. [stand] = Änderungszeit der Datei beim letzten
+ * Laden/Speichern, [signatur] = Inhaltsstand der Tafel zu diesem Zeitpunkt.
+ */
+data class VerbundeneTafel(val name: String, val uri: String, val stand: Long, val signatur: Any?)
+
 /** Ein offenes Textfeld-Eingabefenster: neues Textfeld an [position] oder Bearbeiten von [vorhanden]. */
 data class TextEingabe(val position: Offset, val vorhanden: TextItem? = null)
 
@@ -53,6 +60,15 @@ class TafelState(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)
      *  aktivierter Option „Letzten Hintergrund merken" der zuletzt verwendete (setzt AppWurzel). */
     var neueSeitenHintergrund: HintergrundStil = hintergrundStart
     var aktiveSeite by mutableIntStateOf(0)
+
+    /** Emoji-Überraschung sofort zeigen (Einstellungen → „Jetzt ausprobieren“). */
+    var ueberraschungJetzt by mutableStateOf(false)
+
+    /** Verbindung zu einer Tafeldatei im Sync-Ordner (siehe data/OrdnerSync.kt), null = keine. */
+    var verbundeneTafel by mutableStateOf<VerbundeneTafel?>(null)
+
+    /** Inhaltsstand für den Abgleich (ohne die gerade offene Seite – Blättern ist keine Änderung). */
+    fun syncSignatur(): Any = seiten.map { listOf(it.versionsZaehler, it.hintergrund.value, it.hintergrundBild.value, it.geteilteAnsicht.value) }
     val seite: Seite get() = seiten[aktiveSeite]
 
     var werkzeug by mutableStateOf(Werkzeug.STIFT)

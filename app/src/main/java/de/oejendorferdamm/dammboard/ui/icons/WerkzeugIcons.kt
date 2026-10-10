@@ -600,7 +600,7 @@ fun LinienStilSymbol(gestrichelt: Boolean, modifier: Modifier = Modifier, tint: 
 
 enum class WerkzeugkastenAktion {
     HINTERGRUND, BILD_TEILEN, BILDSCHIRMFOTO, LUPE, ISERV,
-    EXTRAS, PDF, ARBEITSBLATT, ABDECKEN, TIMER, WUERFEL, ZUFALLSNAME, GRUPPEN, LAUTSTAERKE, LERNUHR
+    EXTRAS, PDF, ARBEITSBLATT, ABDECKEN, TIMER, WUERFEL, ZUFALLSNAME, GRUPPEN, LAUTSTAERKE, LERNUHR, TAFELN
 }
 
 @Composable
@@ -662,6 +662,19 @@ fun WerkzeugkastenSymbol(aktion: WerkzeugkastenAktion, modifier: Modifier = Modi
                     linie(Offset(12f, 16.4f), Offset(12f, 10.6f), tint, 1.6f)
                     linie(Offset(9.8f, 12.8f), Offset(12f, 10.6f), tint, 1.6f)
                     linie(Offset(14.2f, 12.8f), Offset(12f, 10.6f), tint, 1.6f)
+                }
+                WerkzeugkastenAktion.TAFELN -> {
+                    // Zwei Tafeln übereinander mit Pfeilen hin und her (Abgleich zwischen Boards).
+                    drawRect(tint, topLeft = Offset(3f, 4f), size = androidx.compose.ui.geometry.Size(9f, 7f), style = kontur(1.5f))
+                    drawRect(tint, topLeft = Offset(12f, 13f), size = androidx.compose.ui.geometry.Size(9f, 7f), style = kontur(1.5f))
+                    linie(Offset(14f, 6f), Offset(19f, 6f), tint, 1.5f)
+                    linie(Offset(19f, 6f), Offset(19f, 10.5f), tint, 1.5f)
+                    linie(Offset(17.2f, 8.7f), Offset(19f, 10.5f), tint, 1.5f)
+                    linie(Offset(20.8f, 8.7f), Offset(19f, 10.5f), tint, 1.5f)
+                    linie(Offset(10f, 18f), Offset(5f, 18f), tint, 1.5f)
+                    linie(Offset(5f, 18f), Offset(5f, 13.5f), tint, 1.5f)
+                    linie(Offset(3.2f, 15.3f), Offset(5f, 13.5f), tint, 1.5f)
+                    linie(Offset(6.8f, 15.3f), Offset(5f, 13.5f), tint, 1.5f)
                 }
                 WerkzeugkastenAktion.EXTRAS -> {
                     // Vier Kacheln, eine davon als Plus

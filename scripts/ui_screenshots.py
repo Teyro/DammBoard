@@ -430,6 +430,130 @@ def neue_funktionen(breite, hoehe):
         time.sleep(0.6)
 
 
+def text_suchen_scrollend(text, versuche=10):
+    """Wischt in der Mitte nach oben, bis ein Text sichtbar ist, und tippt ihn an."""
+    breite, hoehe = bildschirm_groesse()
+    for _ in range(versuche):
+        baum = ui_baum()
+        if baum is not None:
+            for k in baum.iter("node"):
+                if (k.get("text") or "") == text:
+                    x1, y1, x2, y2 = [int(z) for z in k.get("bounds", "").replace("][", ",").strip("[]").split(",")]
+                    if 80 < (y1 + y2) // 2 < hoehe - 80:
+                        adb("shell", "input", "tap", str((x1 + x2) // 2), str((y1 + y2) // 2))
+                        return True
+        adb("shell", "input", "swipe", str(breite // 2), str(hoehe * 3 // 4), str(breite // 2), str(hoehe // 3), "500")
+        time.sleep(1)
+    print(f"WARNUNG: '{text}' auch nach Scrollen nicht gefunden", file=sys.stderr)
+    return False
+
+
+def tippe_ersten(*texte):
+    """Tippt den ersten der Texte an, den es gibt (Systemdialoge heißen je nach Version anders)."""
+    baum = ui_baum()
+    if baum is None:
+        return False
+    for t in texte:
+        for k in baum.iter("node"):
+            if (k.get("text") or "") == t or (k.get("content-desc") or "") == t:
+                x1, y1, x2, y2 = [int(z) for z in k.get("bounds", "").replace("][", ",").strip("[]").split(",")]
+                adb("shell", "input", "tap", str((x1 + x2) // 2), str((y1 + y2) // 2))
+                return True
+    return False
+
+
+def ueberraschung_und_ordner():
+    """0.9.3: Emoji-Überraschung und Tafeln im gemeinsamen Ordner."""
+    breite, hoehe = bildschirm_groesse()
+    # Emoji-Überraschung über Einstellungen → „Jetzt ausprobieren“
+    if tippe_mitte_von("Menü"):
+        time.sleep(1.5)
+        if text_suchen_scrollend("Jetzt ausprobieren"):
+            time.sleep(2)
+            screenshot("32a_gucker.png")
+            if tippe_mitte_von("Überraschung"):
+                time.sleep(2)
+                screenshot("32b_emoji_party.png")
+                time.sleep(3)
+                screenshot("32c_emoji_party.png")
+                time.sleep(7)
+                screenshot("32d_wieder_tafel.png")
+        else:
+            adb("shell", "input", "keyevent", "KEYCODE_BACK")
+            time.sleep(1)
+
+    # Gemeinsamer Ordner: einen Ordner im Gerätespeicher anlegen und auswählen
+    adb("shell", "mkdir", "-p", "/sdcard/Documents/DammSync")
+    if tippe_mitte_von("Werkzeugkasten"):
+        time.sleep(0.8)
+        tippe_mitte_von("Extras")
+        time.sleep(0.6)
+        tippe_mitte_von("Tafeln teilen")
+        time.sleep(1.5)
+    screenshot("33a_tafeln_ohne_ordner.png")
+    if tippe_text("Ordner wählen …"):
+        time.sleep(3)
+        screenshot("33b_ordnerauswahl.png")
+        if not tippe_ersten("DammSync"):
+            # über die Seitenleiste zum Gerätespeicher → Documents
+            tippe_ersten("Show roots", "Stammverzeichnisse anzeigen")
+            time.sleep(1.5)
+            baum = ui_baum()
+            if baum is not None:
+                for k in baum.iter("node"):
+                    t = k.get("text") or ""
+                    if t.startswith("Android SDK") or t.startswith("sdk_gphone") or t in ("Internal storage", "Interner Speicher"):
+                        x1, y1, x2, y2 = [int(z) for z in k.get("bounds", "").replace("][", ",").strip("[]").split(",")]
+                        adb("shell", "input", "tap", str((x1 + x2) // 2), str((y1 + y2) // 2))
+                        break
+            time.sleep(1.5)
+            tippe_ersten("Documents")
+            time.sleep(1.5)
+            tippe_ersten("DammSync")
+        time.sleep(1.5)
+        tippe_ersten("USE THIS FOLDER", "Use this folder", "DIESEN ORDNER VERWENDEN", "Diesen Ordner verwenden", "SELECT", "Auswählen")
+        time.sleep(1.5)
+        tippe_ersten("ALLOW", "Allow", "ZULASSEN", "Zulassen")
+        time.sleep(2.5)
+    screenshot("33c_ordner_gewaehlt.png")
+    # Tafel speichern
+    baum = ui_baum()
+    if baum is not None:
+        for k in baum.iter("node"):
+            if k.get("class") == "android.widget.EditText":
+                x1, y1, x2, y2 = [int(z) for z in k.get("bounds", "").replace("][", ",").strip("[]").split(",")]
+                adb("shell", "input", "tap", str((x1 + x2) // 2), str((y1 + y2) // 2))
+                time.sleep(1)
+                adb("shell", "input", "text", "Testtafel")
+                adb("shell", "input", "keyevent", "KEYCODE_BACK")  # Tastatur zu
+                time.sleep(1)
+                break
+    tippe_text("Speichern")
+    time.sleep(3)
+    screenshot("33d_gespeichert.png")
+    print("Ordner:", adb("shell", "ls", "-l", "/sdcard/Documents/DammSync", check=False).stdout.strip())
+    tippe_mitte_von("Schließen")
+    time.sleep(1.5)
+    # auf der Tafel weitermalen → wird in die Datei zurückgeschrieben
+    zeichne_mit_halten([(breite * 0.3, hoehe * 0.6), (breite * 0.5, hoehe * 0.65), (breite * 0.6, hoehe * 0.5)], halten_s=0.1)
+    time.sleep(6)
+    print("Nach dem Malen:", adb("shell", "ls", "-l", "/sdcard/Documents/DammSync", check=False).stdout.strip())
+    # „anderes Board“ ändert die Datei → beim Zurückkommen wird die neue Fassung geladen
+    adb("shell", "touch", "-t", "203001010000", "/sdcard/Documents/DammSync/Testtafel.dammboard")
+    adb("shell", "input", "keyevent", "KEYCODE_HOME")
+    time.sleep(2)
+    adb("shell", "am", "start", "-n", f"{PAKET}/.MainActivity")
+    time.sleep(4)
+    screenshot("33e_neue_fassung_geladen.png")
+    # „anderes Board“ löscht die Tafel
+    adb("shell", "rm", "/sdcard/Documents/DammSync/Testtafel.dammboard")
+    adb("shell", "input", "keyevent", "KEYCODE_HOME")
+    time.sleep(2)
+    adb("shell", "am", "start", "-n", f"{PAKET}/.MainActivity")
+    time.sleep(4)
+    screenshot("33f_anderswo_geloescht.png")
+
+
 def bildschirm_groesse():
     """Aktuelle (ggf. per 'wm size' simulierte) Bildschirmgröße in Pixeln, quer ausgerichtet."""
     ausgabe = adb("shell", "wm", "size").stdout
@@ -673,6 +797,8 @@ def main():
         adb("shell", "input", "keyevent", "KEYCODE_BACK")
         time.sleep(1)
         screenshot("13_zurueck_zur_tafel.png")
+
+    ueberraschung_und_ordner()
 
     if not laeuft_noch():
         print("FEHLER: App ist während der Bedienung abgestürzt", file=sys.stderr)

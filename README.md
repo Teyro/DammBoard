@@ -70,6 +70,21 @@ Bildschirmfoto und Lupe.
   geteilter Tafel („Bild teilen“) bleibt jeder Strich in seiner Hälfte und
   jede Hälfte hat eine eigene Stiftfarbe
 
+### Neu in 0.9.3
+
+- **Tafeln teilen** (Werkzeugkasten → Extras): einmal einen Ordner wählen, den
+  alle Boards sehen – z. B. den Ordner der Nextcloud- oder Synology-Drive-App,
+  ein Netzlaufwerk oder einen USB-Stick. Tafeln dort speichern, öffnen und
+  löschen; eine geöffnete Tafel wird beim Arbeiten automatisch zurückgeschrieben
+  und lädt neu, wenn ein anderes Board sie geändert hat. Haben zwei Boards
+  gleichzeitig geändert, geht nichts verloren: die eigene Fassung wird als
+  „Name (Kopie HH.MM)“ gespeichert. Den Abgleich zwischen den Boards übernimmt,
+  was den Ordner abgleicht – DammBoard braucht dafür keine Zugangsdaten.
+- **Emoji-Überraschung**: ab und zu (alle 20–40 Minuten, nur wenn gerade nicht
+  gemalt wird) schaut ein Emoji vom Rand herein. Wer es antippt, startet
+  10 Sekunden Emoji-Party; danach ist die Tafel unverändert wieder da.
+  Einstellungen → „Emoji-Überraschung“ (abschaltbar, „Jetzt ausprobieren“).
+
 Kartengrundlagen: Natural Earth (gemeinfrei), deutschlandGeoJSON (Unlicense),
 Bezirksgrenzen © Freie und Hansestadt Hamburg, LGV (dl-de/by-2.0) – Details in
 `app/src/main/assets/karten/QUELLEN.txt`.

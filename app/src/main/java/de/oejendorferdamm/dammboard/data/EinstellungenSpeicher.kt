@@ -41,6 +41,8 @@ private object Schluessel {
     val ZULETZT_GESTARTETE_VERSION = stringPreferencesKey("zuletzt_gestartete_version")
     val TAFEL_SICHERN = booleanPreferencesKey("tafel_sichern")
     val FORM_ERKENNUNG = booleanPreferencesKey("form_erkennung")
+    val SYNC_ORDNER = stringPreferencesKey("sync_ordner")
+    val UEBERRASCHUNGEN = booleanPreferencesKey("ueberraschungen")
 }
 
 /**
@@ -184,6 +186,20 @@ class EinstellungenSpeicher(private val context: Context) {
 
     suspend fun speichereFormErkennung(aktiv: Boolean) {
         context.einstellungenDataStore.edit { prefs -> prefs[Schluessel.FORM_ERKENNUNG] = aktiv }
+    }
+
+    /** Ordner (Storage Access Framework), in dem die Tafeln mit anderen Boards geteilt werden; null = keiner. */
+    val syncOrdner: Flow<String?> = context.einstellungenDataStore.data.map { prefs -> prefs[Schluessel.SYNC_ORDNER] }
+
+    suspend fun speichereSyncOrdner(uri: String?) {
+        context.einstellungenDataStore.edit { prefs -> if (uri == null) prefs.remove(Schluessel.SYNC_ORDNER) else prefs[Schluessel.SYNC_ORDNER] = uri }
+    }
+
+    /** Ab und zu schaut ein Emoji herein – antippen = Emoji-Party (standardmäßig an). */
+    val ueberraschungen: Flow<Boolean> = context.einstellungenDataStore.data.map { prefs -> prefs[Schluessel.UEBERRASCHUNGEN] ?: true }
+
+    suspend fun speichereUeberraschungen(aktiv: Boolean) {
+        context.einstellungenDataStore.edit { prefs -> prefs[Schluessel.UEBERRASCHUNGEN] = aktiv }
     }
 
     /** Aus: jede neue Seite beginnt wieder auf dem bekannten grünen Tafelhintergrund. An: die

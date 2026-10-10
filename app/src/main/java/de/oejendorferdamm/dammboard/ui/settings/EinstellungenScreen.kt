@@ -91,6 +91,9 @@ fun EinstellungenScreen(
     formErkennung: Boolean,
     onTafelSichernGeaendert: (Boolean) -> Unit,
     onFormErkennungGeaendert: (Boolean) -> Unit,
+    ueberraschungen: Boolean = true,
+    onUeberraschungenGeaendert: (Boolean) -> Unit = {},
+    onUeberraschungZeigen: () -> Unit = {},
     onZugangSpeichern: (IServZugang) -> Unit,
     onModusGeaendert: (AnimationsModus) -> Unit,
     onSymbolGroesseGeaendert: (SymbolGroesse) -> Unit,
@@ -195,7 +198,10 @@ fun EinstellungenScreen(
                 onHintergrundMerkenGeaendert = onHintergrundMerkenGeaendert,
                 onHandballenRadierenGeaendert = onHandballenRadierenGeaendert,
                 onHandballenEmpfindlichkeitGeaendert = onHandballenEmpfindlichkeitGeaendert,
-                onRadierenStueckweiseGeaendert = onRadierenStueckweiseGeaendert
+                onRadierenStueckweiseGeaendert = onRadierenStueckweiseGeaendert,
+                ueberraschungen = ueberraschungen,
+                onUeberraschungenGeaendert = onUeberraschungenGeaendert,
+                onUeberraschungZeigen = onUeberraschungZeigen
             )
 
             Spacer(Modifier.height(26.dp))
@@ -405,7 +411,10 @@ private fun ErweiterteEinstellungen(
     onHintergrundMerkenGeaendert: (Boolean) -> Unit,
     onHandballenRadierenGeaendert: (Boolean) -> Unit,
     onHandballenEmpfindlichkeitGeaendert: (Float) -> Unit,
-    onRadierenStueckweiseGeaendert: (Boolean) -> Unit
+    onRadierenStueckweiseGeaendert: (Boolean) -> Unit,
+    ueberraschungen: Boolean = true,
+    onUeberraschungenGeaendert: (Boolean) -> Unit = {},
+    onUeberraschungZeigen: () -> Unit = {}
 ) {
     Text("Erweitert", color = Textfarbe, fontSize = 15.sp, fontWeight = FontWeight.Bold)
     Spacer(Modifier.height(4.dp))
@@ -464,6 +473,17 @@ private fun ErweiterteEinstellungen(
         "Stift am Ende eines Strichs kurz still halten: aus Kreis, Linie, Dreieck oder Rechteck wird eine saubere Form.",
         formErkennung, onFormErkennungGeaendert
     )
+
+    Spacer(Modifier.height(14.dp))
+    SchalterZeile(
+        "Emoji-Überraschung",
+        "Ab und zu schaut ein Emoji vom Rand herein (nur, wenn eine Weile niemand malt). Wer es antippt, " +
+            "löst 10 Sekunden Emoji-Party aus – danach ist die Tafel genau wie vorher.",
+        ueberraschungen, onUeberraschungenGeaendert
+    )
+    androidx.compose.material3.OutlinedButton(onClick = onUeberraschungZeigen, modifier = Modifier.padding(top = 4.dp)) {
+        Text("Jetzt ausprobieren", fontSize = 12.sp)
+    }
 
     Spacer(Modifier.height(14.dp))
     Text("Radierer und Wischen", color = Textfarbe, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
