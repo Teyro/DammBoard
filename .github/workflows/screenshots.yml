@@ -59,4 +59,5 @@ jobs:
           name: dammboard-screenshots-api${{ inputs.api_level }}${{ inputs.board != '' && '-board' || '' }}
           path: |
             screenshots/*.png
+            screenshots/*.xml
             logcat.txt

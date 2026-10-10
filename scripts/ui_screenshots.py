@@ -461,6 +461,7 @@ def tippe_ersten(*texte):
                 x1, y1, x2, y2 = [int(z) for z in k.get("bounds", "").replace("][", ",").strip("[]").split(",")]
                 if x1 < 0 or y1 < 0 or x2 > breite or y2 > hoehe or x2 - x1 < 4 or y2 - y1 < 4:
                     continue
+                print(f"tippe_ersten: {t} bei {k.get('bounds')} ({k.get('class')}, {k.get('resource-id')})")
                 adb("shell", "input", "tap", str((x1 + x2) // 2), str((y1 + y2) // 2))
                 return True
     return False
