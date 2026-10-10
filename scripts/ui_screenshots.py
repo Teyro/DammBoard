@@ -539,7 +539,7 @@ def ueberraschung_und_ordner():
     adb("shell", "mkdir", "-p", "/sdcard/Documents/DammSync")
     # Testversion: Ordnerauswahl gleich in Documents/DammSync öffnen (der Wähler reagiert im
     # Emulator nicht zuverlässig auf Tipps in die Ordnerliste)
-    adb("shell", "am", "start", "-n", f"{PAKET}/.MainActivity", "--es", "test_startordner",
+    adb("shell", "am", "start", "--activity-single-top", "-n", f"{PAKET}/.MainActivity", "--es", "test_startordner",
         "content://com.android.externalstorage.documents/document/primary%3ADocuments%2FDammSync")
     time.sleep(2)
     if tippe_mitte_von("Werkzeugkasten"):

@@ -17,7 +17,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         Karten.init(this)
-        if (BuildConfig.DEBUG) intent?.getStringExtra("test_startordner")?.let { TestStartordner.uri = android.net.Uri.parse(it) }
+        testStartordnerLesen(intent)
         setContent {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
@@ -25,5 +25,14 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        testStartordnerLesen(intent)
+    }
+
+    private fun testStartordnerLesen(intent: android.content.Intent?) {
+        if (BuildConfig.DEBUG) intent?.getStringExtra("test_startordner")?.let { TestStartordner.uri = android.net.Uri.parse(it) }
     }
 }
