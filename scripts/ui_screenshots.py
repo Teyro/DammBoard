@@ -33,8 +33,8 @@ def screenshot(dateiname: str):
 def ui_baum():
     """uiautomator-Abbild der Oberfläche; im Emulator schlägt das gelegentlich fehl – dann erneut."""
     for _ in range(4):
-        dump = adb("shell", "uiautomator", "dump", "/sdcard/dump.xml", check=False)
-        pull = adb("pull", "/sdcard/dump.xml", "dump.xml", check=False)
+        dump = adb("shell", "uiautomator", "dump", "/data/local/tmp/dump.xml", check=False)
+        pull = adb("pull", "/data/local/tmp/dump.xml", "dump.xml", check=False)
         if dump.returncode == 0 and pull.returncode == 0:
             try:
                 return ET.parse("dump.xml")
