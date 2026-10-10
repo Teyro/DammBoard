@@ -60,6 +60,11 @@ private val Text2 = Color(0xFF8A8880)
 private val Akzent = Color(0xFF3A5C4A)
 private val Fehler = Color(0xFFB3261E)
 
+/** Nur Testversion: Ordner, in dem die Ordnerauswahl im Emulator-Test startet. */
+object TestStartordner {
+    var uri: Uri? = null
+}
+
 /** Was der Tafeln-Bildschirm auslöst; die Ergebnisse sind Fehlertexte (null = geklappt). */
 interface TafelnAktionen {
     fun ordnerWaehlen()

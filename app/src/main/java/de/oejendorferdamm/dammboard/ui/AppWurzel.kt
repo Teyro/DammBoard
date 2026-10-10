@@ -173,7 +173,10 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
     val tafelnAktionen = remember {
         object : TafelnAktionen {
             override fun ordnerWaehlen() {
-                try { ordnerWahl.launch(null) } catch (e: Exception) { syncMeldung = "Auf diesem Board gibt es keine Ordnerauswahl." }
+                // Startet im bisher gewählten Ordner; die Testversion kann für den Emulator-Test einen vorgeben
+                val start = ordnerAktuell.value?.let { runCatching { android.provider.DocumentsContract.buildDocumentUriUsingTree(it, android.provider.DocumentsContract.getTreeDocumentId(it)) }.getOrNull() }
+                    ?: if (de.oejendorferdamm.dammboard.BuildConfig.DEBUG) TestStartordner.uri else null
+                try { ordnerWahl.launch(start) } catch (e: Exception) { syncMeldung = "Auf diesem Board gibt es keine Ordnerauswahl." }
             }
 
             override suspend fun speichernUnter(name: String): String? {

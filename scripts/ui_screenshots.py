@@ -537,6 +537,11 @@ def ueberraschung_und_ordner():
 
     # Gemeinsamer Ordner: einen Ordner im Gerätespeicher anlegen und auswählen
     adb("shell", "mkdir", "-p", "/sdcard/Documents/DammSync")
+    # Testversion: Ordnerauswahl gleich in Documents/DammSync öffnen (der Wähler reagiert im
+    # Emulator nicht zuverlässig auf Tipps in die Ordnerliste)
+    adb("shell", "am", "start", "-n", f"{PAKET}/.MainActivity", "--es", "test_startordner",
+        "content://com.android.externalstorage.documents/document/primary%3ADocuments%2FDammSync")
+    time.sleep(2)
     if tippe_mitte_von("Werkzeugkasten"):
         time.sleep(0.8)
         tippe_mitte_von("Extras")

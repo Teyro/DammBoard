@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import de.oejendorferdamm.dammboard.ui.AppWurzel
+import de.oejendorferdamm.dammboard.ui.TestStartordner
 import de.oejendorferdamm.dammboard.ui.canvas.Karten
 
 class MainActivity : ComponentActivity() {
@@ -16,6 +17,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         Karten.init(this)
+        if (BuildConfig.DEBUG) intent?.getStringExtra("test_startordner")?.let { TestStartordner.uri = android.net.Uri.parse(it) }
         setContent {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
