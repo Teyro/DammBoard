@@ -477,15 +477,8 @@ def texte_sichtbar():
 def ordner_im_picker_waehlen(ziel="DammSync"):
     """Navigiert im System-Ordnerwähler zu Documents/<ziel> und bestätigt."""
     im_ziel = False
-    for schritt in range(8):
+    for _ in range(8):
         texte = texte_sichtbar()
-        # Diagnose: Bild und UI-Baum jedes Schritts aufheben
-        screenshot(f"33p_picker_{schritt}.png")
-        try:
-            import shutil
-            shutil.copy("dump.xml", os.path.join(AUSGABE_ORDNER, f"33p_picker_{schritt}.xml"))
-        except OSError:
-            pass
         if im_ziel:
             # im Zielordner: bestätigen
             if tippe_ersten("USE THIS FOLDER", "Use this folder", "DIESEN ORDNER VERWENDEN", "Diesen Ordner verwenden", "SELECT", "Auswählen"):
