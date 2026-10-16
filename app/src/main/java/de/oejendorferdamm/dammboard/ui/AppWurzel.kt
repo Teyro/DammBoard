@@ -391,6 +391,7 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
             },
             onTafeln = { bildschirm = Bildschirm.Tafeln },
             ueberraschungen = ueberraschungen,
+            videoOrdner = syncOrdner,
             onIServOeffnen = {
                 bildschirm = Bildschirm.Dateimanager(
                     DateiModus.Oeffnen { name, bytes ->

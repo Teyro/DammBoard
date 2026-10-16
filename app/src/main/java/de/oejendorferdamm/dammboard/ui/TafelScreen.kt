@@ -89,12 +89,18 @@ fun TafelScreen(
     onIServOeffnen: () -> Unit,
     onTafeln: () -> Unit = {},
     ueberraschungen: Boolean = false,
+    /** Tafeln-Ordner: dort kann „ueberraschung.mp4“ liegen (Easter Egg, siehe KritzelVideo). */
+    videoOrdner: android.net.Uri? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var zeigeBeendenAbfrage by remember { mutableStateOf(false) }
     var zeigeSpiel by remember { mutableStateOf(false) }
+    // Easter Egg: fünfmal schnell auf den Würfel → Kritzel-Kästchen mit Video
+    var zeigeKritzelVideo by remember { mutableStateOf(false) }
+    var wuerfelTipps by remember { mutableStateOf(0) }
+    var wuerfelWarten by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
 
     // Die Zurück-Taste (viele Boards haben sie am Rahmen) schließt erst Panel/Lupe und fragt dann
     // nach – vorher beendete sie die App sofort, und der ganze Tafelinhalt war weg.
@@ -112,6 +118,7 @@ fun TafelScreen(
             state.zeigeSeitenUebersicht -> state.zeigeSeitenUebersicht = false
             state.vorhang != null -> state.vorhang = null
             state.offeneHelfer.isNotEmpty() -> state.offeneHelfer.removeAt(state.offeneHelfer.lastIndex)
+            zeigeKritzelVideo -> zeigeKritzelVideo = false
             zeigeSpiel -> zeigeSpiel = false
             state.offenesPanel != null -> state.schliessePanel()
             state.lupeAktiv -> state.lupeAktiv = false
@@ -233,8 +240,23 @@ fun TafelScreen(
                     onMenu = onOeffneEinstellungen,
                     onTeilen = { state.aufnahmeAnfrage = AufnahmeZweck.TEILEN },
                     onSpiel = {
-                        state.schliessePanel()
-                        zeigeSpiel = true
+                        // Erst kurz abwarten, ob noch weitere Tipper kommen (fünfmal schnell = Easter Egg)
+                        wuerfelWarten?.cancel()
+                        wuerfelTipps++
+                        if (wuerfelTipps >= 5) {
+                            wuerfelTipps = 0
+                            state.schliessePanel()
+                            zeigeKritzelVideo = true
+                        } else {
+                            wuerfelWarten = scope.launch {
+                                delay(450)
+                                wuerfelTipps = 0
+                                if (!zeigeKritzelVideo) {
+                                    state.schliessePanel()
+                                    zeigeSpiel = true
+                                }
+                            }
+                        }
                     },
                     onIServ = { state.aufnahmeAnfrage = AufnahmeZweck.ISERV },
                     onExtra = ::extra
@@ -303,13 +325,21 @@ fun TafelScreen(
                     TafelFussball(onSchliessen = { zeigeSpiel = false })
                 }
 
+                if (zeigeKritzelVideo) {
+                    de.oejendorferdamm.dammboard.ui.spiel.KritzelVideo(
+                        bewegt = animationsModus != AnimationsModus.PERFORMANCE,
+                        videoOrdner = videoOrdner,
+                        onFertig = { zeigeKritzelVideo = false }
+                    )
+                }
+
                 // Emoji-Überraschung: nur, wenn eine Weile nicht gemalt wurde
                 val letzteAenderung = remember { mutableLongStateOf(System.currentTimeMillis()) }
                 LaunchedEffect(state) {
                     snapshotFlow { state.aktiveSeite to state.seite.versionsZaehler }.collect { letzteAenderung.longValue = System.currentTimeMillis() }
                 }
                 EmojiUeberraschung(
-                    aktiv = ueberraschungen && !zeigeSpiel,
+                    aktiv = ueberraschungen && !zeigeSpiel && !zeigeKritzelVideo,
                     letzteAenderung = { letzteAenderung.longValue },
                     jetztZeigen = state.ueberraschungJetzt,
                     onGezeigt = { state.ueberraschungJetzt = false }

@@ -677,6 +677,45 @@ def handballen_wischen(x_anteil, y_von, y_bis):
     print("sendevent:", len(befehle), "Befehle, Fehler:", (r.stderr or r.stdout or "")[:200])
 
 
+def kritzel_video():
+    """Easter Egg: fünfmal schnell auf den Würfel → gekritzeltes Kästchen mit Video, danach wieder weg.
+    Das echte Video bleibt privat – hier ein mit ffmpeg erzeugtes Testbild (6 s)."""
+    import shutil
+    if shutil.which("ffmpeg"):
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=duration=6:size=640x480:rate=25",
+                        "-f", "lavfi", "-i", "sine=frequency=440:duration=6", "-shortest", "-pix_fmt", "yuv420p", "test_video.mp4"])
+        adb("push", "test_video.mp4", "/data/local/tmp/u.mp4", check=False)
+        adb("shell", "chmod", "644", "/data/local/tmp/u.mp4", check=False)
+        adb("shell", "run-as", PAKET, "sh", "-c", "'cat /data/local/tmp/u.mp4 > files/ueberraschung.mp4'", check=False)
+    else:
+        print("WARNUNG: kein ffmpeg – Easter Egg ohne Video", file=sys.stderr)
+    baum = ui_baum()
+    ziel = None
+    if baum is not None:
+        for k in baum.iter("node"):
+            if k.get("content-desc") == "Tafelspiel":
+                x1, y1, x2, y2 = [int(z) for z in k.get("bounds").replace("][", ",").strip("[]").split(",")]
+                ziel = ((x1 + x2) // 2, (y1 + y2) // 2)
+    if ziel is None:
+        print("WARNUNG: Würfel nicht gefunden", file=sys.stderr)
+        return
+    x, y = ziel
+    start = time.time()
+    # fünf Tipper in EINEM Shell-Aufruf – sonst liegen zwischen ihnen zu lange Pausen
+    adb("shell", "; ".join([f"input tap {x} {y}"] * 5))
+    print(f"Fünf Tipper in {time.time() - start:.2f} s")
+    time.sleep(0.4)
+    screenshot("40_kritzel_beginnt.png")
+    time.sleep(1.4)
+    screenshot("41_kritzel_fertig.png")
+    time.sleep(1.5)
+    screenshot("42_video_laeuft.png")
+    time.sleep(2)
+    screenshot("43_video_wandert.png")
+    time.sleep(6)
+    screenshot("44_wieder_tafel.png")
+
+
 def main():
     os.makedirs(AUSGABE_ORDNER, exist_ok=True)
     adb("shell", "am", "start", "-n", f"{PAKET}/.MainActivity")
@@ -831,6 +870,7 @@ def main():
         screenshot("13_zurueck_zur_tafel.png")
 
     ueberraschung_und_ordner()
+    kritzel_video()
 
     if not laeuft_noch():
         print("FEHLER: App ist während der Bedienung abgestürzt", file=sys.stderr)

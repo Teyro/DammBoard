@@ -484,6 +484,7 @@ private fun ErweiterteEinstellungen(
     androidx.compose.material3.OutlinedButton(onClick = onUeberraschungZeigen, modifier = Modifier.padding(top = 4.dp)) {
         Text("Jetzt ausprobieren", fontSize = 12.sp)
     }
+    UeberraschungsVideoWahl()
 
     Spacer(Modifier.height(14.dp))
     Text("Radierer und Wischen", color = Textfarbe, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
@@ -575,4 +576,43 @@ private fun ModusKnopf(label: String, ausgewaehlt: Boolean, modifier: Modifier =
     ) {
         Text(label, color = if (ausgewaehlt) Color.White else Textfarbe, fontSize = 13.sp)
     }
+}
+
+/**
+ * Überraschungsvideo (Easter Egg) wählen. Das Video bleibt auf diesem Board – es wird nie mit der
+ * App verteilt. Alternativ holt sich jedes Board „ueberraschung.mp4“ aus dem Tafeln-Ordner.
+ */
+@Composable
+private fun UeberraschungsVideoWahl() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var vorhanden by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(de.oejendorferdamm.dammboard.ui.spiel.UeberraschungsVideo.vorhanden(context)) }
+    var meldung by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    val wahl = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        meldung = "Wird übernommen …"
+        scope.launch {
+            val ok = de.oejendorferdamm.dammboard.ui.spiel.UeberraschungsVideo.uebernehmen(context.applicationContext, uri)
+            vorhanden = de.oejendorferdamm.dammboard.ui.spiel.UeberraschungsVideo.vorhanden(context)
+            meldung = if (ok) "Gespeichert." else "Das Video lässt sich nicht abspielen."
+        }
+    }
+    Spacer(Modifier.height(10.dp))
+    Text("Überraschungsvideo", color = Textfarbe, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+    Text(
+        (if (vorhanden) "Ein Video ist gewählt. " else "Noch kein Video gewählt. ") +
+            "Es bleibt nur auf diesem Board. Alternativ als „ueberraschung.mp4“ in den Tafeln-Ordner legen – dann holt es sich jedes Board selbst. Wie man es auslöst, bleibt geheim 😉",
+        color = TextfarbeSchwach, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp, bottom = 4.dp)
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        androidx.compose.material3.OutlinedButton(onClick = {
+            try { wahl.launch(arrayOf("video/*")) } catch (_: Exception) { meldung = "Auf diesem Board gibt es keine Dateiauswahl." }
+        }) { Text(if (vorhanden) "Anderes Video wählen …" else "Video wählen …", fontSize = 12.sp) }
+        if (vorhanden) androidx.compose.material3.OutlinedButton(onClick = {
+            de.oejendorferdamm.dammboard.ui.spiel.UeberraschungsVideo.entfernen(context)
+            vorhanden = false
+            meldung = "Entfernt."
+        }) { Text("Entfernen", fontSize = 12.sp) }
+    }
+    meldung?.let { Text(it, color = TextfarbeSchwach, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp)) }
 }
