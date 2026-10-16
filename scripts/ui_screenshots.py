@@ -680,15 +680,12 @@ def handballen_wischen(x_anteil, y_von, y_bis):
 def kritzel_video():
     """Easter Egg: fünfmal schnell auf den Würfel → gekritzeltes Kästchen mit Video, danach wieder weg.
     Das echte Video bleibt privat – hier ein mit ffmpeg erzeugtes Testbild (6 s)."""
-    import shutil
-    if shutil.which("ffmpeg"):
-        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=duration=6:size=640x480:rate=25",
-                        "-f", "lavfi", "-i", "sine=frequency=440:duration=6", "-shortest", "-pix_fmt", "yuv420p", "test_video.mp4"])
+    if os.path.exists("test_video.mp4"):  # erzeugt im Workflow mit ffmpeg
         adb("push", "test_video.mp4", "/data/local/tmp/u.mp4", check=False)
         adb("shell", "chmod", "644", "/data/local/tmp/u.mp4", check=False)
         adb("shell", "run-as", PAKET, "sh", "-c", "'cat /data/local/tmp/u.mp4 > files/ueberraschung.mp4'", check=False)
     else:
-        print("WARNUNG: kein ffmpeg – Easter Egg ohne Video", file=sys.stderr)
+        print("WARNUNG: kein Testvideo – Easter Egg ohne Video", file=sys.stderr)
     baum = ui_baum()
     ziel = None
     if baum is not None:
@@ -700,10 +697,26 @@ def kritzel_video():
         print("WARNUNG: Würfel nicht gefunden", file=sys.stderr)
         return
     x, y = ziel
-    start = time.time()
-    # fünf Tipper in EINEM Shell-Aufruf – sonst liegen zwischen ihnen zu lange Pausen
-    adb("shell", "; ".join([f"input tap {x} {y}"] * 5))
-    print(f"Fünf Tipper in {time.time() - start:.2f} s")
+    # Fünf schnelle Tipper direkt als Touch-Ereignisse („input tap“ braucht im Emulator ~0,7 s pro Tipper)
+    info = touch_geraet()
+    b, h = bildschirm_groesse()
+    if info:
+        geraet, ber = info
+        roh = touch_abbildung()
+        rx, ry = roh(x / b, y / h, ber["ABS_MT_POSITION_X"], ber["ABS_MT_POSITION_Y"])
+        befehle = []
+        for i in range(5):
+            befehle += [f"sendevent {geraet} 3 47 0", f"sendevent {geraet} 3 57 {200 + i}", f"sendevent {geraet} 3 53 {rx}",
+                        f"sendevent {geraet} 3 54 {ry}"]
+            if "ABS_MT_PRESSURE" in ber:
+                befehle.append(f"sendevent {geraet} 3 58 {max(1, ber['ABS_MT_PRESSURE'] // 2)}")
+            befehle += [f"sendevent {geraet} 1 330 1", f"sendevent {geraet} 0 0 0", "sleep 0.06",
+                        f"sendevent {geraet} 3 57 4294967295", f"sendevent {geraet} 1 330 0", f"sendevent {geraet} 0 0 0", "sleep 0.12"]
+        start = time.time()
+        adb("shell", " ; ".join(befehle), check=False)
+        print(f"Fünf Tipper in {time.time() - start:.2f} s")
+    else:
+        print("WARNUNG: kein Touchscreen für sendevent", file=sys.stderr)
     time.sleep(0.4)
     screenshot("40_kritzel_beginnt.png")
     time.sleep(1.4)
