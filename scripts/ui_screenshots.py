@@ -697,26 +697,10 @@ def kritzel_video():
         print("WARNUNG: Würfel nicht gefunden", file=sys.stderr)
         return
     x, y = ziel
-    # Fünf schnelle Tipper direkt als Touch-Ereignisse („input tap“ braucht im Emulator ~0,7 s pro Tipper)
-    info = touch_geraet()
-    b, h = bildschirm_groesse()
-    if info:
-        geraet, ber = info
-        roh = touch_abbildung()
-        rx, ry = roh(x / b, y / h, ber["ABS_MT_POSITION_X"], ber["ABS_MT_POSITION_Y"])
-        befehle = []
-        for i in range(5):
-            befehle += [f"sendevent {geraet} 3 47 0", f"sendevent {geraet} 3 57 {200 + i}", f"sendevent {geraet} 3 53 {rx}",
-                        f"sendevent {geraet} 3 54 {ry}"]
-            if "ABS_MT_PRESSURE" in ber:
-                befehle.append(f"sendevent {geraet} 3 58 {max(1, ber['ABS_MT_PRESSURE'] // 2)}")
-            befehle += [f"sendevent {geraet} 1 330 1", f"sendevent {geraet} 0 0 0", "sleep 0.06",
-                        f"sendevent {geraet} 3 57 4294967295", f"sendevent {geraet} 1 330 0", f"sendevent {geraet} 0 0 0", "sleep 0.12"]
-        start = time.time()
-        adb("shell", " ; ".join(befehle), check=False)
-        print(f"Fünf Tipper in {time.time() - start:.2f} s")
-    else:
-        print("WARNUNG: kein Touchscreen für sendevent", file=sys.stderr)
+    # Fünf Tipper in einem Shell-Aufruf (die Testversion wartet bis 1,5 s auf den nächsten Tipper)
+    start = time.time()
+    adb("shell", "; ".join([f"input tap {x} {y}"] * 5))
+    print(f"Fünf Tipper in {time.time() - start:.2f} s")
     time.sleep(0.4)
     screenshot("40_kritzel_beginnt.png")
     time.sleep(1.4)

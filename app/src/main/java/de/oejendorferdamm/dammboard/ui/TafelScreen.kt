@@ -249,7 +249,8 @@ fun TafelScreen(
                             zeigeKritzelVideo = true
                         } else {
                             wuerfelWarten = scope.launch {
-                                delay(450)
+                                // Testversion: längeres Fenster – „adb input tap“ braucht im Emulator ~0,7 s pro Tipper
+                                delay(if (de.oejendorferdamm.dammboard.BuildConfig.DEBUG) 1500 else 450)
                                 wuerfelTipps = 0
                                 if (!zeigeKritzelVideo) {
                                     state.schliessePanel()
