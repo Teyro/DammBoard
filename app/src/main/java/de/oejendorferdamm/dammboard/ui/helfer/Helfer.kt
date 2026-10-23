@@ -109,6 +109,8 @@ fun HelferEbene(state: TafelState) {
                     HelferArt.GRUPPEN -> GruppenHelfer(verschieben, schliessen, modifier)
                     HelferArt.LAUTSTAERKE -> LautstaerkeHelfer(verschieben, schliessen, modifier)
                     HelferArt.LERNUHR -> LernuhrHelfer(verschieben, schliessen, modifier)
+                    HelferArt.NACHSPUREN -> NachspurenHelfer(verschieben, schliessen, modifier)
+                    HelferArt.WOERTER -> WoerterRatenHelfer(verschieben, schliessen, modifier)
                 }
             }
         }

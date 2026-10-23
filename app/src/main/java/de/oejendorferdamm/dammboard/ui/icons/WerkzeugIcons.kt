@@ -600,7 +600,8 @@ fun LinienStilSymbol(gestrichelt: Boolean, modifier: Modifier = Modifier, tint: 
 
 enum class WerkzeugkastenAktion {
     HINTERGRUND, BILD_TEILEN, BILDSCHIRMFOTO, LUPE, ISERV,
-    EXTRAS, PDF, ARBEITSBLATT, ABDECKEN, TIMER, WUERFEL, ZUFALLSNAME, GRUPPEN, LAUTSTAERKE, LERNUHR, TAFELN
+    EXTRAS, PDF, ARBEITSBLATT, ABDECKEN, TIMER, WUERFEL, ZUFALLSNAME, GRUPPEN, LAUTSTAERKE, LERNUHR, TAFELN,
+    NACHSPUREN, WOERTER
 }
 
 @Composable
@@ -754,6 +755,25 @@ fun WerkzeugkastenSymbol(aktion: WerkzeugkastenAktion, modifier: Modifier = Modi
                     }
                     linie(Offset(12f, 12f), Offset(12f, 6.4f), tint, 1.5f)
                     linie(Offset(12f, 12f), Offset(15.4f, 13.6f), tint, 1.9f)
+                }
+                WerkzeugkastenAktion.NACHSPUREN -> {
+                    // Gepunktetes A mit grünem Startpunkt und Finger-Strich auf der Grundlinie.
+                    val a = Path().apply { moveTo(5f, 19f); lineTo(12f, 4f); lineTo(19f, 19f) }
+                    drawPath(a, tint, kontur(1.8f, PUNKTIERUNG))
+                    linie(Offset(8.4f, 13.4f), Offset(15.6f, 13.4f), tint, 1.4f)
+                    drawCircle(tint, 2.1f, Offset(12f, 4f))
+                    linie(Offset(3f, 21.2f), Offset(21f, 21.2f), tint, 1.2f)
+                }
+                WerkzeugkastenAktion.WOERTER -> {
+                    // Kleine Blume über drei Buchstaben-Lücken.
+                    for (i in 0 until 6) {
+                        val w = Math.toRadians(i * 60.0)
+                        drawCircle(tint, 1.9f, Offset(12f + 3.4f * sin(w).toFloat(), 7.4f - 3.4f * cos(w).toFloat()), kontur(1.2f))
+                    }
+                    drawCircle(tint, 1.4f, Offset(12f, 7.4f))
+                    linie(Offset(3.5f, 19.5f), Offset(7.5f, 19.5f), tint, 1.7f)
+                    linie(Offset(10f, 19.5f), Offset(14f, 19.5f), tint, 1.7f)
+                    linie(Offset(16.5f, 19.5f), Offset(20.5f, 19.5f), tint, 1.7f)
                 }
             }
         }
