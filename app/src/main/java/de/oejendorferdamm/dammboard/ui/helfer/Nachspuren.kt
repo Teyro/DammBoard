@@ -254,6 +254,8 @@ internal fun NachspurenHelfer(onVerschieben: (Offset) -> Unit, onSchliessen: () 
                     val bildSpuren = spuren.map { it.map(zuBild) }
                     val gesamt = bildSpuren.sumOf { it.size }
                     var bisher = 0
+                    // Startpunkte, die (fast) aufeinanderliegen, nebeneinander rücken (z. B. A oben, g rechts)
+                    val marken = startMarken(bildSpuren.map { it.first() }, einheit * 0.3f)
                     bildSpuren.forEachIndexed { nr, spur ->
                         // gepunktete Vorlage
                         zeichneSpur(spur, Hilfslinie, einheit * 0.11f, PathEffect.dashPathEffect(floatArrayOf(1f, einheit * 0.2f)))
@@ -265,7 +267,7 @@ internal fun NachspurenHelfer(onVerschieben: (Offset) -> Unit, onSchliessen: () 
                         }
                         bisher += spur.size
                         // Startpunkt mit Nummer und Richtungspfeil
-                        val start = spur.first()
+                        val start = marken[nr]
                         drawCircle(StartGruen, einheit * 0.13f, start)
                         drawContext.canvas.nativeCanvas.drawText(
                             "${nr + 1}", start.x, start.y + einheit * 0.075f,
@@ -329,6 +331,21 @@ private fun DrawScope.pfeil(spur: List<Offset>, farbe: Color, einheit: Float) {
         close()
     }
     drawPath(pfad, farbe)
+}
+
+/** Position der Startnummern: liegt ein Start dicht an einem früheren, wird er seitlich versetzt. */
+private fun startMarken(starts: List<Offset>, abstand: Float): List<Offset> {
+    val marken = mutableListOf<Offset>()
+    for (st in starts) {
+        var p = st
+        var versuch = 1
+        while (marken.any { (it - p).getDistance() < abstand } && versuch < 6) {
+            p = st + Offset(if (versuch % 2 == 1) abstand * ((versuch + 1) / 2) else -abstand * (versuch / 2), 0f)
+            versuch++
+        }
+        marken += p
+    }
+    return marken
 }
 
 private class Masse { var einheit = 0f; var oben = 0f; var links = 0f }

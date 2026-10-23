@@ -45,6 +45,9 @@ import kotlin.random.Random
 
 private const val BLAETTER = 8
 
+/** Reihenfolge, in der Blätter abfallen – abwechselnd ringsum, damit die Blume rund bleibt. */
+private val WEGFALL_REIHENFOLGE = listOf(0, 4, 2, 6, 1, 5, 3, 7)
+
 /** Einfache Nomen (ohne ß), wie sie in der Grundschule früh vorkommen. */
 private val WORTLISTE = listOf(
     "APFEL", "BALL", "BAUM", "BLUME", "BROT", "BUCH", "FISCH", "HAUS", "HUND", "KATZE", "MAUS", "MOND", "SONNE",
@@ -184,7 +187,7 @@ private fun Blume(blaetter: Int, welk: Boolean, modifier: Modifier) {
                 val winkel = i * 360f / BLAETTER
                 rotate(winkel, kopf) {
                     val oben = Offset(kopf.x - w * 0.09f, kopf.y - w * 0.33f)
-                    if (i < blaetter) {
+                    if (WEGFALL_REIHENFOLGE.indexOf(i) >= BLAETTER - blaetter) {
                         drawOval(BlattFarbe, oben, Size(w * 0.18f, w * 0.26f))
                         drawOval(BlattRand, oben, Size(w * 0.18f, w * 0.26f), style = androidx.compose.ui.graphics.drawscope.Stroke(w * 0.012f))
                     }
