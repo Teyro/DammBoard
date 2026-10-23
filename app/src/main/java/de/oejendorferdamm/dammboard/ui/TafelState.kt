@@ -35,7 +35,7 @@ fun naechsteId(): Long = idZaehler.incrementAndGet()
 enum class AufnahmeZweck { SPEICHERN, TEILEN, ISERV }
 
 /** Kleine Helfer, die über der Tafel schweben (siehe ui/helfer). */
-enum class HelferArt { TIMER, WUERFEL, ZUFALLSNAME, GRUPPEN, LAUTSTAERKE, LERNUHR }
+enum class HelferArt { TIMER, WUERFEL, ZUFALLSNAME, GRUPPEN, LAUTSTAERKE, LERNUHR, NACHSPUREN, WOERTER }
 
 /**
  * Die Tafel ist mit einer Datei im Sync-Ordner verbunden: Änderungen werden dorthin zurückgeschrieben,

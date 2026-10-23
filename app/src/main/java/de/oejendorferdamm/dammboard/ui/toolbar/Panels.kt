@@ -88,6 +88,8 @@ enum class ExtraAktion(val titel: String, val symbol: WerkzeugkastenAktion) {
     GRUPPEN("Gruppen", WerkzeugkastenAktion.GRUPPEN),
     LAUTSTAERKE("Lautstärke", WerkzeugkastenAktion.LAUTSTAERKE),
     LERNUHR("Lernuhr", WerkzeugkastenAktion.LERNUHR),
+    NACHSPUREN("Nachspuren", WerkzeugkastenAktion.NACHSPUREN),
+    WOERTER("Wörter raten", WerkzeugkastenAktion.WOERTER),
     TAFELN("Tafeln teilen", WerkzeugkastenAktion.TAFELN)
 }
 
@@ -809,5 +811,7 @@ internal fun helferFuer(aktion: ExtraAktion): HelferArt? = when (aktion) {
     ExtraAktion.GRUPPEN -> HelferArt.GRUPPEN
     ExtraAktion.LAUTSTAERKE -> HelferArt.LAUTSTAERKE
     ExtraAktion.LERNUHR -> HelferArt.LERNUHR
+    ExtraAktion.NACHSPUREN -> HelferArt.NACHSPUREN
+    ExtraAktion.WOERTER -> HelferArt.WOERTER
     else -> null
 }
