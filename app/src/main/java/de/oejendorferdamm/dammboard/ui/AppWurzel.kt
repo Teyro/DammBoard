@@ -38,6 +38,7 @@ import kotlinx.coroutines.sync.withLock
 import de.oejendorferdamm.dammboard.model.abbild
 import de.oejendorferdamm.dammboard.ui.filemanager.DateiModus
 import de.oejendorferdamm.dammboard.ui.filemanager.bitmapZuPng
+import de.oejendorferdamm.dammboard.model.SchulOrdner
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -46,7 +47,7 @@ private sealed interface Bildschirm {
     data object Brett : Bildschirm
     data object Einstellungen : Bildschirm
     data object Tafeln : Bildschirm
-    data class Dateimanager(val modus: DateiModus) : Bildschirm
+    data class Dateimanager(val modus: DateiModus, val schulOrdner: Boolean = false) : Bildschirm
 }
 
 /** Wie lange nach dem App-Start die automatische Update-Prüfung im Hintergrund läuft. */
@@ -82,7 +83,8 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
     val syncOrdner = syncOrdnerText?.let { android.net.Uri.parse(it) }
     // Für Abläufe, die länger leben als ein Bildaufbau (Sicherung, Abgleich): immer den aktuellen Ordner lesen
     val ordnerAktuell = rememberUpdatedState(syncOrdner)
-    val ueberraschungen by speicher.ueberraschungen.collectAsState(initial = true)
+    val ueberraschungen by speicher.ueberraschungen.collectAsState(initial = false)
+    val schulPasswort by speicher.schulPasswort.collectAsState(initial = "")
 
     val tafelState = rememberTafelState()
     var bildschirm by remember { mutableStateOf<Bildschirm>(Bildschirm.Brett) }
@@ -92,6 +94,7 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
     BackHandler(enabled = bildschirm != Bildschirm.Brett) { bildschirm = Bildschirm.Brett }
 
     LaunchedEffect(formErkennung) { tafelState.formErkennung = formErkennung }
+    LaunchedEffect(ueberraschungen) { tafelState.ueberraschungenAn = ueberraschungen }
 
     // ---------------------------------------------------------------- Tafeln im gemeinsamen Ordner
     var syncMeldung by remember { mutableStateOf<String?>(null) }
@@ -392,9 +395,10 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
             onTafeln = { bildschirm = Bildschirm.Tafeln },
             ueberraschungen = ueberraschungen,
             videoOrdner = syncOrdner,
-            onIServOeffnen = {
+            onIServOeffnen = { schulOrdner ->
                 bildschirm = Bildschirm.Dateimanager(
-                    DateiModus.Oeffnen { name, bytes ->
+                    schulOrdner = schulOrdner,
+                    modus = DateiModus.Oeffnen { name, bytes ->
                         try {
                             val namen = Arbeitsblaetter.importiere(context.applicationContext, name) { bytes.inputStream() }
                             tafelState.arbeitsblaetterEinfuegen(namen)
@@ -457,8 +461,10 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
         }
         is Bildschirm.Dateimanager -> VorbildRaster(faktor = symbolGroesse.skalierung * MENUE_FAKTOR) {
             DateiManagerScreen(
-                zugang = iservZugang,
+                zugang = if (aktuell.schulOrdner) SchulOrdner.zugang(schulPasswort) else iservZugang,
                 modus = aktuell.modus,
+                schulOrdner = aktuell.schulOrdner,
+                onSchulPasswort = { neu -> scope.launch { speicher.speichereSchulPasswort(neu) } },
                 onFertig = { bildschirm = Bildschirm.Brett }
             )
         }

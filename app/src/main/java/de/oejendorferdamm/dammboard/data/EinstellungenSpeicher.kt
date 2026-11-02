@@ -42,7 +42,9 @@ private object Schluessel {
     val TAFEL_SICHERN = booleanPreferencesKey("tafel_sichern")
     val FORM_ERKENNUNG = booleanPreferencesKey("form_erkennung")
     val SYNC_ORDNER = stringPreferencesKey("sync_ordner")
-    val UEBERRASCHUNGEN = booleanPreferencesKey("ueberraschungen")
+    // Neuer Name: mit 0.9.6 sind alle Easter Eggs aus, auch wo der alte Schalter „ueberraschungen“ an war.
+    val UEBERRASCHUNGEN = booleanPreferencesKey("eastereggs_096")
+    val SCHUL_PASSWORT = stringPreferencesKey("schulordner_passwort")
 }
 
 /**
@@ -195,8 +197,17 @@ class EinstellungenSpeicher(private val context: Context) {
         context.einstellungenDataStore.edit { prefs -> if (uri == null) prefs.remove(Schluessel.SYNC_ORDNER) else prefs[Schluessel.SYNC_ORDNER] = uri }
     }
 
-    /** Ab und zu schaut ein Emoji herein – antippen = Emoji-Party (standardmäßig an). */
-    val ueberraschungen: Flow<Boolean> = context.einstellungenDataStore.data.map { prefs -> prefs[Schluessel.UEBERRASCHUNGEN] ?: true }
+    /** Easter Eggs (Emoji-Überraschung, Würfel- und Stift-Überraschung) – standardmäßig aus. */
+    val ueberraschungen: Flow<Boolean> = context.einstellungenDataStore.data.map { prefs -> prefs[Schluessel.UEBERRASCHUNGEN] ?: false }
+
+    /** Passwort des Schul-Ordners (siehe SchulOrdner), verschlüsselt wie das IServ-Passwort. */
+    val schulPasswort: Flow<String> = context.einstellungenDataStore.data.map { it[Schluessel.SCHUL_PASSWORT] ?: "" }
+        .distinctUntilChanged().map { Tresor.entschluesseln(it) }.flowOn(Dispatchers.Default)
+
+    suspend fun speichereSchulPasswort(passwort: String) {
+        val verschluesselt = withContext(Dispatchers.Default) { Tresor.verschluesseln(passwort) }
+        context.einstellungenDataStore.edit { it[Schluessel.SCHUL_PASSWORT] = verschluesselt }
+    }
 
     suspend fun speichereUeberraschungen(aktiv: Boolean) {
         context.einstellungenDataStore.edit { prefs -> prefs[Schluessel.UEBERRASCHUNGEN] = aktiv }

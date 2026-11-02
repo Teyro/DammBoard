@@ -393,7 +393,23 @@ private fun UpdateAbschnitt(
                 Text("Du hast bereits die neueste Version.", color = TextfarbeSchwach, fontSize = 11.sp)
             }
         }
+        Spacer(Modifier.height(8.dp))
+        androidx.compose.material3.OutlinedButton(onClick = { oeffneFDroidRepo(context) }, modifier = Modifier.fillMaxWidth()) {
+            Text("Damm-Apps in F-Droid hinzufügen", fontSize = 12.sp)
+        }
     }
+}
+
+/** Öffnet F-Droid mit der Frage „Paketquelle hinzufügen?“ – ohne F-Droid die Seite mit Anleitung und QR-Code. */
+private fun oeffneFDroidRepo(context: android.content.Context) {
+    val repo = "teyro.github.io/damm-fdroid/repo?fingerprint=db7f158b6eb2c7eb17e79aa4a9ae0e9487c3c2228fe7de60b37a1979408c0604"
+    for (adresse in listOf("fdroidrepos://$repo", "https://teyro.github.io/damm-fdroid/")) {
+        try {
+            context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(adresse)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+            return
+        } catch (_: android.content.ActivityNotFoundException) {}
+    }
+    android.widget.Toast.makeText(context, "Weder F-Droid noch ein Browser ist installiert", android.widget.Toast.LENGTH_LONG).show()
 }
 
 @Composable
@@ -476,9 +492,9 @@ private fun ErweiterteEinstellungen(
 
     Spacer(Modifier.height(14.dp))
     SchalterZeile(
-        "Emoji-Überraschung",
-        "Ab und zu schaut ein Emoji vom Rand herein (nur, wenn eine Weile niemand malt). Wer es antippt, " +
-            "löst 10 Sekunden Emoji-Party aus – danach ist die Tafel genau wie vorher.",
+        "Überraschungen (Easter Eggs)",
+        "Standardmäßig aus. An: ab und zu schaut ein Emoji vom Rand herein (nur, wenn eine Weile niemand malt) – wer es antippt, " +
+            "löst 10 Sekunden Emoji-Party aus. Außerdem gibt es versteckte Überraschungen beim Würfel und beim Stift.",
         ueberraschungen, onUeberraschungenGeaendert
     )
     androidx.compose.material3.OutlinedButton(onClick = onUeberraschungZeigen, modifier = Modifier.padding(top = 4.dp)) {

@@ -75,7 +75,13 @@ private fun istArbeitsblatt(name: String): Boolean =
 
 /** Einfacher Dateimanager für den IServ-WebDAV-Speicher: durch Ordner blättern, schnell oder gezielt speichern bzw. öffnen. */
 @Composable
-fun DateiManagerScreen(zugang: IServZugang, modus: DateiModus, onFertig: () -> Unit) {
+fun DateiManagerScreen(
+    zugang: IServZugang,
+    modus: DateiModus,
+    onFertig: () -> Unit,
+    schulOrdner: Boolean = false,
+    onSchulPasswort: (String) -> Unit = {}
+) {
     val speichern = modus as? DateiModus.Speichern
     val oeffnen = modus as? DateiModus.Oeffnen
     val scope = rememberCoroutineScope()
@@ -87,6 +93,7 @@ fun DateiManagerScreen(zugang: IServZugang, modus: DateiModus, onFertig: () -> U
     var hochladend by remember { mutableStateOf(false) }
     var fehler by remember { mutableStateOf<String?>(null) }
     var erfolg by remember { mutableStateOf<String?>(null) }
+    var passwortFalsch by remember { mutableStateOf(false) }
 
     fun ladeOrdner(neuerPfad: String) {
         ladend = true
@@ -98,6 +105,7 @@ fun DateiManagerScreen(zugang: IServZugang, modus: DateiModus, onFertig: () -> U
                 eintraege = it
                 pfad = neuerPfad
             }.onFailure {
+                if (schulOrdner && it.message?.contains("401") == true) passwortFalsch = true
                 fehler = "Ordner konnte nicht geladen werden: ${it.message}"
             }
         }
@@ -142,6 +150,8 @@ fun DateiManagerScreen(zugang: IServZugang, modus: DateiModus, onFertig: () -> U
     }
 
     LaunchedEffect(zugang) {
+        passwortFalsch = false
+        if (schulOrdner && !zugang.istEingerichtet) return@LaunchedEffect
         if (zugang.istEingerichtet) ladeOrdner("") else fehler = "Bitte zuerst IServ-Zugang in den Einstellungen hinterlegen."
     }
 
@@ -158,7 +168,7 @@ fun DateiManagerScreen(zugang: IServZugang, modus: DateiModus, onFertig: () -> U
                 .padding(20.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                Text(if (oeffnen != null) "Arbeitsblatt aus IServ öffnen" else "In IServ speichern", color = Textfarbe, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(if (schulOrdner) "Vorlagen der Schule" else if (oeffnen != null) "Arbeitsblatt aus IServ öffnen" else "In IServ speichern", color = Textfarbe, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 Box(
                     modifier = Modifier.size(34.dp).clip(CircleShape).background(Color.White).clickable(onClick = onFertig),
                     contentAlignment = Alignment.Center
@@ -167,6 +177,11 @@ fun DateiManagerScreen(zugang: IServZugang, modus: DateiModus, onFertig: () -> U
                 }
             }
 
+            if (schulOrdner && (!zugang.istEingerichtet || passwortFalsch)) {
+                Spacer(Modifier.height(12.dp))
+                SchulPasswortFeld(falsch = passwortFalsch, onPasswort = onSchulPasswort)
+                return@Column
+            }
             if (!zugang.istEingerichtet) {
                 Spacer(Modifier.height(16.dp))
                 Text("Kein IServ-Zugang hinterlegt. Bitte in den Einstellungen (☰) URL, Benutzername und Passwort eintragen.", color = Fehlerfarbe, fontSize = 13.sp)
@@ -251,6 +266,33 @@ fun DateiManagerScreen(zugang: IServZugang, modus: DateiModus, onFertig: () -> U
             }
         }
     }
+}
+
+/** Passwort des Schul-Ordners – nur einmal pro Board nötig (steht absichtlich nicht im öffentlichen Code). */
+@Composable
+private fun SchulPasswortFeld(falsch: Boolean, onPasswort: (String) -> Unit) {
+    var eingabe by remember { mutableStateOf("") }
+    Text(
+        if (falsch) "Das Passwort stimmt nicht (oder wurde geändert). Bitte neu eingeben."
+        else "Einmal das Passwort des Schul-Ordners eingeben – danach merkt sich dieses Board es.",
+        color = if (falsch) Fehlerfarbe else Textfarbe, fontSize = 13.sp
+    )
+    Spacer(Modifier.height(8.dp))
+    androidx.compose.material3.OutlinedTextField(
+        value = eingabe,
+        onValueChange = { eingabe = it },
+        label = { Text("Passwort") },
+        singleLine = true,
+        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+        modifier = Modifier.fillMaxWidth()
+    )
+    Spacer(Modifier.height(8.dp))
+    Button(
+        onClick = { onPasswort(eingabe) },
+        enabled = eingabe.isNotBlank(),
+        colors = ButtonDefaults.buttonColors(containerColor = Akzent),
+        modifier = Modifier.fillMaxWidth()
+    ) { Text("Weiter") }
 }
 
 @Composable

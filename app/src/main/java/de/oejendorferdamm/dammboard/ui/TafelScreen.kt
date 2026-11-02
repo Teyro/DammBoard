@@ -86,7 +86,8 @@ fun TafelScreen(
     onIServAnfrage: (Bitmap) -> Unit,
     tafelWirdGesichert: Boolean,
     onIServPdf: (File) -> Unit,
-    onIServOeffnen: () -> Unit,
+    /** true = aus dem Schul-Ordner (Vorlagen), false = aus IServ. */
+    onIServOeffnen: (Boolean) -> Unit,
     onTafeln: () -> Unit = {},
     ueberraschungen: Boolean = false,
     /** Tafeln-Ordner: dort kann „ueberraschung.mp4“ liegen (Easter Egg, siehe KritzelVideo). */
@@ -243,7 +244,7 @@ fun TafelScreen(
                         // Erst kurz abwarten, ob noch weitere Tipper kommen (fünfmal schnell = Easter Egg)
                         wuerfelWarten?.cancel()
                         wuerfelTipps++
-                        if (wuerfelTipps >= 5) {
+                        if (wuerfelTipps >= 5 && ueberraschungen) {
                             wuerfelTipps = 0
                             state.schliessePanel()
                             zeigeKritzelVideo = true
@@ -281,7 +282,11 @@ fun TafelScreen(
                             },
                             "Aus IServ" to {
                                 zeigeBlattQuelle = false
-                                onIServOeffnen()
+                                onIServOeffnen(false)
+                            },
+                            "Vorlagen der Schule" to {
+                                zeigeBlattQuelle = false
+                                onIServOeffnen(true)
                             }
                         ),
                         onSchliessen = { zeigeBlattQuelle = false }

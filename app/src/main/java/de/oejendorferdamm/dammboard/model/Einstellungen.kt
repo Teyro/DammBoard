@@ -32,3 +32,16 @@ data class IServEintrag(
     val pfad: String,
     val istOrdner: Boolean
 )
+
+/**
+ * Schul-Ordner mit Vorlagen (Schuldock-Freigabe, Unterordner „DammBoard“). Das Passwort steht
+ * bewusst nicht im öffentlichen Code – es wird auf jedem Board einmal eingegeben.
+ */
+object SchulOrdner {
+    const val LINK = "https://cloudfiles.s5586.schuldock.de/s/mxmLySXtyzC6XFp"
+    fun zugang(passwort: String) = IServZugang(
+        serverUrl = "https://cloudfiles.s5586.schuldock.de/public.php/webdav/DammBoard",
+        benutzername = LINK.substringAfterLast('/'),
+        passwort = passwort
+    )
+}

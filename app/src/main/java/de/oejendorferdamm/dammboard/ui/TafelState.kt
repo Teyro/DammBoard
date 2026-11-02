@@ -255,7 +255,11 @@ class TafelState(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)
     /** Kleines Easter Egg für aufmerksame Kolleg:innen: 5x schnell hintereinander auf den
      *  Stift getippt legt eine neue Seite mit dem Namens-Wortspiel an. Ganz normale Seite
      *  danach – über den Papierkorb oder Rückgängig genauso wieder loszuwerden wie alles andere. */
+    /** Easter Eggs erlaubt? (Einstellungen → Erweitert, standardmäßig aus) */
+    var ueberraschungenAn by mutableStateOf(false)
+
     fun loeseStiftEasterEggAus() {
+        if (!ueberraschungenAn) return
         neueSeite()
         seite.hinzufuegen(LaengenEtikett(naechsteId(), Offset(420f, 340f), "DammBoard"))
         seite.hinzufuegen(LaengenEtikett(naechsteId(), Offset(380f, 420f), "😭 💀 😔 😢 😞"))
