@@ -75,6 +75,9 @@ object Arbeitsblaetter {
         }
     }
 
+    /** Ein Bild (z. B. von der Dokumentenkamera) als JPEG ablegen – Dateiname für ein BildItem. */
+    fun speichereBild(context: Context, bitmap: Bitmap): String = speichere(context, bitmap)
+
     private fun speichere(context: Context, bitmap: Bitmap): String {
         val name = "blatt_${UUID.randomUUID()}.jpg"
         FileOutputStream(File(ordner(context), name)).use { bitmap.compress(Bitmap.CompressFormat.JPEG, 88, it) }

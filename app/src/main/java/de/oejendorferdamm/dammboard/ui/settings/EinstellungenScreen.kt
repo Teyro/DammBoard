@@ -121,20 +121,18 @@ fun EinstellungenScreen(
                 .heightIn(max = 800.dp)
                 .clip(RoundedCornerShape(18.dp))
                 .background(Hintergrundfarbe)
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+            // Kopfzeile mit dem Schließen-Knopf bleibt stehen – gescrollt wird nur der Inhalt darunter
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 18.dp, top = 18.dp, bottom = 8.dp)) {
                 Text("Einstellungen", color = Textfarbe, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 Box(
-                    modifier = Modifier.size(36.dp).clip(CircleShape).background(Color.White).clickable(onClick = onZurueck),
+                    modifier = Modifier.size(48.dp).clip(CircleShape).background(Color.White).clickable(onClick = onZurueck),
                     contentAlignment = Alignment.Center
                 ) {
                     AllgemeinSymbol(AllgemeinesSymbol.SCHLIESSEN, Modifier.size(16.dp), Textfarbe)
                 }
             }
-
-            Spacer(Modifier.height(18.dp))
+            Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(start = 24.dp, end = 24.dp, bottom = 24.dp, top = 10.dp)) {
             UpdateAbschnitt(
                 aktuelleVersion = aktuelleVersion,
                 info = updateInfo,
@@ -265,6 +263,7 @@ fun EinstellungenScreen(
 
             Spacer(Modifier.height(18.dp))
             Text("DammBoard $aktuelleVersion", color = TextfarbeSchwach, fontSize = 11.sp)
+            }
         }
     }
 }

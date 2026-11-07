@@ -93,6 +93,9 @@ enum class ExtraAktion(val titel: String, val symbol: WerkzeugkastenAktion) {
     TAFELN("Tafeln teilen", WerkzeugkastenAktion.TAFELN)
 }
 
+/** Diese Extras stehen seit 2.0 unter dem Würfel (Spiele) – nicht doppelt in den Extras. */
+internal val IN_DEN_SPIELEN = setOf(ExtraAktion.WUERFEL, ExtraAktion.NACHSPUREN, ExtraAktion.WOERTER)
+
 internal fun hatPanel(werkzeug: Werkzeug): Boolean = werkzeug != Werkzeug.LASSO && werkzeug != Werkzeug.AUSWAHL
 
 @Composable
@@ -575,7 +578,7 @@ private fun WerkzeugkastenPanel(state: TafelState, onIServ: () -> Unit, onExtra:
             Box(Modifier.width(596.dp).height(1.dp).background(PanelLinie))
             Spacer(Modifier.height(10.dp))
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                ExtraAktion.entries.chunked(5).forEach { zeile ->
+                ExtraAktion.entries.filter { it !in IN_DEN_SPIELEN }.chunked(5).forEach { zeile ->
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         zeile.forEach { aktion ->
                             val offen = when (aktion) {

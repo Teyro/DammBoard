@@ -287,6 +287,13 @@ def neue_funktionen(breite, hoehe):
 
     # Extras: Helfer öffnen
     def extra(name, warten=1.0):
+        # seit 2.0 unter dem Würfel (Spiele) statt in den Extras
+        if name in ("Würfel", "Nachspuren", "Wörter raten"):
+            if tippe_mitte_von("Spiele"):
+                time.sleep(2.2)  # Testversion wartet 1,5 s auf weitere Tipper (Easter Egg)
+                tippe_text(name)
+                time.sleep(warten)
+            return
         if tippe_mitte_von("Werkzeugkasten"):
             time.sleep(0.8)
             tippe_mitte_von("Extras")
@@ -722,7 +729,7 @@ def kritzel_video():
     ziel = None
     if baum is not None:
         for k in baum.iter("node"):
-            if k.get("content-desc") == "Tafelspiel":
+            if k.get("content-desc") == "Spiele":
                 x1, y1, x2, y2 = [int(z) for z in k.get("bounds").replace("][", ",").strip("[]").split(",")]
                 ziel = ((x1 + x2) // 2, (y1 + y2) // 2)
     if ziel is None:
@@ -743,6 +750,47 @@ def kritzel_video():
     screenshot("43_video_wandert.png")
     time.sleep(6)
     screenshot("44_wieder_tafel.png")
+
+
+def dokumentenkamera(breite, hoehe):
+    """2.0: Kamera-Knopf unten links → Vollbild-Vorschau, Aufnahme, auf die Tafel, Bild größer ziehen, darauf schreiben."""
+    adb("shell", "pm", "grant", PAKET, "android.permission.CAMERA", check=False)
+    tippe_mitte_von("Seite hinzufügen")
+    time.sleep(0.8)
+    if not tippe_mitte_von("Dokumentenkamera"):
+        return
+    time.sleep(3)
+    screenshot("50_kamera.png")
+    tippe_text("Drehen")
+    time.sleep(1)
+    screenshot("50b_kamera_gedreht.png")
+    tippe_text("Drehen"); tippe_text("Drehen"); tippe_text("Drehen")
+    time.sleep(1)
+    tippe_text("Aufnahme")
+    time.sleep(1)
+    screenshot("51_aufnahme.png")
+    tippe_text("Auf die Tafel")
+    time.sleep(2)
+    screenshot("52_bild_auf_tafel.png")
+    # Anfasser rechts unten: Bild liegt mittig auf 72 % der Fläche (16:9 → volle 72 % Breite)
+    b, h = bildschirm_groesse()
+    bw, bh = b * 0.72, h * 0.72
+    if bw / bh > 16 / 9:
+        bw = bh * 16 / 9
+    else:
+        bh = bw * 9 / 16
+    x0, y0 = (b - bw) / 2, (h - bh) / 2 - h * 0.04
+    ex, ey = int(x0 + bw + 6), int(y0 + bh + 6)
+    adb("shell", "input", "swipe", str(ex), str(ey), str(int(ex - b * 0.15)), str(int(ey - h * 0.15)), "700")
+    time.sleep(1)
+    screenshot("53_bild_kleiner.png")
+    if tippe_mitte_von("Stift"):
+        time.sleep(0.6)
+        tippe_mitte_von("Stift")
+        time.sleep(0.4)
+        adb("shell", "input", "swipe", str(int(b * 0.35)), str(int(h * 0.4)), str(int(b * 0.55)), str(int(h * 0.45)), "400")
+        time.sleep(0.8)
+    screenshot("54_auf_bild_geschrieben.png")
 
 
 def main():
@@ -858,8 +906,11 @@ def main():
         tippe_mitte_von("Vorherige Seite")
         time.sleep(0.8)
 
-    # Tafelspiel: Fußballfeld öffnen, Ball Richtung rechtes Tor werfen, Punkt von Hand
-    if tippe_mitte_von("Tafelspiel"):
+    # 2.0: Würfel öffnet die Spiele; Tafelfußball: Ball Richtung rechtes Tor werfen, Punkt von Hand
+    if tippe_mitte_von("Spiele"):
+        time.sleep(2.2)
+        screenshot("11_spiele_menue.png")
+        tippe_text("Tafelfußball")
         time.sleep(1.5)
         screenshot("11a_spiel.png")
         mitte_x, mitte_y = int(breite * 0.5), int(hoehe * 0.56)
@@ -873,6 +924,7 @@ def main():
         tippe_mitte_von("Spiel schließen")
         time.sleep(1)
 
+    dokumentenkamera(breite, hoehe)
     neue_funktionen(breite, hoehe)
     if not laeuft_noch():
         print("FEHLER: App ist bei den neuen Funktionen abgestürzt", file=sys.stderr)
@@ -894,6 +946,10 @@ def main():
     if tippe_mitte_von("Menü"):
         time.sleep(1.5)
         screenshot("12_einstellungen.png")
+        # 2.0: Kopfzeile mit X bleibt beim Scrollen stehen
+        adb("shell", "input", "swipe", str(breite // 2), str(int(hoehe * 0.8)), str(breite // 2), str(int(hoehe * 0.2)), "400")
+        time.sleep(0.8)
+        screenshot("12b_einstellungen_gescrollt.png")
         adb("shell", "input", "keyevent", "KEYCODE_BACK")
         time.sleep(1)
         screenshot("13_zurueck_zur_tafel.png")

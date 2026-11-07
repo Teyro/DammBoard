@@ -53,6 +53,7 @@ jobs:
           arch: x86_64
           profile: Nexus 9
           disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back emulated
           script: |
             adb install -r app/build/outputs/apk/debug/app-debug.apk
             if [ -n "${{ inputs.board }}" ]; then adb shell wm size "$(echo '${{ inputs.board }}' | cut -d@ -f1)"; adb shell wm density "$(echo '${{ inputs.board }}' | cut -d@ -f2)"; sleep 3; fi

@@ -308,10 +308,9 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
     LaunchedEffect(Unit) {
         val vorher = speicher.zuletztGestarteteVersion.first()
         if (vorher != BuildConfig.VERSION_NAME) {
-            neuigkeiten = "DammBoard ${BuildConfig.VERSION_NAME} ist installiert – neu: Werkzeugkasten → Extras → „Tafeln teilen“ " +
-                "(Tafeln über einen gemeinsamen Ordner mit anderen Boards abgleichen) und eine kleine Emoji-Überraschung für die Kinder " +
-                "(Menü → Einstellungen, dort auch abschaltbar). " +
-                "(Antippen zum Schließen)"
+            neuigkeiten = "DammBoard ${BuildConfig.VERSION_NAME} ist installiert – neu: Dokumentenkamera (Kamera-Knopf unten links): " +
+                "Bild aufnehmen und als Bild auf die Tafel legen, dort verschieben, größer ziehen und darauf schreiben. " +
+                "Der Würfel öffnet jetzt alle Spiele (Tafelfußball, Wörter raten, Nachspuren, Würfel)."
             speicher.speichereZuletztGestarteteVersion(BuildConfig.VERSION_NAME)
         }
     }

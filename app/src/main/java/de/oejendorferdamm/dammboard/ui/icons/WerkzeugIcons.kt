@@ -291,7 +291,7 @@ private fun Raster.koffer(tint: Color) {
 // ---------------------------------------------------------------------------------------------
 
 enum class AllgemeinesSymbol {
-    SCHLIESSEN, MENUE, TEILEN, PAPIERKORB, RUECKGAENGIG, WIEDERHOLEN, PLUS, PFEIL_LINKS, PFEIL_RECHTS, WUERFEL
+    SCHLIESSEN, MENUE, TEILEN, PAPIERKORB, RUECKGAENGIG, WIEDERHOLEN, PLUS, PFEIL_LINKS, PFEIL_RECHTS, WUERFEL, KAMERA
 }
 
 @Composable
@@ -349,6 +349,19 @@ fun AllgemeinSymbol(symbol: AllgemeinesSymbol, modifier: Modifier = Modifier, ti
                     for ((x, y) in listOf(8f to 8f, 16f to 8f, 12f to 12f, 8f to 16f, 16f to 16f)) {
                         drawCircle(tint, radius = 1.6f, center = Offset(x, y))
                     }
+                }
+                AllgemeinesSymbol.KAMERA -> {
+                    // Kamera: Gehäuse mit Sucher-Buckel und Objektiv
+                    drawPath(
+                        Path().apply {
+                            moveTo(4.6f, 7.4f); lineTo(8.4f, 7.4f); lineTo(10f, 4.8f); lineTo(14f, 4.8f); lineTo(15.6f, 7.4f)
+                            lineTo(19.4f, 7.4f); quadraticTo(21f, 7.4f, 21f, 9f); lineTo(21f, 17.6f); quadraticTo(21f, 19.2f, 19.4f, 19.2f)
+                            lineTo(4.6f, 19.2f); quadraticTo(3f, 19.2f, 3f, 17.6f); lineTo(3f, 9f); quadraticTo(3f, 7.4f, 4.6f, 7.4f); close()
+                        },
+                        tint, style = kontur(1.8f)
+                    )
+                    drawCircle(tint, radius = 3.6f, center = Offset(12f, 13.2f), style = kontur(1.8f))
+                    drawCircle(tint, radius = 1.1f, center = Offset(17.6f, 10f))
                 }
                 AllgemeinesSymbol.PFEIL_RECHTS -> drawPath(
                     Path().apply { moveTo(9f, 4.6f); lineTo(16.4f, 12f); lineTo(9f, 19.4f) },

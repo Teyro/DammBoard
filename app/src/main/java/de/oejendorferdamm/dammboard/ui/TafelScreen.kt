@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -62,7 +64,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** Wie lange der Hinweis "neue Version installiert" höchstens stehen bleibt. */
-private const val NEUIGKEITEN_ANZEIGE_MS = 12_000L
+private const val NEUIGKEITEN_ANZEIGE_MS = 10_000L
 
 /**
  * Bildschirm der Tafel: Zeichenfläche plus komplette Bedienung darüber. Die Zeichenfläche
@@ -98,6 +100,8 @@ fun TafelScreen(
     val scope = rememberCoroutineScope()
     var zeigeBeendenAbfrage by remember { mutableStateOf(false) }
     var zeigeSpiel by remember { mutableStateOf(false) }
+    var zeigeSpieleMenue by remember { mutableStateOf(false) }
+    var zeigeKamera by remember { mutableStateOf(false) }
     // Easter Egg: fünfmal schnell auf den Würfel → Kritzel-Kästchen mit Video
     var zeigeKritzelVideo by remember { mutableStateOf(false) }
     var wuerfelTipps by remember { mutableStateOf(0) }
@@ -121,6 +125,8 @@ fun TafelScreen(
             state.offeneHelfer.isNotEmpty() -> state.offeneHelfer.removeAt(state.offeneHelfer.lastIndex)
             zeigeKritzelVideo -> zeigeKritzelVideo = false
             zeigeSpiel -> zeigeSpiel = false
+            zeigeKamera -> zeigeKamera = false
+            zeigeSpieleMenue -> zeigeSpieleMenue = false
             state.offenesPanel != null -> state.schliessePanel()
             state.lupeAktiv -> state.lupeAktiv = false
             else -> zeigeBeendenAbfrage = true
@@ -255,11 +261,12 @@ fun TafelScreen(
                                 wuerfelTipps = 0
                                 if (!zeigeKritzelVideo) {
                                     state.schliessePanel()
-                                    zeigeSpiel = true
+                                    zeigeSpieleMenue = !zeigeSpieleMenue
                                 }
                             }
                         }
                     },
+                    onKamera = { state.schliessePanel(); zeigeSpieleMenue = false; zeigeKamera = true },
                     onIServ = { state.aufnahmeAnfrage = AufnahmeZweck.ISERV },
                     onExtra = ::extra
                 )
@@ -327,6 +334,29 @@ fun TafelScreen(
 
                 // Tafelspiel liegt über allem und fängt alle Berührungen ab; die Tafel darunter
                 // bleibt unverändert erhalten.
+                if (zeigeSpieleMenue) {
+                    de.oejendorferdamm.dammboard.ui.spiel.SpieleMenue(
+                        onWahl = { spiel ->
+                            zeigeSpieleMenue = false
+                            when (spiel) {
+                                de.oejendorferdamm.dammboard.ui.spiel.Spiel.FUSSBALL -> zeigeSpiel = true
+                                de.oejendorferdamm.dammboard.ui.spiel.Spiel.WOERTER -> extra(ExtraAktion.WOERTER)
+                                de.oejendorferdamm.dammboard.ui.spiel.Spiel.NACHSPUREN -> extra(ExtraAktion.NACHSPUREN)
+                                de.oejendorferdamm.dammboard.ui.spiel.Spiel.WUERFEL -> extra(ExtraAktion.WUERFEL)
+                            }
+                        },
+                        onSchliessen = { zeigeSpieleMenue = false }
+                    )
+                }
+                if (zeigeKamera) {
+                    de.oejendorferdamm.dammboard.ui.kamera.DokumentKamera(
+                        onAufDieTafel = { datei, breite, hoehe ->
+                            zeigeKamera = false
+                            state.bildEinfuegen(datei, breite, hoehe)
+                        },
+                        onSchliessen = { zeigeKamera = false }
+                    )
+                }
                 if (zeigeSpiel) {
                     TafelFussball(onSchliessen = { zeigeSpiel = false })
                 }
@@ -444,22 +474,37 @@ private fun DialogKnopf(text: String, hervorgehoben: Boolean, onClick: () -> Uni
 @Composable
 private fun NeuigkeitenHinweis(text: String, onSchliessen: () -> Unit, modifier: Modifier = Modifier) {
     val aktuellesSchliessen by rememberUpdatedState(onSchliessen)
+    // Nach 10 Sekunden blendet sich der Hinweis von selbst aus; ein schmaler Balken zeigt, wie lange noch
+    val fortschritt = remember(text) { androidx.compose.animation.core.Animatable(0f) }
+    var sichtbar by remember(text) { mutableStateOf(true) }
     LaunchedEffect(text) {
-        delay(NEUIGKEITEN_ANZEIGE_MS)
+        fortschritt.animateTo(1f, androidx.compose.animation.core.tween(NEUIGKEITEN_ANZEIGE_MS.toInt(), easing = androidx.compose.animation.core.LinearEasing))
+        sichtbar = false
+        delay(450)
         aktuellesSchliessen()
     }
-    Box(
+    androidx.compose.animation.AnimatedVisibility(
+        visible = sichtbar,
+        exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(400)),
         modifier = modifier
-            .statusBarsPadding()
-            .padding(top = 24.dp)
-            .widthIn(max = 1100.dp)
-            .shadow(8.dp, RoundedCornerShape(16.dp))
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color.White)
-            .clickable(role = Role.Button, onClick = onSchliessen)
-            .padding(horizontal = 30.dp, vertical = 18.dp)
     ) {
-        Text(text, color = Color(0xFF2B2B2B), fontSize = 22.sp, lineHeight = 30.sp)
+        Box(
+            modifier = Modifier
+                .statusBarsPadding()
+                .padding(top = 24.dp)
+                .widthIn(max = 1100.dp)
+                .shadow(8.dp, RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color.White)
+                .clickable(role = Role.Button) { sichtbar = false; aktuellesSchliessen() }
+        ) {
+            androidx.compose.foundation.layout.Column {
+                Text(text, color = Color(0xFF2B2B2B), fontSize = 22.sp, lineHeight = 30.sp, modifier = Modifier.padding(horizontal = 30.dp, vertical = 18.dp))
+                Box(Modifier.fillMaxWidth().height(5.dp).background(Color(0xFFE6ECE8))) {
+                    Box(Modifier.fillMaxWidth(fortschritt.value).fillMaxHeight().background(Color(0xFF5E8C6A)))
+                }
+            }
+        }
     }
 }
 

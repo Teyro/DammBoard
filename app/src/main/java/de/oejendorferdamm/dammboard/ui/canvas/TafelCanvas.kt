@@ -24,6 +24,8 @@ import de.oejendorferdamm.dammboard.model.FormModus
 import de.oejendorferdamm.dammboard.model.HintergrundStil
 import de.oejendorferdamm.dammboard.model.SeitenAbbild
 import de.oejendorferdamm.dammboard.model.StempelItem
+import de.oejendorferdamm.dammboard.model.BildItem
+import de.oejendorferdamm.dammboard.model.skaliertAuf
 import de.oejendorferdamm.dammboard.model.StiftArt
 import de.oejendorferdamm.dammboard.model.TEXTMARKER_DECKKRAFT
 import de.oejendorferdamm.dammboard.model.TextItem
@@ -291,6 +293,7 @@ private class EbenenCache {
     var hintergrundHash = 0
     var geteilt = false
     var bildHash = 0
+    var bilderStand = -1
 }
 
 /** Ab so vielen Millisekunden Stillhalten am Strichende wird eine Form erkannt. */
@@ -347,6 +350,16 @@ fun TafelCanvas(
         value = if (bildName == null) null else bildName to Arbeitsblaetter.lade(context, bildName)
     }
     val blattBild = if (bildName == null) null else geladenesBlatt?.takeIf { it.first == bildName }?.second ?: Arbeitsblaetter.ausCache(bildName)
+    // Bilder auf der Seite (BildItem) im Hintergrund laden; jedes fertig geladene Bild zeichnet die Ebene neu.
+    var bilderStand by remember { mutableIntStateOf(0) }
+    LaunchedEffect(seite) {
+        androidx.compose.runtime.snapshotFlow { seite.items.filterIsInstance<BildItem>().map { it.datei }.toSet() }
+            .collect { namen ->
+                for (n in namen) if (Arbeitsblaetter.ausCache(n) == null && Arbeitsblaetter.lade(context, n) != null) bilderStand++
+            }
+    }
+    // Bild an der Ecke größer/kleiner ziehen (Auswahl-Werkzeug, genau ein Bild ausgewählt)
+    var bildSkalierung by remember { mutableStateOf<Pair<BildItem, BildItem>?>(null) }
     var formVorschau by remember { mutableStateOf<Pair<Offset, Offset>?>(null) }
     var zirkelVorschau by remember { mutableStateOf<Pair<Offset, Float>?>(null) }
 
@@ -536,7 +549,13 @@ fun TafelCanvas(
                     },
                     onDrag = { change, _ ->
                         change.consume()
-                        if (auswahlModusVerschieben) {
+                        val skal = bildSkalierung
+                        if (skal != null) {
+                            // Breite folgt dem Finger (Seitenverhältnis bleibt), linke obere Ecke bleibt stehen
+                            val neu = skal.first.skaliertAuf(change.position.x - skal.first.position.x)
+                            seite.ersetzeLive(neu)
+                            bildSkalierung = skal.first to neu
+                        } else if (auswahlModusVerschieben) {
                             val letzter = auswahlLetzterPunkt ?: change.position
                             val schritt = change.position - letzter
                             seite.verschiebeAusgewaehlte(schritt)
@@ -593,7 +612,16 @@ fun TafelCanvas(
                 )
 
                 Werkzeug.AUSWAHL -> detectDragGestures(
-                    onDragStart = { start ->
+                    onDragStart = auswahlStart@{ start ->
+                        val einzeln = seite.ausgewaehlteIds.singleOrNull()?.let { id -> seite.items.firstOrNull { it.id == id } } as? BildItem
+                        if (einzeln != null) {
+                            val ecke = Offset(einzeln.position.x + einzeln.breite + 10f * pf(), einzeln.position.y + einzeln.hoehe + 10f * pf())
+                            if ((start - ecke).getDistance() <= BILD_ANFASSER * 2.2f * pf()) {
+                                bildSkalierung = einzeln to einzeln
+                                state.auswahlGesteLaeuft = true
+                                return@auswahlStart
+                            }
+                        }
                         val grenzen = seite.auswahlGrenzen()
                         auswahlModusVerschieben = grenzen != null &&
                             start.x in grenzen.first.x..grenzen.second.x && start.y in grenzen.first.y..grenzen.second.y
@@ -605,7 +633,13 @@ fun TafelCanvas(
                     },
                     onDrag = { change, _ ->
                         change.consume()
-                        if (auswahlModusVerschieben) {
+                        val skal = bildSkalierung
+                        if (skal != null) {
+                            // Breite folgt dem Finger (Seitenverhältnis bleibt), linke obere Ecke bleibt stehen
+                            val neu = skal.first.skaliertAuf(change.position.x - skal.first.position.x)
+                            seite.ersetzeLive(neu)
+                            bildSkalierung = skal.first to neu
+                        } else if (auswahlModusVerschieben) {
                             val letzter = auswahlLetzterPunkt ?: change.position
                             val schritt = change.position - letzter
                             seite.verschiebeAusgewaehlte(schritt)
@@ -616,7 +650,11 @@ fun TafelCanvas(
                         }
                     },
                     onDragEnd = {
-                        if (auswahlModusVerschieben) {
+                        val skal = bildSkalierung
+                        if (skal != null) {
+                            seite.protokolliereErsetzt(skal.first, skal.second)
+                            bildSkalierung = null
+                        } else if (auswahlModusVerschieben) {
                             val bewegt = auswahlStartPunkt != null && auswahlLetzterPunkt != null &&
                                 (auswahlLetzterPunkt!! - auswahlStartPunkt!!).getDistance() > 6f * pf()
                             if (!bewegt) {
@@ -643,6 +681,8 @@ fun TafelCanvas(
                         auswahlStartPunkt = null
                     },
                     onDragCancel = {
+                        bildSkalierung?.let { (alt, neu) -> seite.protokolliereErsetzt(alt, neu) }
+                        bildSkalierung = null
                         state.auswahlRechteck = null
                         state.auswahlGesteLaeuft = false
                         auswahlModusVerschieben = false
@@ -824,18 +864,20 @@ fun TafelCanvas(
             val geteilt = seite.geteilteAnsicht.value
             val bild = blattBild
             val bildHash = System.identityHashCode(bild)
+            val bilder = bilderStand
             val p = pixelFaktor
 
             if (ebenenCache.seiteHash != seiteHash || ebenenCache.version != version ||
                 ebenenCache.breite != breitePx || ebenenCache.hoehe != hoehePx ||
                 ebenenCache.hintergrundHash != hintergrundHash || ebenenCache.geteilt != geteilt ||
-                ebenenCache.bildHash != bildHash
+                ebenenCache.bildHash != bildHash || ebenenCache.bilderStand != bilder
             ) {
                 eingebrannteEbene.record {
                     zeichneSeitenInhalt(seite.items, hintergrund, geteilt, bild, pfadCache)
                     pfadCache.durchgangBeenden()
                 }
                 ebenenCache.bildHash = bildHash
+                ebenenCache.bilderStand = bilder
                 ebenenCache.seiteHash = seiteHash
                 ebenenCache.version = version
                 ebenenCache.breite = breitePx
@@ -928,7 +970,25 @@ private fun DrawScope.zeichneSeitenInhalt(
             2f * p, gestricheltEffekt(p), cap = StrokeCap.Butt
         )
     }
-    items.forEach { item -> zeichneItem(item, pfadCache) }
+    // Bilder liegen immer unten – darauf wird geschrieben (auch nach Rückgängig/Wiederholen)
+    items.forEach { item -> if (item is BildItem) zeichneBild(item) }
+    items.forEach { item -> if (item !is BildItem) zeichneItem(item, pfadCache) }
+}
+
+/** Ein Bild auf der Tafel – noch nicht geladen: heller Platzhalter mit Rahmen. */
+private fun DrawScope.zeichneBild(b: BildItem) {
+    val bild = Arbeitsblaetter.ausCache(b.datei)
+    if (bild != null) {
+        drawImage(
+            bild,
+            dstOffset = androidx.compose.ui.unit.IntOffset(b.position.x.roundToInt(), b.position.y.roundToInt()),
+            dstSize = androidx.compose.ui.unit.IntSize(b.breite.roundToInt().coerceAtLeast(1), b.hoehe.roundToInt().coerceAtLeast(1)),
+            filterQuality = androidx.compose.ui.graphics.FilterQuality.Medium
+        )
+    } else {
+        drawRect(Color(0x33FFFFFF), topLeft = b.position, size = Size(b.breite, b.hoehe))
+        drawRect(Color(0x88FFFFFF), topLeft = b.position, size = Size(b.breite, b.hoehe), style = Stroke(2f * pixelFaktor))
+    }
 }
 
 /** Arbeitsblatt möglichst groß, mittig und über der Werkzeugleiste. */
@@ -1143,6 +1203,7 @@ private fun DrawScope.zeichneItem(item: BoardItem, pfadCache: PfadCache? = null)
         }
         is TextItem -> zeichneText(item)
         is StempelItem -> zeichneStempel(item)
+        is BildItem -> zeichneBild(item)
     }
 }
 
@@ -1193,7 +1254,16 @@ private fun DrawScope.zeichneMarkierung(item: BoardItem) {
         cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f * p),
         style = Stroke(width = 2.5f * p, pathEffect = gestricheltEffekt(p))
     )
+    if (item is BildItem) {
+        val ecke = Offset(max.x + polster, max.y + polster)
+        drawCircle(Color.White, radius = BILD_ANFASSER * p, center = ecke)
+        drawCircle(markierungsFarbe, radius = BILD_ANFASSER * p, center = ecke, style = Stroke(3f * p))
+        drawLine(markierungsFarbe, ecke + Offset(-7f * p, -7f * p), ecke + Offset(7f * p, 7f * p), strokeWidth = 3f * p)
+    }
 }
+
+/** Radius des Anfassers zum Größerziehen eines Bildes (Vorbild-Pixel). */
+private const val BILD_ANFASSER = 22f
 
 /**
  * Zeichnet eine Form – mit weggewischten Stellen in einer eigenen Ebene, in der diese Stellen

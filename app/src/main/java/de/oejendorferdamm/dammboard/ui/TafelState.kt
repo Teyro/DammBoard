@@ -137,6 +137,23 @@ class TafelState(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)
     var lassoPfad by mutableStateOf<List<Offset>?>(null)
     var auswahlRechteck by mutableStateOf<Pair<Offset, Offset>?>(null)
 
+/** Bild (z. B. von der Dokumentenkamera) groß und mittig auf die aktuelle Seite legen, ausgewählt – mit dem
+     *  Auswahl-Werkzeug lässt es sich gleich verschieben und an der Ecke größer/kleiner ziehen. */
+    fun bildEinfuegen(datei: String, bildBreite: Int, bildHoehe: Int) {
+        if (bildBreite <= 0 || bildHoehe <= 0) return
+        val platzB = brettBreite * 0.72f
+        val platzH = brettHoehe * 0.72f
+        val massstab = minOf(platzB / bildBreite, platzH / bildHoehe)
+        val b = bildBreite * massstab
+        val h = bildHoehe * massstab
+        val item = de.oejendorferdamm.dammboard.model.BildItem(naechsteId(), datei, Offset((brettBreite - b) / 2f, (brettHoehe - h) / 2f - brettHoehe * 0.04f), b, h)
+        seite.hinzufuegen(item)
+        waehleWerkzeug(Werkzeug.AUSWAHL)
+        schliessePanel()
+        seite.ausgewaehlteIds.clear()
+        seite.ausgewaehlteIds.add(item.id)
+    }
+
     fun waehleWerkzeug(neu: Werkzeug) {
         if (neu == Werkzeug.WERKZEUGKASTEN) {
             offenesPanel = if (offenesPanel == neu) null else neu

@@ -15,6 +15,8 @@ import de.oejendorferdamm.dammboard.model.Seite
 import de.oejendorferdamm.dammboard.model.SeitenAbbild
 import de.oejendorferdamm.dammboard.model.StempelArt
 import de.oejendorferdamm.dammboard.model.StempelItem
+import de.oejendorferdamm.dammboard.model.BildItem
+import de.oejendorferdamm.dammboard.model.bildDateien
 import de.oejendorferdamm.dammboard.model.StrichItem
 import de.oejendorferdamm.dammboard.model.TextItem
 import de.oejendorferdamm.dammboard.ui.Arbeitsblaetter
@@ -38,13 +40,14 @@ import java.io.FileOutputStream
  */
 object TafelSicherung {
     private const val KENNUNG = 0x44424F41 // "DBOA"
-    private const val VERSION = 1
+    private const val VERSION = 2 // 2: Bilder auf der Tafel (BildItem)
 
     private const val STRICH: Byte = 1
     private const val FORM: Byte = 2
     private const val ETIKETT: Byte = 3
     private const val TEXT: Byte = 4
     private const val STEMPEL: Byte = 5
+    private const val BILD: Byte = 6
 
     /** Nie zwei Sicherungen gleichzeitig (z. B. nach einer Änderung und beim Ausschalten). */
     private val sperre = Mutex()
@@ -71,7 +74,7 @@ object TafelSicherung {
             ziel.delete()
             temp.renameTo(ziel)
         }
-        Arbeitsblaetter.aufraeumen(context, seiten.mapNotNull { it.bild }.toSet())
+        Arbeitsblaetter.aufraeumen(context, seiten.flatMap { it.bildDateien() }.toSet())
     }
 
     /** Die gesicherten Seiten und die zuletzt offene Seite – oder null, wenn nichts (Lesbares) da ist. */
@@ -175,6 +178,13 @@ object TafelSicherung {
                 aus.writeFloat(item.breite)
                 aus.writeFloat(item.hoehe)
             }
+            is BildItem -> {
+                aus.writeByte(BILD.toInt())
+                aus.writeUTF(item.datei)
+                aus.offset(item.position)
+                aus.writeFloat(item.breite)
+                aus.writeFloat(item.hoehe)
+            }
             is StempelItem -> {
                 aus.writeByte(STEMPEL.toInt())
                 aus.offset(item.mitte)
@@ -224,6 +234,15 @@ object TafelSicherung {
                 val farbe = Color(ein.readInt())
                 val art = StempelArt.entries.find { it.name == artName } ?: return null
                 StempelItem(neueId(), mitte, art, groesse, farbe)
+            }
+            BILD -> {
+                val datei = ein.readUTF()
+                val position = ein.offset()
+                val breite = ein.readFloat()
+                val hoehe = ein.readFloat()
+                // nur einfache Dateinamen aus dem eigenen Ordner (keine Pfade)
+                if (datei.isEmpty() || datei.contains("/") || datei.contains("..") || breite !in 1f..100000f || hoehe !in 1f..100000f) null
+                else BildItem(neueId(), datei, position, breite, hoehe)
             }
             else -> throw IllegalStateException("Unbekanntes Element in der Sicherung")
         }

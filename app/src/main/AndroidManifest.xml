@@ -8,6 +8,11 @@
     <!-- Nur für die Lautstärke-Ampel (Werkzeugkasten → Extras); es wird nichts aufgenommen oder gespeichert. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
+    <!-- Dokumentenkamera (USB/UVC, vom Board als externe Kamera weitergereicht) – kein Muss für die Installation -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.external" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
 
     <application
         android:allowBackup="false"

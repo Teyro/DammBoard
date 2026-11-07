@@ -85,6 +85,7 @@ fun BoardItem.begrenzendesRechteck(): Pair<Offset, Offset> = when (this) {
         Offset(max(start.x, ende.x), max(start.y, ende.y))
     is LaengenEtikett -> position to position
     is TextItem -> position to Offset(position.x + breite, position.y + hoehe)
+    is BildItem -> position to Offset(position.x + breite, position.y + hoehe)
     is StempelItem -> {
         val halbeBreite = if (art == StempelArt.SUPER) groesse else groesse / 2
         Offset(mitte.x - halbeBreite, mitte.y - groesse / 2) to Offset(mitte.x + halbeBreite, mitte.y + groesse / 2)
@@ -125,7 +126,7 @@ fun BoardItem.beruehrtVon(punkt: Offset, radius: Float): Boolean = when (this) {
             punkt.y >= min.y - radius && punkt.y <= max.y + radius
     }
     is LaengenEtikett -> hypot(punkt.x - position.x, punkt.y - position.y) <= radius
-    is TextItem, is StempelItem -> {
+    is TextItem, is StempelItem, is BildItem -> {
         val (min, max) = begrenzendesRechteck()
         punkt.x >= min.x - radius && punkt.x <= max.x + radius &&
             punkt.y >= min.y - radius && punkt.y <= max.y + radius
@@ -138,6 +139,7 @@ fun BoardItem.verschoben(delta: Offset): BoardItem = when (this) {
     is FormItem -> copy(start = start + delta, ende = ende + delta, radiert = radiert.map { it.copy(mitte = it.mitte + delta) })
     is LaengenEtikett -> copy(position = position + delta)
     is TextItem -> copy(position = position + delta)
+    is BildItem -> copy(position = position + delta)
     is StempelItem -> copy(mitte = mitte + delta)
 }
 
@@ -147,6 +149,7 @@ fun BoardItem.mitId(neueId: Long): BoardItem = when (this) {
     is FormItem -> copy(id = neueId)
     is LaengenEtikett -> copy(id = neueId)
     is TextItem -> copy(id = neueId)
+    is BildItem -> copy(id = neueId)
     is StempelItem -> copy(id = neueId)
 }
 
@@ -263,6 +266,22 @@ data class TextItem(
     val hoehe: Float
 ) : BoardItem
 
+/** Ein Bild auf der Tafel (z. B. von der Dokumentenkamera): Datei im Ordner „blaetter“, frei verschieb- und skalierbar.
+ *  [position] = linke obere Ecke. Der Radierer lässt Bilder in Ruhe (darauf geschrieben wird mit eigenen Strichen). */
+data class BildItem(
+    override val id: Long,
+    val datei: String,
+    val position: Offset,
+    val breite: Float,
+    val hoehe: Float
+) : BoardItem
+
+/** Dasselbe Bild auf neue Breite gebracht (Seitenverhältnis bleibt), linke obere Ecke bleibt stehen. */
+fun BildItem.skaliertAuf(neueBreite: Float): BildItem {
+    val b = neueBreite.coerceIn(40f, 20000f)
+    return copy(breite = b, hoehe = hoehe * b / breite)
+}
+
 data class StempelItem(
     override val id: Long,
     val mitte: Offset,
@@ -312,7 +331,7 @@ class Seite(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)) {
      * die ganze Geste als EIN Schritt) auf den Undo-Stapel.
      */
     fun radiereBeruehrte(punkt: Offset, radius: Float, neueId: () -> Long, stueckweise: Boolean = true) {
-        val treffer = items.filter { it.beruehrtVon(punkt, radius) }
+        val treffer = items.filter { it !is BildItem && it.beruehrtVon(punkt, radius) }
         if (treffer.isEmpty()) return
         val ersatz = HashMap<Long, List<BoardItem>>(treffer.size * 2)
         for (item in treffer) {
@@ -387,6 +406,21 @@ class Seite(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)) {
         rueckgaengigStapel.add(Ersetzt(listOf(alt), listOf(neu)))
         wiederholenStapel.clear()
         versionsZaehler++
+    }
+
+    /** Während einer Geste sichtbar ersetzen (ohne Rückgängig-Schritt) – am Ende [protokolliereErsetzt]. */
+    fun ersetzeLive(neu: BoardItem) {
+        val index = items.indexOfFirst { it.id == neu.id }
+        if (index < 0) return
+        items[index] = neu
+        versionsZaehler++
+    }
+
+    /** Eine abgeschlossene Geste (z. B. Bild skaliert) als EINEN Rückgängig-Schritt eintragen. */
+    fun protokolliereErsetzt(alt: BoardItem, neu: BoardItem) {
+        if (alt == neu) return
+        rueckgaengigStapel.add(Ersetzt(listOf(alt), listOf(neu)))
+        wiederholenStapel.clear()
     }
 
     /** Inhalt ohne Rückgängig-Schritt setzen – nur beim Wiederherstellen/Duplizieren einer Seite. */
@@ -540,6 +574,9 @@ class Seite(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)) {
  * Unveränderlicher Schnappschuss einer Seite – zum Zeichnen außerhalb des UI-Threads (PDF,
  * Vorschaubilder, automatische Sicherung), ohne dass die Tafel dabei gesperrt werden muss.
  */
+/** Alle Bilddateien einer Seite (Arbeitsblatt + Bilder auf der Tafel) – für Aufräumen und Tafeln teilen. */
+fun SeitenAbbild.bildDateien(): List<String> = listOfNotNull(bild) + items.filterIsInstance<BildItem>().map { it.datei }
+
 data class SeitenAbbild(
     val items: List<BoardItem>,
     val hintergrund: HintergrundStil,

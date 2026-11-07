@@ -6,6 +6,7 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import de.oejendorferdamm.dammboard.model.Seite
 import de.oejendorferdamm.dammboard.model.SeitenAbbild
+import de.oejendorferdamm.dammboard.model.bildDateien
 import de.oejendorferdamm.dammboard.ui.Arbeitsblaetter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -149,7 +150,7 @@ object OrdnerSync {
             DataOutputStream(inhalt).use { TafelSicherung.schreibeInhalt(it, seiten, aktiv) }
             zip.write(inhalt.toByteArray())
             zip.closeEntry()
-            seiten.mapNotNull { it.bild }.toSet().forEach { blatt ->
+            seiten.flatMap { it.bildDateien() }.toSet().forEach { blatt ->
                 val f = File(Arbeitsblaetter.ordner(context), blatt)
                 if (f.exists()) {
                     zip.putNextEntry(ZipEntry("blaetter/$blatt"))
