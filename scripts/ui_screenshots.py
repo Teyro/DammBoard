@@ -553,6 +553,8 @@ def ueberraschung_und_ordner():
     # Emoji-Überraschung über Einstellungen → „Jetzt ausprobieren“
     if tippe_mitte_von("Menü"):
         time.sleep(1.5)
+        tippe_text("Überraschungen")  # seit 2.0: Übersicht mit Bereichen
+        time.sleep(1)
         if text_suchen_scrollend("Jetzt ausprobieren"):
             time.sleep(2)
             screenshot("32a_gucker.png")
@@ -946,11 +948,34 @@ def main():
     if tippe_mitte_von("Menü"):
         time.sleep(1.5)
         screenshot("12_einstellungen.png")
-        # 2.0: Kopfzeile mit X bleibt beim Scrollen stehen
+        # 2.0: Bereiche wie im DammLauncher; Kopfzeile mit X bleibt beim Scrollen stehen
+        tippe_text("Zeichnen und Radieren")
+        time.sleep(1)
+        screenshot("12a_einstellungen_zeichnen.png")
         adb("shell", "input", "swipe", str(breite // 2), str(int(hoehe * 0.8)), str(breite // 2), str(int(hoehe * 0.2)), "400")
         time.sleep(0.8)
         screenshot("12b_einstellungen_gescrollt.png")
+        adb("shell", "input", "keyevent", "KEYCODE_BACK")  # zurück zur Übersicht
+        time.sleep(1)
+        tippe_text("Darstellung")
+        time.sleep(1)
+        tippe_text("Kamera-Knopf zeigen")
+        screenshot("12c_einstellungen_darstellung.png")
         adb("shell", "input", "keyevent", "KEYCODE_BACK")
+        time.sleep(1)
+        adb("shell", "input", "keyevent", "KEYCODE_BACK")
+        time.sleep(1)
+        screenshot("12d_ohne_kamera_knopf.png")
+        # Kamera-Knopf wieder einschalten
+        if tippe_mitte_von("Menü"):
+            time.sleep(1.5)
+            tippe_text("Darstellung")
+            time.sleep(1)
+            tippe_text("Kamera-Knopf zeigen")
+            time.sleep(0.5)
+            tippe_mitte_von("Schließen") or adb("shell", "input", "keyevent", "KEYCODE_BACK")
+            time.sleep(1)
+            adb("shell", "input", "keyevent", "KEYCODE_BACK")
         time.sleep(1)
         screenshot("13_zurueck_zur_tafel.png")
 

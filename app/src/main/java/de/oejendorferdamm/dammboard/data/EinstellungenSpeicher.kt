@@ -41,6 +41,7 @@ private object Schluessel {
     val ZULETZT_GESTARTETE_VERSION = stringPreferencesKey("zuletzt_gestartete_version")
     val TAFEL_SICHERN = booleanPreferencesKey("tafel_sichern")
     val FORM_ERKENNUNG = booleanPreferencesKey("form_erkennung")
+    val KAMERA_KNOPF = booleanPreferencesKey("kamera_knopf")
     val SYNC_ORDNER = stringPreferencesKey("sync_ordner")
     // Neuer Name: mit 0.9.6 sind alle Easter Eggs aus, auch wo der alte Schalter „ueberraschungen“ an war.
     val UEBERRASCHUNGEN = booleanPreferencesKey("eastereggs_096")
@@ -184,6 +185,13 @@ class EinstellungenSpeicher(private val context: Context) {
     /** Stift am Strichende kurz halten = saubere Form – standardmäßig an. */
     val formErkennung: Flow<Boolean> = context.einstellungenDataStore.data.map { prefs ->
         prefs[Schluessel.FORM_ERKENNUNG] ?: true
+    }
+
+    /** Knopf „Dokumentenkamera“ unten links zeigen – standardmäßig an. */
+    val kameraKnopf: Flow<Boolean> = context.einstellungenDataStore.data.map { prefs -> prefs[Schluessel.KAMERA_KNOPF] ?: true }
+
+    suspend fun speichereKameraKnopf(an: Boolean) {
+        context.einstellungenDataStore.edit { prefs -> prefs[Schluessel.KAMERA_KNOPF] = an }
     }
 
     suspend fun speichereFormErkennung(aktiv: Boolean) {

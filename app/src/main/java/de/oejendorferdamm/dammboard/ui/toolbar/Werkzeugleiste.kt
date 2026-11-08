@@ -120,7 +120,7 @@ fun TafelBedienung(
     Layout(
         modifier = modifier.fillMaxSize().navigationBarsPadding(),
         content = {
-            LinkeGruppe(zeigeUpdatePunkt, onSchliessen, onMenu, onTeilen, onSpiel, onKamera, Modifier.layoutId(ID_LINKS))
+            LinkeGruppe(zeigeUpdatePunkt, onSchliessen, onMenu, onTeilen, onSpiel, if (state.kameraKnopf) onKamera else null, Modifier.layoutId(ID_LINKS))
             WerkzeugGruppe(state, Modifier.layoutId(ID_WERKZEUGE))
             RechteGruppe(state, Modifier.layoutId(ID_RECHTS))
             PanelEinblendung(sichtbar = offen != null, animiert = animiert, modifier = Modifier.layoutId(ID_PANEL)) {
@@ -212,7 +212,7 @@ private fun LinkeGruppe(
     onMenu: () -> Unit,
     onTeilen: () -> Unit,
     onSpiel: () -> Unit,
-    onKamera: () -> Unit,
+    onKamera: (() -> Unit)?,
     modifier: Modifier = Modifier
 ) {
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(KnopfAbstand), verticalAlignment = Alignment.CenterVertically) {
@@ -238,8 +238,10 @@ private fun LinkeGruppe(
         RundKnopf("Spiele", onSpiel) {
             AllgemeinSymbol(AllgemeinesSymbol.WUERFEL, Modifier.size(LeistenSymbol), SymbolFarbe)
         }
-        RundKnopf("Dokumentenkamera", onKamera) {
-            AllgemeinSymbol(AllgemeinesSymbol.KAMERA, Modifier.size(LeistenSymbol), SymbolFarbe)
+        if (onKamera != null) {
+            RundKnopf("Dokumentenkamera", onKamera) {
+                AllgemeinSymbol(AllgemeinesSymbol.KAMERA, Modifier.size(LeistenSymbol), SymbolFarbe)
+            }
         }
     }
 }

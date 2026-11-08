@@ -41,6 +41,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -91,6 +93,8 @@ fun EinstellungenScreen(
     formErkennung: Boolean,
     onTafelSichernGeaendert: (Boolean) -> Unit,
     onFormErkennungGeaendert: (Boolean) -> Unit,
+    kameraKnopf: Boolean = true,
+    onKameraKnopfGeaendert: (Boolean) -> Unit = {},
     ueberraschungen: Boolean = true,
     onUeberraschungenGeaendert: (Boolean) -> Unit = {},
     onUeberraschungZeigen: () -> Unit = {},
@@ -110,6 +114,7 @@ fun EinstellungenScreen(
     var benutzername by remember(aktuellerZugang) { mutableStateOf(aktuellerZugang.benutzername) }
     var passwort by remember(aktuellerZugang) { mutableStateOf(aktuellerZugang.passwort) }
     var urlFehler by remember { mutableStateOf<String?>(null) }
+    var seite by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
 
     // systemBarsPadding: Die Karte bleibt zwischen Status- und Navigationsleiste, statt auf
     // kleineren Bildschirmen darunter zu verschwinden (die App zeichnet randlos).
@@ -122,17 +127,51 @@ fun EinstellungenScreen(
                 .clip(RoundedCornerShape(18.dp))
                 .background(Hintergrundfarbe)
         ) {
-            // Kopfzeile mit dem Schließen-Knopf bleibt stehen – gescrollt wird nur der Inhalt darunter
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 18.dp, top = 18.dp, bottom = 8.dp)) {
-                Text("Einstellungen", color = Textfarbe, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            val titel = when (seite) {
+                "update" -> "Updates"; "darstellung" -> "Darstellung"; "zeichnen" -> "Zeichnen und Radieren"
+                "tafel" -> "Tafel"; "spass" -> "Überraschungen"; "iserv" -> "IServ"; "ueber" -> "Über DammBoard"
+                else -> "Einstellungen"
+            }
+            // Zurück-Taste: erst zur Übersicht, dann wie das ✕
+            androidx.activity.compose.BackHandler(enabled = seite != null) { seite = null }
+            // Kopfzeile bleibt stehen (✕ immer sichtbar) – gescrollt wird nur der Inhalt darunter
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 8.dp)) {
+                if (seite != null) {
+                    Box(
+                        modifier = Modifier.size(48.dp).clip(CircleShape).background(Color.White).clickable { seite = null }.semantics { contentDescription = "Zurück zur Übersicht" },
+                        contentAlignment = Alignment.Center
+                    ) { Text("‹", color = Textfarbe, fontSize = 28.sp, fontWeight = FontWeight.Bold) }
+                    Spacer(Modifier.width(12.dp))
+                } else {
+                    Spacer(Modifier.width(6.dp))
+                }
+                Text(titel, color = Textfarbe, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                 Box(
-                    modifier = Modifier.size(48.dp).clip(CircleShape).background(Color.White).clickable(onClick = onZurueck),
+                    modifier = Modifier.size(48.dp).clip(CircleShape).background(Color.White).clickable(onClick = onZurueck).semantics { contentDescription = "Schließen" },
                     contentAlignment = Alignment.Center
                 ) {
                     AllgemeinSymbol(AllgemeinesSymbol.SCHLIESSEN, Modifier.size(16.dp), Textfarbe)
                 }
             }
             Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(start = 24.dp, end = 24.dp, bottom = 24.dp, top = 10.dp)) {
+            val an = { b: Boolean -> if (b) "an" else "aus" }
+            when (seite) {
+                null -> {
+                    BereichZeile("⬆️", Color(0xFF2563EB), "Updates",
+                        if (updateInfo != null) "Neue Version ${updateInfo.version} verfügbar" else "Installiert: $aktuelleVersion · automatisch prüfen ${an(autoUpdatePruefung)}",
+                        hinweis = updateInfo != null) { seite = "update" }
+                    BereichZeile("🎨", Color(0xFF7C3AED), "Darstellung",
+                        "${if (aktuellerModus == AnimationsModus.NORMAL) "Normal" else "Performance"} · Symbole ${aktuelleSymbolGroesse.bezeichnung} · Kamera-Knopf ${an(kameraKnopf)}") { seite = "darstellung" }
+                    BereichZeile("✏️", Color(0xFFD97706), "Zeichnen und Radieren",
+                        "Formerkennung ${an(formErkennung)} · Radierer ${if (radierenStueckweise) "stückweise" else "ganz"} · Handballen ${an(handballenRadieren)}") { seite = "zeichnen" }
+                    BereichZeile("🗂", Color(0xFF0891B2), "Tafel",
+                        "Automatisch sichern ${an(tafelSichern)} · Hintergrund merken ${an(hintergrundMerken)}") { seite = "tafel" }
+                    BereichZeile("🎉", Color(0xFFDB2777), "Überraschungen", "Easter Eggs ${an(ueberraschungen)} · Überraschungsvideo") { seite = "spass" }
+                    BereichZeile("☁️", Color(0xFF16A34A), "IServ",
+                        if (aktuellerZugang.serverUrl.isBlank()) "nicht eingerichtet" else aktuellerZugang.serverUrl.removePrefix("https://").substringBefore("/")) { seite = "iserv" }
+                    BereichZeile("ℹ️", Color(0xFF6B7280), "Über DammBoard", "Version $aktuelleVersion · Bildschirm") { seite = "ueber" }
+                }
+                "update" -> {
             UpdateAbschnitt(
                 aktuelleVersion = aktuelleVersion,
                 info = updateInfo,
@@ -142,8 +181,8 @@ fun EinstellungenScreen(
                 onAutoGeaendert = onAutoUpdateGeaendert,
                 onJetztPruefen = onUpdatePruefungAnfordern
             )
-
-            Spacer(Modifier.height(24.dp))
+                }
+                "darstellung" -> {
             Text("Darstellung", color = Textfarbe, fontSize = 15.sp, fontWeight = FontWeight.Bold)
             Text(
                 "Normalmodus mit sanften Übergängen, oder Performance-Modus ganz ohne Animationen.",
@@ -178,11 +217,17 @@ fun EinstellungenScreen(
                     }
                 }
             }
-            // Hilft bei der Fehlersuche aus der Ferne: zeigt, was das Gerät Android meldet.
-            Text(bildschirmInfo, color = TextfarbeSchwach, fontSize = 10.sp, modifier = Modifier.padding(top = 6.dp))
 
             Spacer(Modifier.height(22.dp))
+            SchalterZeile(
+                "Kamera-Knopf zeigen",
+                "Knopf „Dokumentenkamera“ unten links in der Leiste. Aus, wenn an diesem Board keine Dokumentenkamera hängt.",
+                kameraKnopf, onKameraKnopfGeaendert
+            )
+                }
+                "zeichnen" -> {
             ErweiterteEinstellungen(
+                teil = "zeichnen",
                 zeichenPraezision = zeichenPraezision,
                 hintergrundMerken = hintergrundMerken,
                 handballenRadieren = handballenRadieren,
@@ -201,8 +246,52 @@ fun EinstellungenScreen(
                 onUeberraschungenGeaendert = onUeberraschungenGeaendert,
                 onUeberraschungZeigen = onUeberraschungZeigen
             )
-
-            Spacer(Modifier.height(26.dp))
+                }
+                "tafel" -> {
+            ErweiterteEinstellungen(
+                teil = "tafel",
+                zeichenPraezision = zeichenPraezision,
+                hintergrundMerken = hintergrundMerken,
+                handballenRadieren = handballenRadieren,
+                handballenEmpfindlichkeit = handballenEmpfindlichkeit,
+                radierenStueckweise = radierenStueckweise,
+                tafelSichern = tafelSichern,
+                formErkennung = formErkennung,
+                onTafelSichernGeaendert = onTafelSichernGeaendert,
+                onFormErkennungGeaendert = onFormErkennungGeaendert,
+                onZeichenPraezisionGeaendert = onZeichenPraezisionGeaendert,
+                onHintergrundMerkenGeaendert = onHintergrundMerkenGeaendert,
+                onHandballenRadierenGeaendert = onHandballenRadierenGeaendert,
+                onHandballenEmpfindlichkeitGeaendert = onHandballenEmpfindlichkeitGeaendert,
+                onRadierenStueckweiseGeaendert = onRadierenStueckweiseGeaendert,
+                ueberraschungen = ueberraschungen,
+                onUeberraschungenGeaendert = onUeberraschungenGeaendert,
+                onUeberraschungZeigen = onUeberraschungZeigen
+            )
+                }
+                "spass" -> {
+            ErweiterteEinstellungen(
+                teil = "spass",
+                zeichenPraezision = zeichenPraezision,
+                hintergrundMerken = hintergrundMerken,
+                handballenRadieren = handballenRadieren,
+                handballenEmpfindlichkeit = handballenEmpfindlichkeit,
+                radierenStueckweise = radierenStueckweise,
+                tafelSichern = tafelSichern,
+                formErkennung = formErkennung,
+                onTafelSichernGeaendert = onTafelSichernGeaendert,
+                onFormErkennungGeaendert = onFormErkennungGeaendert,
+                onZeichenPraezisionGeaendert = onZeichenPraezisionGeaendert,
+                onHintergrundMerkenGeaendert = onHintergrundMerkenGeaendert,
+                onHandballenRadierenGeaendert = onHandballenRadierenGeaendert,
+                onHandballenEmpfindlichkeitGeaendert = onHandballenEmpfindlichkeitGeaendert,
+                onRadierenStueckweiseGeaendert = onRadierenStueckweiseGeaendert,
+                ueberraschungen = ueberraschungen,
+                onUeberraschungenGeaendert = onUeberraschungenGeaendert,
+                onUeberraschungZeigen = onUeberraschungZeigen
+            )
+                }
+                "iserv" -> {
             Text("IServ-Speicher", color = Textfarbe, fontSize = 15.sp, fontWeight = FontWeight.Bold)
             Text(
                 "Web-Adresse deines IServ-WebDAV-Speichers, z. B. https://schule.example.de/iserv/webdav",
@@ -261,8 +350,14 @@ fun EinstellungenScreen(
                 Text("IServ-Zugang speichern")
             }
 
-            Spacer(Modifier.height(18.dp))
-            Text("DammBoard $aktuelleVersion", color = TextfarbeSchwach, fontSize = 11.sp)
+                }
+                "ueber" -> {
+                    Text("DammBoard $aktuelleVersion", color = Textfarbe, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(6.dp))
+                    // Hilft bei der Fehlersuche aus der Ferne: zeigt, was das Gerät Android meldet.
+                    Text(bildschirmInfo, color = TextfarbeSchwach, fontSize = 11.sp)
+                }
+            }
             }
         }
     }
@@ -413,6 +508,7 @@ private fun oeffneFDroidRepo(context: android.content.Context) {
 
 @Composable
 private fun ErweiterteEinstellungen(
+    teil: String,
     zeichenPraezision: Float,
     hintergrundMerken: Boolean,
     handballenRadieren: Boolean,
@@ -431,9 +527,7 @@ private fun ErweiterteEinstellungen(
     onUeberraschungenGeaendert: (Boolean) -> Unit = {},
     onUeberraschungZeigen: () -> Unit = {}
 ) {
-    Text("Erweitert", color = Textfarbe, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-    Spacer(Modifier.height(4.dp))
-
+    if (teil == "zeichnen") {
     Text("Zeichen-Genauigkeit", color = Textfarbe, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
     Text(
         "Wie fein Freihandlinien erfasst werden. Weiter rechts = glattere Kurven und besser " +
@@ -456,8 +550,15 @@ private fun ErweiterteEinstellungen(
         )
         Text("Fein", color = TextfarbeSchwach, fontSize = 10.sp)
     }
-
     Spacer(Modifier.height(14.dp))
+    SchalterZeile(
+        "Formerkennung",
+        "Stift am Ende eines Strichs kurz still halten: aus Kreis, Linie, Dreieck oder Rechteck wird eine saubere Form.",
+        formErkennung, onFormErkennungGeaendert
+    )
+    }
+
+    if (teil == "tafel") {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
             Text("Letzten Hintergrund merken", color = Textfarbe, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
@@ -481,15 +582,9 @@ private fun ErweiterteEinstellungen(
             "die Tafel beim nächsten Start wieder da. Neu anfangen: Seitenzahl unten rechts antippen → „Neue leere Tafel“.",
         tafelSichern, onTafelSichernGeaendert
     )
+    }
 
-    Spacer(Modifier.height(14.dp))
-    SchalterZeile(
-        "Formerkennung",
-        "Stift am Ende eines Strichs kurz still halten: aus Kreis, Linie, Dreieck oder Rechteck wird eine saubere Form.",
-        formErkennung, onFormErkennungGeaendert
-    )
-
-    Spacer(Modifier.height(14.dp))
+    if (teil == "spass") {
     SchalterZeile(
         "Überraschungen (Easter Eggs)",
         "Standardmäßig aus. An: ab und zu schaut ein Emoji vom Rand herein (nur, wenn eine Weile niemand malt) – wer es antippt, " +
@@ -499,9 +594,12 @@ private fun ErweiterteEinstellungen(
     androidx.compose.material3.OutlinedButton(onClick = onUeberraschungZeigen, modifier = Modifier.padding(top = 4.dp)) {
         Text("Jetzt ausprobieren", fontSize = 12.sp)
     }
-    UeberraschungsVideoWahl()
-
     Spacer(Modifier.height(14.dp))
+    UeberraschungsVideoWahl()
+    }
+
+    if (teil == "zeichnen") {
+    Spacer(Modifier.height(18.dp))
     Text("Radierer und Wischen", color = Textfarbe, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
     Text(
         "Stückweise: nur das, worüber gewischt wird, verschwindet – wie mit einem Schwamm, auch bei " +
@@ -557,11 +655,32 @@ private fun ErweiterteEinstellungen(
             Text("Empfindlich", color = TextfarbeSchwach, fontSize = 10.sp)
         }
     }
+    }
+}
+
+/** Eine Zeile der Übersicht: farbiges Symbol, Name, Zusammenfassung, Pfeil – wie im DammLauncher. */
+@Composable
+private fun BereichZeile(symbol: String, farbe: Color, titel: String, text: String, hinweis: Boolean = false, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp).clip(RoundedCornerShape(16.dp)).background(Color.White)
+            .clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp)
+    ) {
+        Box(Modifier.size(44.dp).clip(CircleShape).background(farbe.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
+            Text(symbol, fontSize = 22.sp)
+        }
+        Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
+            Text(titel, color = Textfarbe, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Text(text, color = if (hinweis) Fehlerfarbe else TextfarbeSchwach, fontSize = 12.sp, maxLines = 2)
+        }
+        Text("›", color = TextfarbeSchwach, fontSize = 26.sp)
+    }
 }
 
 @Composable
 private fun SchalterZeile(titel: String, text: String, wert: Boolean, onGeaendert: (Boolean) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+    // Die ganze Zeile schaltet um (auf dem Board leichter zu treffen als der kleine Schalter)
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { onGeaendert(!wert) }) {
         Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
             Text(titel, color = Textfarbe, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             Text(text, color = TextfarbeSchwach, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))

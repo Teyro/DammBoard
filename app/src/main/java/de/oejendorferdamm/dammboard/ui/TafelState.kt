@@ -88,6 +88,8 @@ class TafelState(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)
     /** Welche Hälfte zuletzt beschrieben wurde – deren Farbe zeigt und ändert das Stift-Panel. */
     var aktiveHaelfte by mutableIntStateOf(0)
     var formErkennung by mutableStateOf(true)
+    /** Kamera-Knopf in der Leiste (Einstellungen → Darstellung). */
+    var kameraKnopf by mutableStateOf(true)
 
     // Formen
     var formTyp by mutableStateOf(FormTyp.LINIE)

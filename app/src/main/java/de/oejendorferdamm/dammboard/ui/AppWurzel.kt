@@ -79,6 +79,7 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
     val gespeicherterHintergrund by speicher.gespeicherterHintergrund.collectAsState(initial = null)
     val tafelSichern by speicher.tafelSichern.collectAsState(initial = true)
     val formErkennung by speicher.formErkennung.collectAsState(initial = true)
+    val kameraKnopf by speicher.kameraKnopf.collectAsState(initial = true)
     val syncOrdnerText by speicher.syncOrdner.collectAsState(initial = null)
     val syncOrdner = syncOrdnerText?.let { android.net.Uri.parse(it) }
     // Für Abläufe, die länger leben als ein Bildaufbau (Sicherung, Abgleich): immer den aktuellen Ordner lesen
@@ -94,6 +95,7 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
     BackHandler(enabled = bildschirm != Bildschirm.Brett) { bildschirm = Bildschirm.Brett }
 
     LaunchedEffect(formErkennung) { tafelState.formErkennung = formErkennung }
+    LaunchedEffect(kameraKnopf) { tafelState.kameraKnopf = kameraKnopf }
     LaunchedEffect(ueberraschungen) { tafelState.ueberraschungenAn = ueberraschungen }
 
     // ---------------------------------------------------------------- Tafeln im gemeinsamen Ordner
@@ -308,9 +310,8 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
     LaunchedEffect(Unit) {
         val vorher = speicher.zuletztGestarteteVersion.first()
         if (vorher != BuildConfig.VERSION_NAME) {
-            neuigkeiten = "DammBoard ${BuildConfig.VERSION_NAME} ist installiert – neu: Dokumentenkamera (Kamera-Knopf unten links): " +
-                "Bild aufnehmen und als Bild auf die Tafel legen, dort verschieben, größer ziehen und darauf schreiben. " +
-                "Der Würfel öffnet jetzt alle Spiele (Tafelfußball, Wörter raten, Nachspuren, Würfel)."
+            neuigkeiten = "DammBoard ${BuildConfig.VERSION_NAME} ist installiert – Einstellungen neu gegliedert (Übersicht mit Bereichen, ✕ immer oben rechts). " +
+                "Den Kamera-Knopf kannst du unter Einstellungen → Darstellung ausblenden."
             speicher.speichereZuletztGestarteteVersion(BuildConfig.VERSION_NAME)
         }
     }
@@ -431,6 +432,8 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
                 formErkennung = formErkennung,
                 onTafelSichernGeaendert = { neu -> scope.launch { speicher.speichereTafelSichern(neu) } },
                 onFormErkennungGeaendert = { neu -> scope.launch { speicher.speichereFormErkennung(neu) } },
+                kameraKnopf = kameraKnopf,
+                onKameraKnopfGeaendert = { neu -> scope.launch { speicher.speichereKameraKnopf(neu) } },
                 onZugangSpeichern = { neu -> scope.launch { speicher.speichereIServZugang(neu) } },
                 onModusGeaendert = { neu -> scope.launch { speicher.speichereAnimationsModus(neu) } },
                 onSymbolGroesseGeaendert = { neu -> scope.launch { speicher.speichereSymbolGroesse(neu) } },
