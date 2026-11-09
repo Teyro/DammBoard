@@ -30,7 +30,7 @@ private object Schluessel {
     val PASSWORT = stringPreferencesKey("iserv_passwort")
     val ANIMATIONSMODUS = stringPreferencesKey("animationsmodus")
     val SYMBOLGROESSE = stringPreferencesKey("symbolgroesse")
-    val AUTO_UPDATE_PRUEFUNG = booleanPreferencesKey("auto_update_pruefung")
+    val AUTO_UPDATE_PRUEFUNG = booleanPreferencesKey("auto_update_pruefung2") // neuer Schlüssel (2.0.2): überall erst einmal aus
     val ZEICHEN_PRAEZISION = floatPreferencesKey("zeichen_praezision")
     val HINTERGRUND_MERKEN = booleanPreferencesKey("hintergrund_merken")
     val HANDBALLEN_RADIEREN = booleanPreferencesKey("handballen_radieren")
@@ -119,7 +119,7 @@ class EinstellungenSpeicher(private val context: Context) {
     /** Ob ca. 10 Sekunden nach dem App-Start automatisch (unauffällig, nur roter Punkt) auf
      *  Updates geprüft wird. Manuell prüfen geht im Einstellungsmenü immer, unabhängig davon. */
     val autoUpdatePruefung: Flow<Boolean> = context.einstellungenDataStore.data.map { prefs ->
-        prefs[Schluessel.AUTO_UPDATE_PRUEFUNG] ?: true
+        prefs[Schluessel.AUTO_UPDATE_PRUEFUNG] ?: false
     }
 
     suspend fun speichereAutoUpdatePruefung(aktiv: Boolean) {

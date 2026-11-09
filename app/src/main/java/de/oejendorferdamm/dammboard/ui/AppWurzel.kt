@@ -70,7 +70,7 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
     val iservZugang by speicher.iservZugang.collectAsState(initial = IServZugang())
     val animationsModus by speicher.animationsModus.collectAsState(initial = AnimationsModus.NORMAL)
     val symbolGroesse by speicher.symbolGroesse.collectAsState(initial = SymbolGroesse.STANDARD)
-    val autoUpdatePruefung by speicher.autoUpdatePruefung.collectAsState(initial = true)
+    val autoUpdatePruefung by speicher.autoUpdatePruefung.collectAsState(initial = false)
     val zeichenPraezision by speicher.zeichenPraezision.collectAsState(initial = 0.7f)
     val hintergrundMerken by speicher.hintergrundMerken.collectAsState(initial = false)
     val handballenRadieren by speicher.handballenRadieren.collectAsState(initial = true)
