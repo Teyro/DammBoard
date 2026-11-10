@@ -34,5 +34,6 @@ class MainActivity : ComponentActivity() {
 
     private fun testStartordnerLesen(intent: android.content.Intent?) {
         if (BuildConfig.DEBUG) intent?.getStringExtra("test_startordner")?.let { TestStartordner.uri = android.net.Uri.parse(it) }
+        if (BuildConfig.DEBUG && intent?.getBooleanExtra("test_ablage", false) == true) TestStartordner.ablage.value = true
     }
 }

@@ -570,6 +570,15 @@ def ueberraschung_und_ordner():
             time.sleep(1)
 
     # Gemeinsamer Ordner: einen Ordner im Gerätespeicher anlegen und auswählen
+    # Ablage nach Fächern (2.1): Testversion öffnet sie per Startparameter und legt die Tafel einmal ab
+    adb("shell", "am", "start", "--activity-single-top", "-n", f"{PAKET}/.MainActivity", "--ez", "test_ablage", "true")
+    time.sleep(3)
+    screenshot("32a_ablage_faecher.png")
+    if tippe_mitte_von("Tafel"):
+        time.sleep(1.5)
+        screenshot("32b_ablage_fach.png")
+    adb("shell", "input", "keyevent", "KEYCODE_BACK")
+    time.sleep(1)
     adb("shell", "mkdir", "-p", "/sdcard/Documents/DammSync")
     # Testversion: Ordnerauswahl gleich in Documents/DammSync öffnen (der Wähler reagiert im
     # Emulator nicht zuverlässig auf Tipps in die Ordnerliste)

@@ -63,6 +63,8 @@ private val Fehler = Color(0xFFB3261E)
 /** Nur Testversion: Ordner, in dem die Ordnerauswahl im Emulator-Test startet. */
 object TestStartordner {
     var uri: Uri? = null
+    /** Testversion: gleich die Ablage öffnen (Oberflächentest) */
+    var ablage = androidx.compose.runtime.mutableStateOf(false)
 }
 
 /** Was der Tafeln-Bildschirm auslöst; die Ergebnisse sind Fehlertexte (null = geklappt). */

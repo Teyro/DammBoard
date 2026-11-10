@@ -477,6 +477,14 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
             ablageNeu++
         }
     }
+    // Testversion: Ablage auf Wunsch gleich öffnen (Oberflächentest), dabei einmal ablegen, damit ein Fach zu sehen ist
+    LaunchedEffect(TestStartordner.ablage.value) {
+        if (de.oejendorferdamm.dammboard.BuildConfig.DEBUG && TestStartordner.ablage.value) {
+            TestStartordner.ablage.value = false
+            ablegen(abschnittJetzt(), auchUnveraendert = true)
+            bildschirm = Bildschirm.Ablage
+        }
+    }
     val ablageAktionen = remember {
         object : AblageAktionen {
             override suspend fun oeffnen(e: de.oejendorferdamm.dammboard.data.Ablage.Eintrag): String? = try {
