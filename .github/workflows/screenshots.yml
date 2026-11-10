@@ -31,7 +31,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Debug-APK bauen
-        run: ./gradlew assembleDebug
+        run: ./gradlew testDebugUnitTest assembleDebug
 
       - name: Testvideo für das Easter Egg erzeugen (das echte Video bleibt privat)
         run: |

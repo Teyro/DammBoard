@@ -12,6 +12,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -47,6 +48,7 @@ private sealed interface Bildschirm {
     data object Brett : Bildschirm
     data object Einstellungen : Bildschirm
     data object Tafeln : Bildschirm
+    data object Ablage : Bildschirm
     data class Dateimanager(val modus: DateiModus, val schulOrdner: Boolean = false) : Bildschirm
 }
 
@@ -86,6 +88,8 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
     val ordnerAktuell = rememberUpdatedState(syncOrdner)
     val ueberraschungen by speicher.ueberraschungen.collectAsState(initial = false)
     val schulPasswort by speicher.schulPasswort.collectAsState(initial = "")
+    val ablageOrdner by speicher.ablageOrdner.collectAsState(initial = "Tafel")
+    val ablageAutomatisch by speicher.ablageAutomatisch.collectAsState(initial = true)
 
     val tafelState = rememberTafelState()
     var bildschirm by remember { mutableStateOf<Bildschirm>(Bildschirm.Brett) }
@@ -305,6 +309,191 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
         onDispose { lebenszyklus.lifecycle.removeObserver(beobachter) }
     }
 
+    // ---------------------------------------------------------------- Ablage nach Fächern (aus dem Stundenplan von DammTable)
+    val app = context.applicationContext
+    val ablagePrefs = remember { app.getSharedPreferences("ablage", android.content.Context.MODE_PRIVATE) }
+    val bildschirmPx = remember { context.resources.displayMetrics.let { maxOf(it.widthPixels, it.heightPixels) to minOf(it.widthPixels, it.heightPixels) } }
+    val ablageOrdnerAktuell = rememberUpdatedState(ablageOrdner)
+    val ablageAutoAktuell = rememberUpdatedState(ablageAutomatisch)
+    var abgelegtSignatur by remember { mutableStateOf<Any?>(null) }
+    var ablageMeldung by remember { mutableStateOf<String?>(null) }
+    var ablageArbeitet by remember { mutableStateOf(false) }
+    var ablageNeu by remember { mutableIntStateOf(0) }
+    val ablageSperre = remember { kotlinx.coroutines.sync.Mutex() }
+    var plan by remember { mutableStateOf<de.oejendorferdamm.dammboard.data.Stundenplan.Tag?>(null) }
+
+    fun hatInhalt() = tafelState.seiten.any { it.items.isNotEmpty() || it.hintergrundBild.value != null }
+
+    /** Abschnitt „Datum|Stunde|Fach“ jetzt – ohne Stundenplan einer je Tag unter „Tafel“ */
+    fun abschnittJetzt(): String {
+        val heute = java.time.LocalDate.now()
+        val s = de.oejendorferdamm.dammboard.data.Stundenplan.laufend(plan?.takeIf { it.datum == heute }, java.time.LocalTime.now())
+        return "$heute|${s?.stunde ?: ""}|${s?.fach ?: "Tafel"}"
+    }
+
+    /** Tafel in den Ordner des Abschnitts ablegen (nur mit Inhalt und wenn seit dem letzten Ablegen etwas geändert wurde) */
+    suspend fun ablegen(abschnitt: String, auchUnveraendert: Boolean = false): String? = ablageSperre.withLock {
+        if (!hatInhalt()) return@withLock null
+        val signatur = tafelState.syncSignatur()
+        if (!auchUnveraendert && signatur == abgelegtSignatur) return@withLock null
+        val teile = abschnitt.split('|')
+        val datum = runCatching { java.time.LocalDate.parse(teile[0]) }.getOrDefault(java.time.LocalDate.now())
+        val stunde = teile.getOrNull(1)?.toIntOrNull()
+        val fach = teile.getOrNull(2)?.ifBlank { null } ?: "Tafel"
+        try {
+            de.oejendorferdamm.dammboard.data.Ablage.speichere(app, ablageOrdnerAktuell.value, fach, de.oejendorferdamm.dammboard.data.Ablage.name(fach, datum, stunde),
+                tafelState.seiten.map { it.abbild() }, tafelState.aktiveSeite, bildschirmPx.first, bildschirmPx.second)
+            abgelegtSignatur = signatur
+            ablageNeu++
+            null
+        } catch (e: Exception) { "Fehler beim Ablegen: ${e.message}" }
+    }
+
+    // Beim Stundenwechsel die Tafel in den Ordner der Stunde legen, die gerade zu Ende ist (alle 30 s geprüft)
+    LaunchedEffect(Unit) {
+        var planStand = 0L
+        while (true) {
+            if (System.currentTimeMillis() - planStand > 10 * 60_000L) {
+                plan = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { de.oejendorferdamm.dammboard.data.Stundenplan.heute(app) }
+                planStand = System.currentTimeMillis()
+            }
+            val jetzt = abschnittJetzt()
+            val vorher = ablagePrefs.getString("abschnitt", null)
+            if (vorher != jetzt) {
+                if (vorher != null && ablageAutoAktuell.value) ablegen(vorher)
+                ablagePrefs.edit().putString("abschnitt", jetzt).apply()
+            }
+            delay(30_000)
+        }
+    }
+
+    // Beim Ausschalten/Verlassen: die laufende Stunde ablegen (falls geändert)
+    DisposableEffect(lebenszyklus) {
+        val beobachter = LifecycleEventObserver { _, ereignis ->
+            if (ereignis == Lifecycle.Event.ON_STOP && ablageAutoAktuell.value) scope.launch { ablegen(abschnittJetzt()) }
+        }
+        lebenszyklus.lifecycle.addObserver(beobachter)
+        onDispose { lebenszyklus.lifecycle.removeObserver(beobachter) }
+    }
+
+    // Neuer Tag: die Tafel von gestern ablegen und mit einer leeren Seite beginnen
+    LaunchedEffect(Unit) {
+        delay(1500) // nach dem Wiederherstellen der Sicherung
+        val heute = java.time.LocalDate.now().toString()
+        val letzter = ablagePrefs.getString("tag", null)
+        if (ablageAutomatisch && letzter != null && letzter != heute && tafelState.verbundeneTafel == null && hatInhalt()) {
+            val abschnitt = ablagePrefs.getString("abschnitt", null)?.takeIf { it.startsWith(letzter) } ?: "$letzter||Tafel"
+            if (ablegen(abschnitt, auchUnveraendert = true) == null) {
+                tafelState.neueTafel()
+                abgelegtSignatur = tafelState.syncSignatur()
+            }
+        }
+        ablagePrefs.edit().putString("tag", heute).apply()
+    }
+
+    /** Alte Tafeln (.ubmx2) in die Ablage übernehmen; [fach] = Ordner in der Ablage. Gibt (Anzahl, letzte Seiten) zurück. */
+    suspend fun importiere(dateien: List<Pair<String, android.net.Uri>>, fach: (String) -> String): Pair<Int, List<de.oejendorferdamm.dammboard.model.Seite>?> {
+        var anzahl = 0
+        var letzte: List<de.oejendorferdamm.dammboard.model.Seite>? = null
+        val unbekannt = HashMap<String, Int>()
+        for ((pfad, uri) in dateien) {
+            try {
+                val daten = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { app.contentResolver.openInputStream(uri)?.use { it.readBytes() } } ?: continue
+                val e = de.oejendorferdamm.dammboard.data.UbmxImport.ausZip(daten, bildschirmPx.first.toFloat(), bildschirmPx.second.toFloat(), ::naechsteId) { n ->
+                    "imp_" + System.nanoTime().toString(36) + "_" + n.replace(Regex("[^A-Za-z0-9_.-]"), "_").takeLast(60)
+                }
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { e.bilder.forEach { (n, b) -> java.io.File(Arbeitsblaetter.ordner(app), n).writeBytes(b) } }
+                e.unbekannt.forEach { (k, v) -> unbekannt[k] = (unbekannt[k] ?: 0) + v }
+                // „2026111011284158“ (Zeitstempel im alten Dateinamen) → „Tafel 2026-11-10 11.28“
+                val roh = pfad.substringAfterLast('/').removeSuffix(de.oejendorferdamm.dammboard.data.UbmxImport.ENDUNG).removeSuffix(".UBMX2")
+                val m = Regex("^(20\\d{2})(\\d{2})(\\d{2})(\\d{2})(\\d{2})").find(roh)
+                val name = if (m != null) "Tafel ${m.groupValues[1]}-${m.groupValues[2]}-${m.groupValues[3]} ${m.groupValues[4]}.${m.groupValues[5]}" else roh
+                val f = de.oejendorferdamm.dammboard.data.Ablage.speichere(app, ablageOrdnerAktuell.value, fach(pfad), name, e.seiten, 0, bildschirmPx.first, bildschirmPx.second)
+                if (m != null) runCatching {
+                    val t = java.time.LocalDateTime.of(m.groupValues[1].toInt(), m.groupValues[2].toInt(), m.groupValues[3].toInt(), m.groupValues[4].toInt(), m.groupValues[5].toInt())
+                    val ms = t.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+                    f.setLastModified(ms); java.io.File(f.parentFile, f.name.removeSuffix(".dammboard") + ".png").setLastModified(ms)
+                }
+                letzte = e.seiten.map { a -> de.oejendorferdamm.dammboard.model.Seite(a.hintergrund).apply { hintergrundBild.value = a.bild; setzeInhalt(a.items) } }
+                anzahl++
+            } catch (e: Exception) {
+                ablageMeldung = "Nicht lesbar: ${pfad.substringAfterLast('/')} (${e.message})"
+            }
+        }
+        if (unbekannt.isNotEmpty()) ablageMeldung = "Übersprungen (unbekannt): " + unbekannt.entries.joinToString { "${it.key} ${it.value}×" }
+        return anzahl to letzte
+    }
+
+    val importWahl = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+        ablageArbeitet = true
+        scope.launch {
+            val liste = uris.map { u -> (android.provider.OpenableColumns.DISPLAY_NAME.let { spalte -> app.contentResolver.query(u, arrayOf(spalte), null, null, null)?.use { c -> if (c.moveToFirst()) c.getString(0) else null } } ?: u.lastPathSegment ?: "Tafel") to u }
+            val (n, letzte) = importiere(liste) { "Import" }
+            // eine einzelne Tafel gleich öffnen (die aktuelle vorher ablegen)
+            if (n == 1 && letzte != null) {
+                ablegen(abschnittJetzt())
+                verbindungMerken(null)
+                tafelState.seitenErsetzen(letzte, 0)
+                abgelegtSignatur = tafelState.syncSignatur()
+            }
+            if (ablageMeldung == null || n > 0) ablageMeldung = if (n == 0) "Nichts importiert." else "$n alte Tafel" + (if (n == 1) " importiert und geöffnet (Ordner „Import“)." else "n importiert (Ordner „Import“).")
+            ablageArbeitet = false
+            ablageNeu++
+        }
+    }
+    val ordnerImportWahl = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree()) { baum ->
+        if (baum == null) return@rememberLauncherForActivityResult
+        ablageArbeitet = true
+        scope.launch {
+            // Dateien im Ordner und eine Ebene darunter; Unterordner werden zu Fächern, sonst der Name des Ordners
+            val gefunden = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val r = app.contentResolver
+                fun kinder(dokId: String): List<Triple<String, String, String>> = try {
+                    r.query(android.provider.DocumentsContract.buildChildDocumentsUriUsingTree(baum, dokId), arrayOf(android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                        android.provider.DocumentsContract.Document.COLUMN_DISPLAY_NAME, android.provider.DocumentsContract.Document.COLUMN_MIME_TYPE), null, null, null)?.use { c ->
+                        buildList { while (c.moveToNext()) add(Triple(c.getString(0), c.getString(1) ?: "", c.getString(2) ?: "")) }
+                    } ?: emptyList()
+                } catch (_: Exception) { emptyList() }
+                val wurzelId = android.provider.DocumentsContract.getTreeDocumentId(baum)
+                val wurzelName = OrdnerSync.ordnerName(app, baum)
+                val liste = ArrayList<Pair<String, android.net.Uri>>()
+                val fachVon = HashMap<String, String>()
+                fun nimm(id: String, name: String, fach: String) {
+                    if (!name.endsWith(".ubmx2", ignoreCase = true)) return
+                    val pfad = "$fach/$name"
+                    liste.add(pfad to android.provider.DocumentsContract.buildDocumentUriUsingTree(baum, id)); fachVon[pfad] = fach
+                }
+                for ((id, name, typ) in kinder(wurzelId)) {
+                    if (typ == android.provider.DocumentsContract.Document.MIME_TYPE_DIR) kinder(id).forEach { (i2, n2, _) -> nimm(i2, n2, name) }
+                    else nimm(id, name, wurzelName)
+                }
+                liste to fachVon
+            }
+            val (liste, fachVon) = gefunden
+            val (n, _) = importiere(liste) { p -> fachVon[p] ?: "Import" }
+            ablageMeldung = if (n == 0) "Im Ordner liegen keine alten Tafeln (.ubmx2)." else "$n alte Tafeln importiert."
+            ablageArbeitet = false
+            ablageNeu++
+        }
+    }
+    val ablageAktionen = remember {
+        object : AblageAktionen {
+            override suspend fun oeffnen(e: de.oejendorferdamm.dammboard.data.Ablage.Eintrag): String? = try {
+                ablegen(abschnittJetzt())
+                val (seiten, aktiv) = de.oejendorferdamm.dammboard.data.Ablage.oeffne(app, e.datei, ::naechsteId)
+                verbindungMerken(null)
+                tafelState.seitenErsetzen(seiten, aktiv)
+                abgelegtSignatur = tafelState.syncSignatur()
+                null
+            } catch (x: Exception) { ablageMeldung = "Öffnen fehlgeschlagen: ${x.message}"; ablageMeldung }
+            override fun importieren() { try { importWahl.launch(arrayOf("*/*")) } catch (_: Exception) { ablageMeldung = "Auf diesem Board gibt es keine Dateiauswahl." } }
+            override fun ordnerImportieren() { try { ordnerImportWahl.launch(null) } catch (_: Exception) { ablageMeldung = "Auf diesem Board gibt es keine Ordnerauswahl." } }
+            override fun jetztAblegen() { scope.launch { ablageMeldung = ablegen(abschnittJetzt(), auchUnveraendert = true) ?: if (hatInhalt()) "Abgelegt unter „${abschnittJetzt().split('|')[2]}“." else "Die Tafel ist leer." } }
+            override fun tafelnTeilen() { bildschirm = Bildschirm.Tafeln }
+        }
+    }
+
     // Nach einem Update einmal kurz zeigen, dass die neue Version läuft.
     var neuigkeiten by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
@@ -392,7 +581,7 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
             onIServPdf = { datei ->
                 bildschirm = Bildschirm.Dateimanager(DateiModus.Speichern(datei.name, "application/pdf") { datei.readBytes() })
             },
-            onTafeln = { bildschirm = Bildschirm.Tafeln },
+            onTafeln = { ablageMeldung = null; bildschirm = Bildschirm.Ablage },
             ueberraschungen = ueberraschungen,
             videoOrdner = syncOrdner,
             onIServOeffnen = { schulOrdner ->
@@ -461,6 +650,13 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
                 onZurueck = { bildschirm = Bildschirm.Brett }
             )
         }
+        is Bildschirm.Ablage -> AblageScreen(
+            ordnerName = ablageOrdner, automatisch = ablageAutomatisch, meldung = ablageMeldung, arbeitet = ablageArbeitet, neuLaden = ablageNeu,
+            aktionen = ablageAktionen,
+            onOrdnerName = { n -> scope.launch { speicher.speichereAblageOrdner(n) } },
+            onAutomatisch = { an -> scope.launch { speicher.speichereAblageAutomatisch(an) } },
+            onZurueck = { bildschirm = Bildschirm.Brett }
+        )
         is Bildschirm.Dateimanager -> VorbildRaster(faktor = symbolGroesse.skalierung * MENUE_FAKTOR) {
             DateiManagerScreen(
                 zugang = if (aktuell.schulOrdner) SchulOrdner.zugang(schulPasswort) else iservZugang,

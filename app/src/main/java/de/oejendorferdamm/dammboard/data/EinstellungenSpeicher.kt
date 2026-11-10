@@ -42,6 +42,8 @@ private object Schluessel {
     val TAFEL_SICHERN = booleanPreferencesKey("tafel_sichern")
     val FORM_ERKENNUNG = booleanPreferencesKey("form_erkennung")
     val KAMERA_KNOPF = booleanPreferencesKey("kamera_knopf")
+    val ABLAGE_ORDNER = stringPreferencesKey("ablage_ordner")
+    val ABLAGE_AUTOMATISCH = booleanPreferencesKey("ablage_automatisch")
     val SYNC_ORDNER = stringPreferencesKey("sync_ordner")
     // Neuer Name: mit 0.9.6 sind alle Easter Eggs aus, auch wo der alte Schalter „ueberraschungen“ an war.
     val UEBERRASCHUNGEN = booleanPreferencesKey("eastereggs_096")
@@ -192,6 +194,17 @@ class EinstellungenSpeicher(private val context: Context) {
 
     suspend fun speichereKameraKnopf(an: Boolean) {
         context.einstellungenDataStore.edit { prefs -> prefs[Schluessel.KAMERA_KNOPF] = an }
+    }
+
+    /** Ablage: Ordnername (Board oder Klasse) und ob nach jeder Stunde / am Tagesende automatisch abgelegt wird */
+    val ablageOrdner: Flow<String> = context.einstellungenDataStore.data.map { prefs -> prefs[Schluessel.ABLAGE_ORDNER] ?: "Tafel" }
+    val ablageAutomatisch: Flow<Boolean> = context.einstellungenDataStore.data.map { prefs -> prefs[Schluessel.ABLAGE_AUTOMATISCH] ?: true }
+
+    suspend fun speichereAblageOrdner(name: String) {
+        context.einstellungenDataStore.edit { prefs -> prefs[Schluessel.ABLAGE_ORDNER] = name.take(60) }
+    }
+    suspend fun speichereAblageAutomatisch(an: Boolean) {
+        context.einstellungenDataStore.edit { prefs -> prefs[Schluessel.ABLAGE_AUTOMATISCH] = an }
     }
 
     suspend fun speichereFormErkennung(aktiv: Boolean) {

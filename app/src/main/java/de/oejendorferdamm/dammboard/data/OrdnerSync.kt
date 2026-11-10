@@ -105,8 +105,13 @@ object OrdnerSync {
 
     /** Tafel öffnen: Arbeitsblätter landen im Blätter-Ordner der App, die Seiten kommen zurück. */
     suspend fun oeffne(context: Context, datei: Uri, neueId: () -> Long): Pair<List<Seite>, Int> = withContext(Dispatchers.IO) {
+        context.contentResolver.openInputStream(datei)?.use { oeffneStrom(context, it, neueId) } ?: throw IOException("Datei lässt sich nicht öffnen")
+    }
+
+    /** Tafel aus einem Datenstrom (Datei im Ordner oder in der Ablage) */
+    fun oeffneStrom(context: Context, roh: java.io.InputStream, neueId: () -> Long): Pair<List<Seite>, Int> {
         var inhalt: ByteArray? = null
-        context.contentResolver.openInputStream(datei)?.use { roh ->
+        run {
             ZipInputStream(roh.buffered()).use { zip ->
                 while (true) {
                     val e = zip.nextEntry ?: break
@@ -128,9 +133,9 @@ object OrdnerSync {
                     }
                 }
             }
-        } ?: throw IOException("Datei lässt sich nicht öffnen")
+        }
         val daten = inhalt ?: throw IOException("Das ist keine DammBoard-Tafel.")
-        DataInputStream(daten.inputStream()).use { TafelSicherung.liesInhalt(context, it, neueId) }
+        return DataInputStream(daten.inputStream()).use { TafelSicherung.liesInhalt(context, it, neueId) }
             ?: throw IOException("Die Tafel ist beschädigt oder von einer neueren DammBoard-Version.")
     }
 
@@ -142,7 +147,7 @@ object OrdnerSync {
         }
     }
 
-    private fun packe(context: Context, seiten: List<SeitenAbbild>, aktiv: Int): ByteArray {
+    internal fun packe(context: Context, seiten: List<SeitenAbbild>, aktiv: Int): ByteArray {
         val aus = ByteArrayOutputStream()
         ZipOutputStream(aus).use { zip ->
             zip.putNextEntry(ZipEntry(INHALT))

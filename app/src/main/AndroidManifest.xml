@@ -8,6 +8,11 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" tools:node="remove" />
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
+    <!-- Stundenplan aus DammTable (Fach der laufenden Stunde, Symbole der Fächer) – nur mit demselben Schlüssel -->
+    <uses-permission android:name="de.oejendorferdamm.dammtable.permission.STUNDENPLAN" />
+    <queries>
+        <provider android:authorities="de.oejendorferdamm.dammtable.stundenplan" />
+    </queries>
     <!-- Für die In-App-Aktualisierung: Installation der von GitHub heruntergeladenen Update-APK. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Nur für die Lautstärke-Ampel (Werkzeugkasten → Extras); es wird nichts aufgenommen oder gespeichert. -->

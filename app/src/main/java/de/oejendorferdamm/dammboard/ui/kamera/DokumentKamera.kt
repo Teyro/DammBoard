@@ -121,7 +121,10 @@ fun DokumentKamera(onAufDieTafel: (datei: String, breite: Int, hoehe: Int) -> Un
     // Kamera öffnen, sobald Kamera und Fläche da sind (nicht, solange ein Standbild gezeigt wird)
     val id = gewaehlt
     val tv = textur
-    DisposableEffect(id, tv, oberflaecheBereit, erlaubt, usb) {
+    // Bei USB nicht an der System-Kamera hängen: Öffnet DammBoard die USB-Kamera, meldet Android das als Änderung der
+    // Kameraliste – die Sitzung würde sonst ständig neu starten (Bild flackert und blitzt).
+    val schluessel: String? = if (usb) "usb" else id
+    DisposableEffect(schluessel, tv, oberflaecheBereit, erlaubt) {
         if (!erlaubt || tv == null || !oberflaecheBereit) return@DisposableEffect onDispose { }
         val groesse = { g: Size -> vorschauGroesse = g; verhaeltnis = g.width.toFloat() / g.height }
         if (usb) {
@@ -295,11 +298,19 @@ private class UsbSitzung(
             helfer = h
             h.setStateCallback(object : com.herohan.uvcapp.ICameraHelper.StateCallback {
                 override fun onAttach(device: UsbDevice) { waehle(device) }
-                override fun onDeviceOpen(device: UsbDevice, isFirstOpen: Boolean) { helfer?.openCamera() }
+                override fun onDeviceOpen(device: UsbDevice, isFirstOpen: Boolean) {
+                    val hh = helfer ?: return
+                    // Schärfstes MJPEG bis Full HD (unkomprimiert ist über USB oft zu viel und reißt ab); sonst Standard
+                    val beste = try {
+                        hh.supportedSizeList.orEmpty().filter { it.type == com.serenegiant.usb.UVCCamera.UVC_VS_FRAME_MJPEG && it.width * it.height <= 1920 * 1080 }
+                            .maxByOrNull { it.width * it.height }
+                    } catch (_: Exception) { null }
+                    if (beste != null) hh.openCamera(beste) else hh.openCamera()
+                }
                 override fun onCameraOpen(device: UsbDevice) {
                     val hh = helfer ?: return
                     hh.startPreview()
-                    hh.previewSize?.let { s -> haupt.post { onGroesse(Size(s.width, s.height)) }; textur.surfaceTexture?.setDefaultBufferSize(s.width, s.height) }
+                    hh.previewSize?.let { s -> haupt.post { onGroesse(Size(s.width, s.height)) } }
                     textur.surfaceTexture?.let { hh.addSurface(it, false) }
                 }
                 override fun onCameraClose(device: UsbDevice) { textur.surfaceTexture?.let { try { helfer?.removeSurface(it) } catch (_: Exception) {} } }

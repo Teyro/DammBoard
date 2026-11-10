@@ -12,8 +12,8 @@ android {
         applicationId = "de.oejendorferdamm.dammboard"
         minSdk = 26
         targetSdk = 34
-        versionCode = 28
-        versionName = "2.0.3"
+        versionCode = 29
+        versionName = "2.1.0"
     }
 
     // Wird nur in CI über Umgebungsvariablen gesetzt (siehe .github/workflows/release.yml);
@@ -70,4 +70,5 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     // Dokumentenkameras direkt per USB (UVC) – für Boards, die USB-Kameras nicht als „externe Kamera“ an Apps weiterreichen
     implementation("com.herohan:UVCAndroid:1.0.13")
+    testImplementation("junit:junit:4.13.2")
 }

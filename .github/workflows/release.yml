@@ -28,7 +28,7 @@ jobs:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
 
       - name: Signierte Release-APK bauen
-        run: ./gradlew assembleRelease
+        run: ./gradlew testReleaseUnitTest assembleRelease
         env:
           RELEASE_KEYSTORE_PATH: release-keystore.p12
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
