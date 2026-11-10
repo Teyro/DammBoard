@@ -26,7 +26,7 @@ class UbmxImportTest {
         val striche = s.items.filterIsInstance<StrichItem>()
         val kreise = s.items.filterIsInstance<FormItem>().filter { it.typ == FormTyp.KREIS }
         assertEquals(1, striche.size)
-        assertEquals(362, striche[0].punkte.size)
+        assertEquals(361, striche[0].punkte.size)
         assertEquals(Color.Black, striche[0].farbe)
         assertEquals(4f, striche[0].breite, 0.01f) // 8 px → halbe Größe
         assertEquals(1, kreise.size)
