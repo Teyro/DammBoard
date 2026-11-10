@@ -4,6 +4,9 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
+import android.hardware.usb.UsbConstants
+import android.hardware.usb.UsbDevice
+import android.hardware.usb.UsbManager
 import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.graphics.SurfaceTexture
@@ -68,8 +71,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Dokumentenkamera im Vollbild: Live-Bild der per USB angeschlossenen Kamera (UVC – das Board reicht sie als
- * „externe Kamera“ an Apps weiter), „Aufnahme“ friert ein Standbild ein, „Auf die Tafel“ legt es als Bild auf die
+ * Dokumentenkamera im Vollbild: Live-Bild der per USB angeschlossenen Kamera. Ist eine USB-Videokamera (UVC) eingesteckt,
+ * wird sie direkt angesprochen (Bibliothek UVCAndroid) – viele Boards reichen sie nicht als „externe Kamera“ an Apps weiter.
+ * Sonst die Kameras des Systems (Camera2); kommt dort nach 4 s kein Bild, wird auf USB gewechselt. „Aufnahme“ friert ein Standbild ein, „Auf die Tafel“ legt es als Bild auf die
  * aktuelle Seite. Die Tafel bleibt solange im Hintergrund. Gibt es mehrere Kameras, steht die externe vorn.
  */
 @Composable
@@ -91,6 +95,9 @@ fun DokumentKamera(onAufDieTafel: (datei: String, breite: Int, hoehe: Int) -> Un
     var standbild by remember { mutableStateOf<Bitmap?>(null) }
     var fehler by remember { mutableStateOf<String?>(null) }
     var speichert by remember { mutableStateOf(false) }
+    // Direkt per USB (UVC) statt über das System
+    var usb by remember { mutableStateOf(usbKamera(context) != null) }
+    var letztesBild by remember { mutableStateOf(0L) }
 
     // Kameras auflisten – auch wenn die Dokumentenkamera erst jetzt eingesteckt wird
     DisposableEffect(erlaubt) {
@@ -114,11 +121,37 @@ fun DokumentKamera(onAufDieTafel: (datei: String, breite: Int, hoehe: Int) -> Un
     // Kamera öffnen, sobald Kamera und Fläche da sind (nicht, solange ein Standbild gezeigt wird)
     val id = gewaehlt
     val tv = textur
-    DisposableEffect(id, tv, oberflaecheBereit, erlaubt) {
-        if (!erlaubt || id == null || tv == null || !oberflaecheBereit) return@DisposableEffect onDispose { }
-        val sitzung = KameraSitzung(context, id, tv, onGroesse = { g -> vorschauGroesse = g; verhaeltnis = g.width.toFloat() / g.height }, onFehler = { fehler = it })
+    DisposableEffect(id, tv, oberflaecheBereit, erlaubt, usb) {
+        if (!erlaubt || tv == null || !oberflaecheBereit) return@DisposableEffect onDispose { }
+        val groesse = { g: Size -> vorschauGroesse = g; verhaeltnis = g.width.toFloat() / g.height }
+        if (usb) {
+            fehler = null
+            val s = UsbSitzung(context, tv, onGroesse = groesse, onFehler = { fehler = it })
+            s.starte()
+            return@DisposableEffect onDispose { s.schliessen() }
+        }
+        if (id == null) return@DisposableEffect onDispose { }
+        val sitzung = KameraSitzung(context, id, tv, onGroesse = groesse, onFehler = { fehler = it })
         sitzung.starte()
-        onDispose { sitzung.schliessen() }
+        letztesBild = 0L
+        // Kein Bild nach 4 s, aber eine USB-Kamera steckt? Dann direkt per USB.
+        val wache = Handler(Looper.getMainLooper())
+        val pruefen = Runnable { if (letztesBild == 0L && usbKamera(context) != null) usb = true }
+        wache.postDelayed(pruefen, 4000)
+        onDispose { wache.removeCallbacks(pruefen); sitzung.schliessen() }
+    }
+
+    // USB-Kamera eingesteckt oder abgezogen, während die Kamera offen ist
+    DisposableEffect(Unit) {
+        val empfaenger = object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: Context, i: android.content.Intent) {
+                val da = usbKamera(context) != null
+                if (da != usb) { usb = da; fehler = null }
+            }
+        }
+        val filter = android.content.IntentFilter().apply { addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED); addAction(UsbManager.ACTION_USB_DEVICE_DETACHED) }
+        ContextCompat.registerReceiver(context, empfaenger, filter, ContextCompat.RECEIVER_EXPORTED)
+        onDispose { try { context.unregisterReceiver(empfaenger) } catch (_: Exception) {} }
     }
 
     fun aufnehmen(): Bitmap? {
@@ -142,7 +175,7 @@ fun DokumentKamera(onAufDieTafel: (datei: String, breite: Int, hoehe: Int) -> Un
             when {
                 !erlaubt -> Hinweis(if (abgelehnt) "Ohne Kamera-Erlaubnis geht es nicht. Bitte in den Android-Einstellungen für DammBoard „Kamera“ erlauben." else "Kamera-Erlaubnis wird angefragt …")
                 fehler != null -> Hinweis(fehler!!)
-                kameras.isEmpty() -> Hinweis("Keine Kamera gefunden. Ist die Dokumentenkamera per USB eingesteckt? Manche Boards reichen USB-Kameras nicht an Apps weiter – dann geht es nur mit der Kamera-App des Boards.")
+                !usb && kameras.isEmpty() -> Hinweis("Keine Kamera gefunden. Ist die Dokumentenkamera per USB eingesteckt? Manche Boards reichen USB-Kameras nicht an Apps weiter – dann geht es nur mit der Kamera-App des Boards.")
                 bild != null -> Image(bild.asImageBitmap(), contentDescription = "Aufnahme", contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
                 else -> {
                     val gedreht = drehung % 180 != 0
@@ -154,7 +187,7 @@ fun DokumentKamera(onAufDieTafel: (datei: String, breite: Int, hoehe: Int) -> Un
                                         override fun onSurfaceTextureAvailable(s: SurfaceTexture, w: Int, h: Int) { oberflaecheBereit = true }
                                         override fun onSurfaceTextureSizeChanged(s: SurfaceTexture, w: Int, h: Int) {}
                                         override fun onSurfaceTextureDestroyed(s: SurfaceTexture): Boolean { oberflaecheBereit = false; return true }
-                                        override fun onSurfaceTextureUpdated(s: SurfaceTexture) {}
+                                        override fun onSurfaceTextureUpdated(s: SurfaceTexture) { if (letztesBild == 0L) letztesBild = System.currentTimeMillis() }
                                     }
                                     if (isAvailable) oberflaecheBereit = true
                                     textur = this
@@ -183,7 +216,7 @@ fun DokumentKamera(onAufDieTafel: (datei: String, breite: Int, hoehe: Int) -> Un
             Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 22.dp),
             horizontalArrangement = Arrangement.spacedBy(18.dp), verticalAlignment = Alignment.CenterVertically
         ) {
-            if (kameras.size > 1 && standbild == null) {
+            if (!usb && kameras.size > 1 && standbild == null) {
                 KameraKnopf("🔁", "Kamera wechseln") {
                     val i = kameras.indexOf(gewaehlt)
                     gewaehlt = kameras[(i + 1) % kameras.size]
@@ -191,13 +224,13 @@ fun DokumentKamera(onAufDieTafel: (datei: String, breite: Int, hoehe: Int) -> Un
             }
             KameraKnopf("⟳", "Drehen") { drehung = (drehung + 90) % 360; standbild = null }
             if (standbild == null) {
-                KameraKnopf("📸", "Aufnahme", hervorgehoben = true, aktiv = erlaubt && kameras.isNotEmpty() && fehler == null) {
+                KameraKnopf("📸", "Aufnahme", hervorgehoben = true, aktiv = erlaubt && (usb || kameras.isNotEmpty()) && fehler == null) {
                     standbild = try { aufnehmen() } catch (e: Exception) { null }
                 }
             } else {
                 KameraKnopf("↺", "Neu aufnehmen") { standbild = null }
             }
-            KameraKnopf("📋", if (speichert) "Wird eingefügt …" else "Auf die Tafel", hervorgehoben = standbild != null, aktiv = !speichert && erlaubt && kameras.isNotEmpty()) {
+            KameraKnopf("📋", if (speichert) "Wird eingefügt …" else "Auf die Tafel", hervorgehoben = standbild != null, aktiv = !speichert && erlaubt && (usb || kameras.isNotEmpty())) {
                 val bild = standbild ?: try { aufnehmen() } catch (e: Exception) { null }
                 if (bild != null) {
                     speichert = true
@@ -230,6 +263,68 @@ private fun KameraKnopf(zeichen: String, titel: String, hervorgehoben: Boolean =
     ) {
         Text(zeichen, fontSize = 30.sp, color = if (hervorgehoben) Color.White else Color(0xFF2B2B2B))
         Text(titel, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = if (hervorgehoben) Color.White else Color(0xFF2B2B2B))
+    }
+}
+
+/** Eingesteckte USB-Videokamera (UVC: Schnittstelle der Klasse „Video“), sonst null */
+internal fun usbKamera(context: Context): UsbDevice? {
+    val m = context.getSystemService(Context.USB_SERVICE) as? UsbManager ?: return null
+    return try {
+        m.deviceList.values.firstOrNull { d -> (0 until d.interfaceCount).any { d.getInterface(it).interfaceClass == UsbConstants.USB_CLASS_VIDEO } }
+    } catch (_: Exception) { null }
+}
+
+/**
+ * Vorschau direkt über USB (UVCAndroid): Gerät wählen → Android fragt nach dem USB-Zugriff → Kamera öffnen →
+ * Vorschau auf die TextureView. Standbild wie bei Camera2 über TextureView.getBitmap.
+ */
+private class UsbSitzung(
+    private val context: Context,
+    private val textur: TextureView,
+    private val onGroesse: (Size) -> Unit,
+    private val onFehler: (String) -> Unit
+) {
+    private var helfer: com.herohan.uvcapp.CameraHelper? = null
+    private var gewaehlt = false
+    private val haupt = Handler(Looper.getMainLooper())
+
+    fun starte() {
+        try {
+            com.serenegiant.utils.UVCUtils.init(context.applicationContext as android.app.Application)
+            val h = com.herohan.uvcapp.CameraHelper()
+            helfer = h
+            h.setStateCallback(object : com.herohan.uvcapp.ICameraHelper.StateCallback {
+                override fun onAttach(device: UsbDevice) { waehle(device) }
+                override fun onDeviceOpen(device: UsbDevice, isFirstOpen: Boolean) { helfer?.openCamera() }
+                override fun onCameraOpen(device: UsbDevice) {
+                    val hh = helfer ?: return
+                    hh.startPreview()
+                    hh.previewSize?.let { s -> haupt.post { onGroesse(Size(s.width, s.height)) }; textur.surfaceTexture?.setDefaultBufferSize(s.width, s.height) }
+                    textur.surfaceTexture?.let { hh.addSurface(it, false) }
+                }
+                override fun onCameraClose(device: UsbDevice) { textur.surfaceTexture?.let { try { helfer?.removeSurface(it) } catch (_: Exception) {} } }
+                override fun onDeviceClose(device: UsbDevice) {}
+                override fun onDetach(device: UsbDevice) { gewaehlt = false; haupt.post { onFehler("Die Kamera wurde getrennt. Bitte wieder einstecken.") } }
+                override fun onCancel(device: UsbDevice) { gewaehlt = false; haupt.post { onFehler("Ohne USB-Zugriff geht es nicht. Bitte die Kamera abziehen, wieder einstecken und beim Nachfragen „OK“ tippen (am besten mit Haken bei „Immer“).") } }
+                override fun onError(device: UsbDevice, e: com.herohan.uvcapp.CameraException) { haupt.post { onFehler("Die USB-Kamera meldet einen Fehler: ${e.message ?: "unbekannt"}") } }
+            })
+            // schon eingesteckt? Dann gleich wählen (onAttach kommt nicht auf jedem Gerät für bereits angeschlossene Kameras)
+            haupt.postDelayed({ usbKamera(context)?.let { waehle(it) } }, 300)
+        } catch (e: Throwable) {
+            onFehler("Die USB-Kamera lässt sich nicht starten: ${e.message ?: e.javaClass.simpleName}")
+        }
+    }
+
+    private fun waehle(d: UsbDevice) {
+        if (gewaehlt) return
+        if ((0 until d.interfaceCount).none { d.getInterface(it).interfaceClass == UsbConstants.USB_CLASS_VIDEO }) return
+        gewaehlt = true
+        try { helfer?.selectDevice(d) } catch (e: Exception) { gewaehlt = false; onFehler("Die USB-Kamera lässt sich nicht wählen: ${e.message}") }
+    }
+
+    fun schliessen() {
+        try { helfer?.release() } catch (_: Throwable) {}
+        helfer = null
     }
 }
 
@@ -292,10 +387,14 @@ private class KameraSitzung(
                     if (geschlossen) { s.close(); return }
                     sitzung = s
                     try {
+                        // Autofokus nur, wenn die Kamera ihn kann – manche USB-Kameras liefern sonst gar kein Bild
+                        val afModi = try {
+                            (context.getSystemService(Context.CAMERA_SERVICE) as CameraManager).getCameraCharacteristics(id).get(CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES)
+                        } catch (_: Exception) { null }
                         val anfrage = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {
                             addTarget(flaeche)
                             set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
-                            set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
+                            if (afModi?.contains(CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE) == true) set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
                         }
                         s.setRepeatingRequest(anfrage.build(), null, haupt)
                     } catch (e: Exception) {
