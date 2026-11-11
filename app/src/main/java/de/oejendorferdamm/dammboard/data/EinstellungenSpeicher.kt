@@ -190,7 +190,7 @@ class EinstellungenSpeicher(private val context: Context) {
     }
 
     /** Knopf „Dokumentenkamera“ unten links zeigen – standardmäßig an. */
-    val kameraKnopf: Flow<Boolean> = context.einstellungenDataStore.data.map { prefs -> prefs[Schluessel.KAMERA_KNOPF] ?: true }
+    val kameraKnopf: Flow<Boolean> = context.einstellungenDataStore.data.map { prefs -> prefs[Schluessel.KAMERA_KNOPF] ?: kameraStandard }
 
     suspend fun speichereKameraKnopf(an: Boolean) {
         context.einstellungenDataStore.edit { prefs -> prefs[Schluessel.KAMERA_KNOPF] = an }
@@ -259,3 +259,13 @@ class EinstellungenSpeicher(private val context: Context) {
         }
     }
 }
+
+/**
+ * Kamera-Knopf von Haus aus: auf den älteren CTOUCH-Boards (Android 9 oder älter bzw. Hersteller CTOUCH) aus –
+ * dort hängt meist keine Dokumentenkamera. Wer ihn selbst geschaltet hat, behält seine Wahl.
+ */
+val kameraStandard: Boolean
+    get() {
+        val geraet = (android.os.Build.MANUFACTURER + " " + android.os.Build.BRAND + " " + android.os.Build.MODEL).lowercase()
+        return android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q && !geraet.contains("ctouch")
+    }

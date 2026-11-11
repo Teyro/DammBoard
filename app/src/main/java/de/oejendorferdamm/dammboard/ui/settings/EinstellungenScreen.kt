@@ -131,7 +131,7 @@ fun EinstellungenScreen(
         ) {
             val titel = when (seite) {
                 "update" -> "Updates"; "darstellung" -> "Darstellung"; "zeichnen" -> "Zeichnen und Radieren"
-                "tafel" -> "Tafel"; "spass" -> "Überraschungen"; "iserv" -> "IServ"; "ueber" -> "Über DammBoard"
+                "tafel" -> "Tafel"; "spass" -> "Überraschungen"; "iserv" -> "IServ"; "ueber" -> "Über DammBoard"; "kamera" -> "Dokumentenkamera"
                 else -> "Einstellungen"
             }
             // Zurück-Taste: erst zur Übersicht, dann wie das ✕
@@ -163,7 +163,9 @@ fun EinstellungenScreen(
                         if (updateInfo != null) "Neue Version ${updateInfo.version} verfügbar" else "Installiert: $aktuelleVersion · automatisch prüfen ${an(autoUpdatePruefung)}",
                         hinweis = updateInfo != null) { seite = "update" }
                     BereichZeile("🎨", Color(0xFF7C3AED), "Darstellung",
-                        "${if (aktuellerModus == AnimationsModus.NORMAL) "Normal" else "Performance"} · Symbole ${aktuelleSymbolGroesse.bezeichnung} · Kamera-Knopf ${an(kameraKnopf)}") { seite = "darstellung" }
+                        "${if (aktuellerModus == AnimationsModus.NORMAL) "Normal" else "Performance"} · Symbole ${aktuelleSymbolGroesse.bezeichnung}") { seite = "darstellung" }
+                    BereichZeile("📷", Color(0xFFE01E3C), "Dokumentenkamera",
+                        if (kameraKnopf) "an – Knopf unten links in der Leiste" else "aus – kein Kamera-Knopf") { seite = "kamera" }
                     BereichZeile("✏️", Color(0xFFD97706), "Zeichnen und Radieren",
                         "Formerkennung ${an(formErkennung)} · Radierer ${if (radierenStueckweise) "stückweise" else "ganz"} · Handballen ${an(handballenRadieren)}") { seite = "zeichnen" }
                     BereichZeile("🗂", Color(0xFF0891B2), "Tafel",
@@ -220,10 +222,12 @@ fun EinstellungenScreen(
                 }
             }
 
-            Spacer(Modifier.height(22.dp))
+                }
+                "kamera" -> {
             SchalterZeile(
                 "Kamera-Knopf zeigen",
-                "Knopf „Dokumentenkamera“ unten links in der Leiste. Aus, wenn an diesem Board keine Dokumentenkamera hängt.",
+                "Knopf „Dokumentenkamera“ unten links in der Leiste: fotografieren, zuschneiden, drehen, Zauberstab – und als Bild auf die Tafel. " +
+                    "Aus, wenn an diesem Board keine Dokumentenkamera hängt (auf den älteren CTOUCH-Boards ist sie von Haus aus aus).",
                 kameraKnopf, onKameraKnopfGeaendert
             )
                 }

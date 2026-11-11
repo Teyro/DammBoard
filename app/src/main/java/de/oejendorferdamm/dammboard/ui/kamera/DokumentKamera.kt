@@ -56,6 +56,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
@@ -95,6 +98,9 @@ fun DokumentKamera(onAufDieTafel: (datei: String, breite: Int, hoehe: Int) -> Un
     var standbild by remember { mutableStateOf<Bitmap?>(null) }
     var fehler by remember { mutableStateOf<String?>(null) }
     var speichert by remember { mutableStateOf(false) }
+    /** Ecken beim Zuschneiden (null = nicht im Zuschneiden) */
+    var zuschnitt by remember { mutableStateOf<List<Punkt>?>(null) }
+    var hinweis by remember { mutableStateOf<String?>(null) }
     // Direkt per USB (UVC) statt über das System
     var usb by remember { mutableStateOf(usbKamera(context) != null) }
     var letztesBild by remember { mutableStateOf(0L) }
@@ -179,6 +185,7 @@ fun DokumentKamera(onAufDieTafel: (datei: String, breite: Int, hoehe: Int) -> Un
                 !erlaubt -> Hinweis(if (abgelehnt) "Ohne Kamera-Erlaubnis geht es nicht. Bitte in den Android-Einstellungen für DammBoard „Kamera“ erlauben." else "Kamera-Erlaubnis wird angefragt …")
                 fehler != null -> Hinweis(fehler!!)
                 !usb && kameras.isEmpty() -> Hinweis("Keine Kamera gefunden. Ist die Dokumentenkamera per USB eingesteckt? Manche Boards reichen USB-Kameras nicht an Apps weiter – dann geht es nur mit der Kamera-App des Boards.")
+                bild != null && zuschnitt != null -> ZuschneideAnsicht(bild, zuschnitt!!) { zuschnitt = it }
                 bild != null -> Image(bild.asImageBitmap(), contentDescription = "Aufnahme", contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
                 else -> {
                     val gedreht = drehung % 180 != 0
@@ -214,18 +221,68 @@ fun DokumentKamera(onAufDieTafel: (datei: String, breite: Int, hoehe: Int) -> Un
             contentAlignment = Alignment.Center
         ) { Text("✕", fontSize = 28.sp, color = Color(0xFF2B2B2B)) }
 
+        // --- kurzer Hinweis (z. B. Zauberstab fand kein Blatt)
+        hinweis?.let { h ->
+            LaunchedEffect(h) { kotlinx.coroutines.delay(4000); hinweis = null }
+            Text(
+                h, color = Color.White, fontSize = 20.sp, textAlign = TextAlign.Center,
+                modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 24.dp)
+                    .clip(RoundedCornerShape(16.dp)).background(Color(0xCC000000)).padding(horizontal = 24.dp, vertical = 12.dp)
+            )
+        }
+
         // --- Knöpfe unten
         Row(
             Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 22.dp),
             horizontalArrangement = Arrangement.spacedBy(18.dp), verticalAlignment = Alignment.CenterVertically
         ) {
+          val still = standbild
+          if (still != null && zuschnitt != null) {
+            // Zuschneiden: Ecken ziehen, dann übernehmen (zieht das Bild auch gerade)
+            KameraKnopf("✕", "Abbrechen") { zuschnitt = null }
+            KameraKnopf("🪄", "Blatt suchen") {
+                scope.launch {
+                    val e = withContext(Dispatchers.Default) { try { BlattErkennung.finde(still) } catch (_: Exception) { null } }
+                    if (e != null) zuschnitt = e else hinweis = "Kein Blatt erkannt – bitte die Ecken von Hand ziehen."
+                }
+            }
+            KameraKnopf("✓", "Übernehmen", hervorgehoben = true) {
+                val e = zuschnitt!!
+                scope.launch {
+                    standbild = withContext(Dispatchers.Default) { try { BlattErkennung.geradeZiehen(still, e) } catch (_: Exception) { still } }
+                    zuschnitt = null
+                }
+            }
+          } else {
             if (!usb && kameras.size > 1 && standbild == null) {
                 KameraKnopf("🔁", "Kamera wechseln") {
                     val i = kameras.indexOf(gewaehlt)
                     gewaehlt = kameras[(i + 1) % kameras.size]
                 }
             }
-            KameraKnopf("⟳", "Drehen") { drehung = (drehung + 90) % 360; standbild = null }
+            // Drehen: im Standbild das Foto selbst, sonst die Vorschau
+            KameraKnopf("⟳", "Drehen") {
+                if (still != null) scope.launch { standbild = withContext(Dispatchers.Default) { BlattErkennung.drehe(still) } }
+                else drehung = (drehung + 90) % 360
+            }
+            if (still != null) {
+                KameraKnopf("✂", "Zuschneiden") {
+                    val r = 0.06f
+                    zuschnitt = listOf(
+                        Punkt(still.width * r, still.height * r), Punkt(still.width * (1 - r), still.height * r),
+                        Punkt(still.width * (1 - r), still.height * (1 - r)), Punkt(still.width * r, still.height * (1 - r))
+                    )
+                }
+                // Zauberstab: Blatt finden, ausschneiden, gerade ziehen (nahe A4 → genau A4)
+                KameraKnopf("🪄", "Zauberstab") {
+                    scope.launch {
+                        val neu = withContext(Dispatchers.Default) {
+                            try { BlattErkennung.finde(still)?.let { BlattErkennung.geradeZiehen(still, it) } } catch (_: Exception) { null }
+                        }
+                        if (neu != null) standbild = neu else hinweis = "Kein Blatt erkannt – mit „Zuschneiden“ geht es von Hand."
+                    }
+                }
+            }
             if (standbild == null) {
                 KameraKnopf("📸", "Aufnahme", hervorgehoben = true, aktiv = erlaubt && (usb || kameras.isNotEmpty()) && fehler == null) {
                     standbild = try { aufnehmen() } catch (e: Exception) { null }
@@ -244,6 +301,60 @@ fun DokumentKamera(onAufDieTafel: (datei: String, breite: Int, hoehe: Int) -> Un
                     }
                 }
             }
+          }
+        }
+    }
+}
+
+/** Standbild mit vier ziehbaren Ecken; außerhalb des Vierecks abgedunkelt. */
+@Composable
+private fun ZuschneideAnsicht(bild: Bitmap, ecken: List<Punkt>, onEcken: (List<Punkt>) -> Unit) {
+    val bildIb = remember(bild) { bild.asImageBitmap() }
+    val aktuell by androidx.compose.runtime.rememberUpdatedState(ecken)
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+        val dichte = androidx.compose.ui.platform.LocalDensity.current
+        val bPx = with(dichte) { maxWidth.toPx() }
+        val hPx = with(dichte) { maxHeight.toPx() }
+        val s = minOf(bPx / bild.width, hPx / bild.height)
+        val ox = (bPx - bild.width * s) / 2f
+        val oy = (hPx - bild.height * s) / 2f
+        var gezogen by remember { mutableIntStateOf(-1) }
+        androidx.compose.foundation.Canvas(
+            Modifier.fillMaxSize().pointerInput(bild) {
+                detectDragGestures(
+                    onDragStart = { p ->
+                        // nächste Ecke (großzügig: auf dem Board mit dem Finger)
+                        val i = aktuell.indices.minByOrNull { k -> val e = aktuell[k]; kotlin.math.hypot(ox + e.x * s - p.x, oy + e.y * s - p.y) } ?: -1
+                        gezogen = if (i >= 0 && kotlin.math.hypot(ox + aktuell[i].x * s - p.x, oy + aktuell[i].y * s - p.y) < 160f) i else -1
+                    },
+                    onDragEnd = { gezogen = -1 },
+                    onDragCancel = { gezogen = -1 }
+                ) { change, d ->
+                    if (gezogen < 0) return@detectDragGestures
+                    change.consume()
+                    val e = aktuell[gezogen]
+                    val neu = Punkt((e.x + d.x / s).coerceIn(0f, bild.width.toFloat()), (e.y + d.y / s).coerceIn(0f, bild.height.toFloat()))
+                    onEcken(aktuell.toMutableList().also { it[gezogen] = neu })
+                }
+            }
+        ) {
+            drawImage(
+                bildIb, dstOffset = androidx.compose.ui.unit.IntOffset(ox.toInt(), oy.toInt()),
+                dstSize = androidx.compose.ui.unit.IntSize((bild.width * s).toInt(), (bild.height * s).toInt())
+            )
+            val pfad = androidx.compose.ui.graphics.Path().apply {
+                ecken.forEachIndexed { i, e -> if (i == 0) moveTo(ox + e.x * s, oy + e.y * s) else lineTo(ox + e.x * s, oy + e.y * s) }
+                close()
+            }
+            clipPath(pfad, androidx.compose.ui.graphics.ClipOp.Difference) {
+                drawRect(Color(0x99000000))
+            }
+            drawPath(pfad, Color.White, style = androidx.compose.ui.graphics.drawscope.Stroke(4.dp.toPx()))
+            ecken.forEachIndexed { i, e ->
+                val m = androidx.compose.ui.geometry.Offset(ox + e.x * s, oy + e.y * s)
+                drawCircle(Color.White, 26.dp.toPx(), m)
+                drawCircle(if (i == gezogen) Color(0xFFE01E3C) else Color(0xFF1F2124), 18.dp.toPx(), m)
+            }
         }
     }
 }
@@ -258,7 +369,7 @@ private fun KameraKnopf(zeichen: String, titel: String, hervorgehoben: Boolean =
     Column(
         Modifier
             .clip(RoundedCornerShape(20.dp))
-            .background(if (hervorgehoben) Color(0xFF5E8C6A) else Color(0xFFEBEBEB))
+            .background(if (hervorgehoben) Color(0xFFE01E3C) else Color.White)
             .clickable(enabled = aktiv, role = Role.Button, onClick = onClick)
             .padding(horizontal = 26.dp, vertical = 12.dp)
             .graphicsLayer { alpha = if (aktiv) 1f else 0.45f },

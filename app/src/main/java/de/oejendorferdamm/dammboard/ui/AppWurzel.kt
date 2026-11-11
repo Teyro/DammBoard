@@ -81,7 +81,7 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
     val gespeicherterHintergrund by speicher.gespeicherterHintergrund.collectAsState(initial = null)
     val tafelSichern by speicher.tafelSichern.collectAsState(initial = true)
     val formErkennung by speicher.formErkennung.collectAsState(initial = true)
-    val kameraKnopf by speicher.kameraKnopf.collectAsState(initial = true)
+    val kameraKnopf by speicher.kameraKnopf.collectAsState(initial = de.oejendorferdamm.dammboard.data.kameraStandard)
     val syncOrdnerText by speicher.syncOrdner.collectAsState(initial = null)
     val syncOrdner = syncOrdnerText?.let { android.net.Uri.parse(it) }
     // Für Abläufe, die länger leben als ein Bildaufbau (Sicherung, Abgleich): immer den aktuellen Ordner lesen

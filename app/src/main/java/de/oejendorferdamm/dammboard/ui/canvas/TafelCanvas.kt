@@ -970,9 +970,8 @@ private fun DrawScope.zeichneSeitenInhalt(
             2f * p, gestricheltEffekt(p), cap = StrokeCap.Butt
         )
     }
-    // Bilder liegen immer unten – darauf wird geschrieben (auch nach Rückgängig/Wiederholen)
-    items.forEach { item -> if (item is BildItem) zeichneBild(item) }
-    items.forEach { item -> if (item !is BildItem) zeichneItem(item, pfadCache) }
+    // In der Reihenfolge des Einfügens: ein neues Kamerabild liegt vorn, was danach geschrieben wird, liegt darauf
+    items.forEach { item -> zeichneItem(item, pfadCache) }
 }
 
 /** Ein Bild auf der Tafel – noch nicht geladen: heller Platzhalter mit Rahmen. */

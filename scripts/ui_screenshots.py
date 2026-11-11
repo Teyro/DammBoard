@@ -780,6 +780,23 @@ def dokumentenkamera(breite, hoehe):
     tippe_text("Aufnahme")
     time.sleep(1)
     screenshot("51_aufnahme.png")
+    # 2.2: Standbild drehen, zuschneiden (Ecken ziehen), Zauberstab
+    tippe_text("Drehen")
+    time.sleep(1.5)
+    screenshot("51a_standbild_gedreht.png")
+    tippe_text("Drehen"); time.sleep(1); tippe_text("Drehen"); time.sleep(1); tippe_text("Drehen"); time.sleep(1.5)
+    if tippe_text("Zuschneiden"):
+        time.sleep(1)
+        b0, h0 = bildschirm_groesse()
+        adb("shell", "input", "swipe", str(int(b0 * 0.2)), str(int(h0 * 0.15)), str(int(b0 * 0.3)), str(int(h0 * 0.25)), "600")
+        time.sleep(1)
+        screenshot("51b_zuschneiden.png")
+        tippe_text("Übernehmen")
+        time.sleep(2)
+        screenshot("51c_zugeschnitten.png")
+    if tippe_text("Zauberstab"):
+        time.sleep(2.5)
+        screenshot("51d_zauberstab.png")
     tippe_text("Auf die Tafel")
     time.sleep(2)
     screenshot("52_bild_auf_tafel.png")
@@ -966,7 +983,7 @@ def main():
         screenshot("12b_einstellungen_gescrollt.png")
         adb("shell", "input", "keyevent", "KEYCODE_BACK")  # zurück zur Übersicht
         time.sleep(1)
-        tippe_text("Darstellung")
+        tippe_text("Dokumentenkamera")
         time.sleep(1)
         tippe_text("Kamera-Knopf zeigen")
         screenshot("12c_einstellungen_darstellung.png")
@@ -978,7 +995,7 @@ def main():
         # Kamera-Knopf wieder einschalten
         if tippe_mitte_von("Menü"):
             time.sleep(1.5)
-            tippe_text("Darstellung")
+            tippe_text("Dokumentenkamera")
             time.sleep(1)
             tippe_text("Kamera-Knopf zeigen")
             time.sleep(0.5)
