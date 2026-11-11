@@ -40,6 +40,8 @@ class BlattErkennungTest {
     fun ohneBlattNichts() {
         assertNull(BlattErkennung.ecken(IntArray(100 * 100) { 128 }, 100, 100))
         assertNull(BlattErkennung.ecken(bild(100, 100) { x, y -> x < 5 && y < 5 }, 100, 100))
+        // Treppe/L-Form (wie heller Himmel über Häusern) ist kein Blatt
+        assertNull(BlattErkennung.ecken(bild(200, 150) { x, y -> y < 40 || (x < 60 && y < 120) }, 200, 150))
     }
 
     @Test

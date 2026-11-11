@@ -62,7 +62,19 @@ object BlattErkennung {
         }
         val ecken = listOf(ol, or, ur, ul)
         // entartet (z. B. nur ein Streifen)? dann lieber nichts tun
-        if (flaeche(ecken) < grau.size * 0.1f) return null
+        val f = flaeche(ecken)
+        if (f < grau.size * 0.1f) return null
+        // Ein Blatt füllt sein Viereck fast ganz aus (Himmel, Treppenstufen, Lichtflecken nicht)
+        if (besteGroesse < f * 0.85f) return null
+        // … und hat ungefähr rechte Winkel (schräg fotografiert: großzügig)
+        for (i in 0..3) {
+            val a = ecken[(i + 3) % 4]; val m = ecken[i]; val c = ecken[(i + 1) % 4]
+            val w = Math.toDegrees(kotlin.math.abs(kotlin.math.atan2(
+                ((a.x - m.x) * (c.y - m.y) - (a.y - m.y) * (c.x - m.x)).toDouble(),
+                ((a.x - m.x) * (c.x - m.x) + (a.y - m.y) * (c.y - m.y)).toDouble()
+            )))
+            if (w < 55.0 || w > 125.0) return null
+        }
         return ecken
     }
 
