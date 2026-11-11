@@ -40,11 +40,11 @@ import java.io.File
 
 /* Gemeinsame Bausteine der schwebenden Helfer (Maße in Vorbild-Pixeln, siehe ui/Skalierung.kt). */
 
-internal val HelferFlaeche = Color(0xFFF4F4F2)
-internal val HelferText = Color(0xFF2B2B2B)
-internal val HelferTextSchwach = Color(0xFF6E6E6E)
-internal val HelferAkzent = Color(0xFF3A5C4A)
-internal val HelferKnopf = Color(0xFFE2E2DE)
+internal val HelferFlaeche = Color(0xFFECEEF1) // Farben wie in DammZeit
+internal val HelferText = Color(0xFF1F2124)
+internal val HelferTextSchwach = Color(0xFF6B7078)
+internal val HelferAkzent = Color(0xFFE01E3C)
+internal val HelferKnopf = Color(0xFFE1E4E8)
 
 /**
  * Karte eines Helfers: Titelzeile zum Verschieben und ein Schließen-Knopf. Fängt alle
@@ -89,7 +89,9 @@ internal fun HelferKarte(
             Box(
                 modifier = Modifier
                     .size(46.dp)
+                    .shadow(3.dp, CircleShape)
                     .clip(CircleShape)
+                    .background(Color.White)
                     .clickable(role = Role.Button, onClick = onSchliessen)
                     .semantics { contentDescription = "$titel schließen" },
                 contentAlignment = Alignment.Center

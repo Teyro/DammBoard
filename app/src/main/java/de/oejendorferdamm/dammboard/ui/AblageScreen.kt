@@ -63,10 +63,10 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val Grund = Color(0xFFF2F1ED)
-private val Schrift1 = Color(0xFF2B2B28)
-private val Schrift2 = Color(0xFF8A8880)
-private val Gruen = Color(0xFF3A5C4A)
+private val Grund = Color(0xFFECEEF1) // Farben wie in DammZeit
+private val Schrift1 = Color(0xFF1F2124)
+private val Schrift2 = Color(0xFF6B7078)
+private val Akzent = Color(0xFFE01E3C)
 private val Rot = Color(0xFFB3261E)
 
 interface AblageAktionen {
@@ -139,8 +139,8 @@ fun AblageScreen(
                     AllgemeinSymbol(AllgemeinesSymbol.SCHLIESSEN, Modifier.size(16.dp), Schrift1)
                 }
             }
-            meldung?.let { Spacer(Modifier.height(6.dp)); Text(it, color = if (it.startsWith("Fehler") || it.contains("nicht")) Rot else Gruen, fontSize = 14.sp) }
-            if (arbeitet) { Spacer(Modifier.height(6.dp)); CircularProgressIndicator(color = Gruen, modifier = Modifier.size(26.dp)) }
+            meldung?.let { Spacer(Modifier.height(6.dp)); Text(it, color = if (it.startsWith("Fehler") || it.contains("nicht")) Rot else Akzent, fontSize = 14.sp) }
+            if (arbeitet) { Spacer(Modifier.height(6.dp)); CircularProgressIndicator(color = Akzent, modifier = Modifier.size(26.dp)) }
             Spacer(Modifier.height(12.dp))
 
             if (einstellungen && fach == null) {
@@ -148,7 +148,7 @@ fun AblageScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         OutlinedTextField(name, { name = it.take(60) }, singleLine = true, label = { Text("Name der Ablage (Board oder Klasse, z. B. 2a)") }, modifier = Modifier.weight(1f))
                         Spacer(Modifier.width(8.dp))
-                        Button(onClick = { onOrdnerName(name.trim().ifBlank { "Tafel" }) }, colors = ButtonDefaults.buttonColors(containerColor = Gruen)) { Text("Übernehmen") }
+                        Button(onClick = { onOrdnerName(name.trim().ifBlank { "Tafel" }) }, colors = ButtonDefaults.buttonColors(containerColor = Akzent)) { Text("Übernehmen") }
                     }
                     Spacer(Modifier.height(10.dp))
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { onAutomatisch(!automatisch) }) {
@@ -156,7 +156,7 @@ fun AblageScreen(
                             Text("Automatisch ablegen", color = Schrift1, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                             Text("Nach jeder Stunde in den Ordner des Fachs (aus dem Stundenplan von DammTable), am Ende des Tages und beim Ausschalten. Am nächsten Tag startet die Tafel leer.", color = Schrift2, fontSize = 12.sp)
                         }
-                        Switch(checked = automatisch, onCheckedChange = onAutomatisch, colors = SwitchDefaults.colors(checkedTrackColor = Gruen))
+                        Switch(checked = automatisch, onCheckedChange = onAutomatisch, colors = SwitchDefaults.colors(checkedTrackColor = Akzent, checkedThumbColor = Color.White))
                     }
                     Spacer(Modifier.height(10.dp))
                     Row {
@@ -184,7 +184,7 @@ fun AblageScreen(
                             val s = symbole[x.name]
                             Box(Modifier.fillMaxWidth().aspectRatio(1.6f).clip(RoundedCornerShape(12.dp)).background(Color(0xFFE8EEE9)), contentAlignment = Alignment.Center) {
                                 if (s != null) Image(s.asImageBitmap(), contentDescription = x.name, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(6.dp))
-                                else Text(x.name.take(2).uppercase(), color = Gruen, fontSize = 40.sp, fontWeight = FontWeight.Bold)
+                                else Text(x.name.take(2).uppercase(), color = Akzent, fontSize = 40.sp, fontWeight = FontWeight.Bold)
                             }
                             Spacer(Modifier.height(8.dp))
                             Text(x.name, color = Schrift1, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
@@ -219,7 +219,7 @@ fun AblageScreen(
         }
 
         oeffnenFrage?.let { e ->
-            AblageFrage("„${e.name}“ öffnen? Die Tafel, die gerade zu sehen ist, wird vorher abgelegt.", "Öffnen", Gruen,
+            AblageFrage("„${e.name}“ öffnen? Die Tafel, die gerade zu sehen ist, wird vorher abgelegt.", "Öffnen", Akzent,
                 onJa = { oeffnenFrage = null; scope.launch { if (aktionen.oeffnen(e) == null) onZurueck() } }, onNein = { oeffnenFrage = null })
         }
         loeschenFrage?.let { e ->

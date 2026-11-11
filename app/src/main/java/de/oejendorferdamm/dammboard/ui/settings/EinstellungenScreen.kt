@@ -44,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -66,10 +67,10 @@ import de.oejendorferdamm.dammboard.ui.update.oeffneUnbekannteQuellenEinstellung
 import kotlinx.coroutines.launch
 import java.io.File
 
-private val Hintergrundfarbe = Color(0xFFF2F1ED)
-private val Textfarbe = Color(0xFF2B2B28)
-private val TextfarbeSchwach = Color(0xFF8A8880)
-private val Akzent = Color(0xFF3A5C4A)
+private val Hintergrundfarbe = Color(0xFFECEEF1) // Farben und Knöpfe wie in DammZeit
+private val Textfarbe = Color(0xFF1F2124)
+private val TextfarbeSchwach = Color(0xFF6B7078)
+private val Akzent = Color(0xFFE01E3C)
 private val Fehlerfarbe = Color(0xFFB3261E)
 
 /** Einstellungsmenü: Version/Updates, Darstellung, Symbolgröße und ganz unten IServ-Zugangsdaten. */
@@ -118,12 +119,13 @@ fun EinstellungenScreen(
 
     // systemBarsPadding: Die Karte bleibt zwischen Status- und Navigationsleiste, statt auf
     // kleineren Bildschirmen darunter zu verschwinden (die App zeichnet randlos).
-    Box(modifier = Modifier.fillMaxSize().background(Color(0xFF5E8C6A)).systemBarsPadding()) {
+    Box(modifier = Modifier.fillMaxSize().background(Color(0xFFC9CED6)).systemBarsPadding()) {
         Column(
             modifier = Modifier
                 .align(Alignment.Center)
                 .widthIn(max = 480.dp)
                 .heightIn(max = 800.dp)
+                .shadow(16.dp, RoundedCornerShape(18.dp))
                 .clip(RoundedCornerShape(18.dp))
                 .background(Hintergrundfarbe)
         ) {
@@ -138,7 +140,7 @@ fun EinstellungenScreen(
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 8.dp)) {
                 if (seite != null) {
                     Box(
-                        modifier = Modifier.size(48.dp).clip(CircleShape).background(Color.White).clickable { seite = null }.semantics { contentDescription = "Zurück zur Übersicht" },
+                        modifier = Modifier.size(48.dp).shadow(3.dp, CircleShape).clip(CircleShape).background(Color.White).clickable { seite = null }.semantics { contentDescription = "Zurück zur Übersicht" },
                         contentAlignment = Alignment.Center
                     ) { Text("‹", color = Textfarbe, fontSize = 28.sp, fontWeight = FontWeight.Bold) }
                     Spacer(Modifier.width(12.dp))
@@ -147,7 +149,7 @@ fun EinstellungenScreen(
                 }
                 Text(titel, color = Textfarbe, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                 Box(
-                    modifier = Modifier.size(48.dp).clip(CircleShape).background(Color.White).clickable(onClick = onZurueck).semantics { contentDescription = "Schließen" },
+                    modifier = Modifier.size(48.dp).shadow(3.dp, CircleShape).clip(CircleShape).background(Color.White).clickable(onClick = onZurueck).semantics { contentDescription = "Schließen" },
                     contentAlignment = Alignment.Center
                 ) {
                     AllgemeinSymbol(AllgemeinesSymbol.SCHLIESSEN, Modifier.size(16.dp), Textfarbe)
@@ -571,7 +573,7 @@ private fun ErweiterteEinstellungen(
         Switch(
             checked = hintergrundMerken,
             onCheckedChange = onHintergrundMerkenGeaendert,
-            colors = SwitchDefaults.colors(checkedTrackColor = Akzent)
+            colors = SwitchDefaults.colors(checkedTrackColor = Akzent, checkedThumbColor = Color.White)
         )
     }
 
@@ -631,7 +633,7 @@ private fun ErweiterteEinstellungen(
         Switch(
             checked = handballenRadieren,
             onCheckedChange = onHandballenRadierenGeaendert,
-            colors = SwitchDefaults.colors(checkedTrackColor = Akzent)
+            colors = SwitchDefaults.colors(checkedTrackColor = Akzent, checkedThumbColor = Color.White)
         )
     }
     if (handballenRadieren) {
@@ -663,7 +665,7 @@ private fun ErweiterteEinstellungen(
 private fun BereichZeile(symbol: String, farbe: Color, titel: String, text: String, hinweis: Boolean = false, onClick: () -> Unit) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp).clip(RoundedCornerShape(16.dp)).background(Color.White)
+        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp).shadow(2.dp, RoundedCornerShape(16.dp)).clip(RoundedCornerShape(16.dp)).background(Color.White)
             .clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp)
     ) {
         Box(Modifier.size(44.dp).clip(CircleShape).background(farbe.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
@@ -685,7 +687,7 @@ private fun SchalterZeile(titel: String, text: String, wert: Boolean, onGeaender
             Text(titel, color = Textfarbe, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             Text(text, color = TextfarbeSchwach, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))
         }
-        Switch(checked = wert, onCheckedChange = onGeaendert, colors = SwitchDefaults.colors(checkedTrackColor = Akzent))
+        Switch(checked = wert, onCheckedChange = onGeaendert, colors = SwitchDefaults.colors(checkedTrackColor = Akzent, checkedThumbColor = Color.White))
     }
 }
 
@@ -703,7 +705,7 @@ private fun ModusKnopf(label: String, ausgewaehlt: Boolean, modifier: Modifier =
         modifier = modifier
             .padding(4.dp)
             .clip(RoundedCornerShape(50))
-            .background(if (ausgewaehlt) Akzent else Color.Transparent)
+            .background(if (ausgewaehlt) Textfarbe else Color.Transparent)
             .clickable(onClick = onClick)
             .padding(vertical = 10.dp),
         contentAlignment = Alignment.Center

@@ -359,7 +359,7 @@ private fun ZufallsnameHelfer(onVerschieben: (Offset) -> Unit, onSchliessen: () 
                 Switch(
                     checked = ohneWiederholung,
                     onCheckedChange = { ohneWiederholung = it },
-                    colors = SwitchDefaults.colors(checkedTrackColor = HelferAkzent)
+                    colors = SwitchDefaults.colors(checkedTrackColor = HelferAkzent, checkedThumbColor = Color.White)
                 )
                 if (ohneWiederholung && namen.isNotEmpty()) {
                     Text("  noch ${verfuegbar.size} von ${namen.size}", color = HelferTextSchwach, fontSize = 18.sp)
