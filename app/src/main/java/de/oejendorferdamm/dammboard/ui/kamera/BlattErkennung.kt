@@ -49,6 +49,12 @@ object BlattErkennung {
         }
         // zu klein = kein Blatt; fast alles hell = das Blatt füllt schon das Bild (nichts zu tun)
         if (besteGroesse < grau.size * 0.12f || besteGroesse > grau.size * 0.97f) return null
+        // Berührt die Fläche drei oder vier Bildränder, ist es Himmel/Wand/Tisch – kein Blatt (oder das Blatt füllt das Bild schon)
+        var oben = 0; var unten = 0; var links = 0; var rechts = 0
+        for (x in 0 until b) { if (marke[x] == besteMarke) oben++; if (marke[(h - 1) * b + x] == besteMarke) unten++ }
+        for (y in 0 until h) { if (marke[y * b] == besteMarke) links++; if (marke[y * b + b - 1] == besteMarke) rechts++ }
+        val raender = listOf(oben > b * 0.05f, unten > b * 0.05f, links > h * 0.05f, rechts > h * 0.05f).count { it }
+        if (raender >= 3) return null
         var olS = Float.MAX_VALUE; var urS = -Float.MAX_VALUE; var orD = -Float.MAX_VALUE; var ulD = Float.MAX_VALUE
         var ol = Punkt(0f, 0f); var or = ol; var ur = ol; var ul = ol
         for (i in grau.indices) {
