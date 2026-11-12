@@ -94,6 +94,28 @@ class IServClient(private val zugang: IServZugang) {
         }
     }
 
+    /** Datei auf dem Server verschieben (überschreibt) */
+    suspend fun verschieben(vonPfad: String, vonName: String, nachPfad: String, nachName: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val anfrage = Request.Builder().url(adresse(vonPfad, vonName))
+                .header("Authorization", Credentials.basic(zugang.benutzername, zugang.passwort))
+                .header("Destination", adresse(nachPfad, nachName).toString())
+                .header("Overwrite", "T")
+                .method("MOVE", null).build()
+            iservHttp.newCall(anfrage).execute().use { a ->
+                if (a.isSuccessful) Result.success(Unit) else Result.failure(IOException("Verschieben fehlgeschlagen: HTTP ${a.code}"))
+            }
+        } catch (e: Exception) { Result.failure(e) }
+    }
+
+    suspend fun loeschen(pfad: String, name: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val anfrage = Request.Builder().url(adresse(pfad, name))
+                .header("Authorization", Credentials.basic(zugang.benutzername, zugang.passwort)).delete().build()
+            iservHttp.newCall(anfrage).execute().use { Result.success(Unit) }
+        } catch (e: Exception) { Result.failure(e) }
+    }
+
     /** Ordner (und alle darüber) anlegen – schon vorhanden ist kein Fehler */
     suspend fun ordnerAnlegen(pfad: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {

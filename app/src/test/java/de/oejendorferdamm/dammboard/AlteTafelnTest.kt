@@ -27,3 +27,28 @@ class AlteTafelnTest {
         assertEquals("https://c.de/remote.php/dav/files/u/x", Nextcloud.davAdresse("https://c.de/remote.php/dav/files/u/x", "u"))
     }
 }
+
+class NextcloudSchuleTest {
+    private val json = """{"klasse":"4C","nextcloud":{"server":"https://nc.example","benutzer":"clevertouch","pfad":"cleverTouch/{fach}/Klasse {klasse}",
+        "haeuser":[{"name":"Haus 1","jahrgaenge":[4],"passwort":"h1"},{"name":"Haus 4","jahrgaenge":[1,2],"passwort":"h4"}]}}"""
+
+    @Test
+    fun hausNachJahrgang() {
+        val s = Nextcloud.schuleAus(json, "")!!
+        assertEquals("4c", s.klasse)
+        assertEquals("h1", s.passwort)
+        assertEquals("h4", Nextcloud.schuleAus(json.replace("\"4C\"", "\"2a\""), "")!!.passwort)
+        // Klasse fehlt in DammTable → Name der Ablage
+        assertEquals("h4", Nextcloud.schuleAus(json.replace("\"4C\"", "\"\""), "1b")!!.passwort)
+        // kein Haus für den Jahrgang → nichts
+        assertEquals(null, Nextcloud.schuleAus(json.replace("\"4C\"", "\"3a\""), ""))
+    }
+
+    @Test
+    fun fachOrdner() {
+        val da = listOf("Deutsch", "Englisch", "Mathematik", "Sachunterricht")
+        assertEquals("Mathematik", Nextcloud.fachOrdner("Mathe", da))
+        assertEquals("Deutsch", Nextcloud.fachOrdner("deutsch", da))
+        assertEquals("Religion", Nextcloud.fachOrdner("Religion", da))
+    }
+}

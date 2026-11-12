@@ -276,9 +276,15 @@ private fun NextcloudEinstellungen() {
     var meldung by remember { mutableStateOf(nc.status(context).let { if (it.isEmpty()) "" else "Zuletzt hochgeladen: $it" }) }
     fun speichern() { val neu = k.copy(passwort = passwort.ifEmpty { k.passwort }); nc.speichere(context, neu); k = neu; passwort = "" }
 
+    val schule = remember { nc.schule(context, "") }
     Text("Nextcloud", color = Schrift1, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+    if (schule != null) {
+        Text("Zugänge der Schule (über DammTable): Klasse ${schule.klasse} → ${schule.pfad.replace("{klasse}", schule.klasse).replace("{fach}", "<Fach>")} – nach jeder Stunde als PNG. Nichts einzutippen.",
+            color = Akzent, fontSize = 12.sp)
+    }
     Text(
-        if (k.server.isNotBlank() && k.benutzer.isNotBlank()) "Nach jeder Stunde geht die Tafel auch nach ${k.server.removePrefix("https://")} (Benutzer ${k.benutzer}, Ordner „${k.ordner}“)."
+        if (schule != null) "Eigene Nextcloud (nur ohne Zugänge der Schule):"
+        else if (k.server.isNotBlank() && k.benutzer.isNotBlank()) "Nach jeder Stunde geht die Tafel auch nach ${k.server.removePrefix("https://")} (Benutzer ${k.benutzer}, Ordner „${k.ordner}“)."
         else "Server und Benutzer eintragen – oder als versteckte Datei „DammBoard/.nextcloud.json“ in den Schul-Ordner legen, dann füllt sich das von selbst.",
         color = Schrift2, fontSize = 12.sp
     )

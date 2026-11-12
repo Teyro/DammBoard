@@ -344,9 +344,17 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
             val datei = de.oejendorferdamm.dammboard.data.Ablage.speichere(app, ablageOrdnerAktuell.value, fach, de.oejendorferdamm.dammboard.data.Ablage.name(fach, datum, stunde),
                 tafelState.seiten.map { it.abbild() }, tafelState.aktiveSeite, bildschirmPx.first, bildschirmPx.second)
             abgelegtSignatur = signatur
-            // auch in die Nextcloud (falls eingerichtet) – im Hintergrund, ein Fehler hält das Ablegen nicht auf
+            // auch in die Nextcloud – im Hintergrund, ein Fehler hält das Ablegen nicht auf:
+            // mit den Zugängen der Schule (über DammTable) als PNG nach cleverTouch/<Fach>/Klasse 4c, sonst die eigene Einrichtung
             val board = ablageOrdnerAktuell.value
-            scope.launch(kotlinx.coroutines.Dispatchers.IO) { de.oejendorferdamm.dammboard.data.Nextcloud.hochladen(app, datei, board, fach) }
+            val seiten = tafelState.seiten.map { it.abbild() }
+            val (b, h) = bildschirmPx
+            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                val nc = de.oejendorferdamm.dammboard.data.Nextcloud
+                val schule = nc.schule(app, board)
+                if (schule != null && nc.lese(app).an) nc.hochladenSchule(app, schule, seiten, b, h, fach, datum, stunde)
+                else nc.hochladen(app, datei, board, fach)
+            }
             ablageNeu++
             null
         } catch (e: Exception) { "Fehler beim Ablegen: ${e.message}" }
