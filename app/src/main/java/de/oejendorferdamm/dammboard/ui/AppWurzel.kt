@@ -350,10 +350,13 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
             val seiten = tafelState.seiten.map { it.abbild() }
             val (b, h) = bildschirmPx
             scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                val nc = de.oejendorferdamm.dammboard.data.Nextcloud
-                val schule = nc.schule(app, board)
-                if (schule != null && nc.lese(app).an) nc.hochladenSchule(app, schule, seiten, b, h, fach, datum, stunde)
-                else nc.hochladen(app, datei, board, fach)
+                // Fehler (auch zu wenig Speicher beim Rendern auf alten Boards) dürfen die Tafel nie abstürzen lassen
+                try {
+                    val nc = de.oejendorferdamm.dammboard.data.Nextcloud
+                    val schule = nc.schule(app, board)
+                    if (schule != null && nc.lese(app).an) nc.hochladenSchule(app, schule, seiten, b, h, fach, datum, stunde)
+                    else nc.hochladen(app, datei, board, fach)
+                } catch (_: Throwable) {}
             }
             ablageNeu++
             null
@@ -385,8 +388,9 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
             }
             // Einmal am Tag die Vorschaubilder der Schul-Cloud auffrischen – Zeitfenster je Jahrgang, zufällige Minute
             val vc = de.oejendorferdamm.dammboard.data.VorschauCache
-            val sch = de.oejendorferdamm.dammboard.data.Nextcloud.schule(app, ablageOrdnerAktuell.value)
-            if (sch != null && vc.faellig(app, sch, ablageOrdnerAktuell.value)) scope.launch { try { vc.auffrischen(app, sch) } catch (_: Exception) {} }
+            // Zugang über DammTable (Abfrage bei einer anderen App) nicht auf dem Hauptfaden – sonst ruckelt die Tafel
+            val sch = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { de.oejendorferdamm.dammboard.data.Nextcloud.schule(app, ablageOrdnerAktuell.value) }
+            if (sch != null && vc.faellig(app, sch, ablageOrdnerAktuell.value)) scope.launch { try { vc.auffrischen(app, sch) } catch (_: Throwable) {} }
             delay(30_000)
         }
     }
