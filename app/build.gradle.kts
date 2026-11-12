@@ -12,8 +12,8 @@ android {
         applicationId = "de.oejendorferdamm.dammboard"
         minSdk = 26
         targetSdk = 34
-        versionCode = 33
-        versionName = "2.4.0"
+        versionCode = 34
+        versionName = "2.5.0"
     }
 
     // Wird nur in CI über Umgebungsvariablen gesetzt (siehe .github/workflows/release.yml);

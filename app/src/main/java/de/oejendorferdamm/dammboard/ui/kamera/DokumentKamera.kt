@@ -104,6 +104,9 @@ fun DokumentKamera(onAufDieTafel: (datei: String, breite: Int, hoehe: Int) -> Un
     // Direkt per USB (UVC) statt über das System
     var usb by remember { mutableStateOf(usbKamera(context) != null) }
     var letztesBild by remember { mutableStateOf(0L) }
+    // Bildqualität der USB-Kamera (gemerkt): reißt das Bild, eine Stufe niedriger
+    val kameraPrefs = remember { context.getSharedPreferences("kamera", Context.MODE_PRIVATE) }
+    var stufe by remember { mutableIntStateOf(kameraPrefs.getInt("stufe", 1)) }
 
     // Kameras auflisten – auch wenn die Dokumentenkamera erst jetzt eingesteckt wird
     DisposableEffect(erlaubt) {
@@ -129,13 +132,13 @@ fun DokumentKamera(onAufDieTafel: (datei: String, breite: Int, hoehe: Int) -> Un
     val tv = textur
     // Bei USB nicht an der System-Kamera hängen: Öffnet DammBoard die USB-Kamera, meldet Android das als Änderung der
     // Kameraliste – die Sitzung würde sonst ständig neu starten (Bild flackert und blitzt).
-    val schluessel: String? = if (usb) "usb" else id
+    val schluessel: String? = if (usb) "usb$stufe" else id
     DisposableEffect(schluessel, tv, oberflaecheBereit, erlaubt) {
         if (!erlaubt || tv == null || !oberflaecheBereit) return@DisposableEffect onDispose { }
         val groesse = { g: Size -> vorschauGroesse = g; verhaeltnis = g.width.toFloat() / g.height }
         if (usb) {
             fehler = null
-            val s = UsbSitzung(context, tv, onGroesse = groesse, onFehler = { fehler = it })
+            val s = UsbSitzung(context, tv, stufe, onGroesse = groesse, onFehler = { fehler = it })
             s.starte()
             return@DisposableEffect onDispose { s.schliessen() }
         }
@@ -261,6 +264,13 @@ fun DokumentKamera(onAufDieTafel: (datei: String, breite: Int, hoehe: Int) -> Un
                 }
             }
             // Drehen: im Standbild das Foto selbst, sonst die Vorschau
+            if (usb && still == null) {
+                KameraKnopf("◐", "Qualität: " + when (stufe) { 2 -> "hoch"; 0 -> "niedrig"; else -> "mittel" }) {
+                    stufe = (stufe + 2) % 3 // mittel → niedrig → hoch → mittel
+                    kameraPrefs.edit().putInt("stufe", stufe).apply()
+                    hinweis = "Reißt das Bild, „niedrig“ wählen – dann braucht die Kamera weniger USB-Bandbreite."
+                }
+            }
             KameraKnopf("⟳", "Drehen") {
                 if (still != null) scope.launch { standbild = withContext(Dispatchers.Default) { BlattErkennung.drehe(still) } }
                 else drehung = (drehung + 90) % 360
@@ -308,7 +318,7 @@ fun DokumentKamera(onAufDieTafel: (datei: String, breite: Int, hoehe: Int) -> Un
 
 /** Standbild mit vier ziehbaren Ecken; außerhalb des Vierecks abgedunkelt. */
 @Composable
-private fun ZuschneideAnsicht(bild: Bitmap, ecken: List<Punkt>, onEcken: (List<Punkt>) -> Unit) {
+internal fun ZuschneideAnsicht(bild: Bitmap, ecken: List<Punkt>, onEcken: (List<Punkt>) -> Unit) {
     val bildIb = remember(bild) { bild.asImageBitmap() }
     val aktuell by androidx.compose.runtime.rememberUpdatedState(ecken)
     androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -365,7 +375,7 @@ private fun Hinweis(text: String) {
 }
 
 @Composable
-private fun KameraKnopf(zeichen: String, titel: String, hervorgehoben: Boolean = false, aktiv: Boolean = true, onClick: () -> Unit) {
+internal fun KameraKnopf(zeichen: String, titel: String, hervorgehoben: Boolean = false, aktiv: Boolean = true, onClick: () -> Unit) {
     Column(
         Modifier
             .clip(RoundedCornerShape(20.dp))
@@ -395,6 +405,8 @@ internal fun usbKamera(context: Context): UsbDevice? {
 private class UsbSitzung(
     private val context: Context,
     private val textur: TextureView,
+    /** 0 = niedrig, 1 = mittel, 2 = hoch */
+    private val stufe: Int,
     private val onGroesse: (Size) -> Unit,
     private val onFehler: (String) -> Unit
 ) {
@@ -411,12 +423,19 @@ private class UsbSitzung(
                 override fun onAttach(device: UsbDevice) { waehle(device) }
                 override fun onDeviceOpen(device: UsbDevice, isFirstOpen: Boolean) {
                     val hh = helfer ?: return
-                    // Schärfstes MJPEG bis Full HD (unkomprimiert ist über USB oft zu viel und reißt ab); sonst Standard
-                    val beste = try {
-                        hh.supportedSizeList.orEmpty().filter { it.type == com.serenegiant.usb.UVCCamera.UVC_VS_FRAME_MJPEG && it.width * it.height <= 1920 * 1080 }
-                            .maxByOrNull { it.width * it.height }
-                    } catch (_: Exception) { null }
-                    if (beste != null) hh.openCamera(beste) else hh.openCamera()
+                    // MJPEG bis zur gewählten Stufe (Hoch: Full HD, Mittel: 1280×720, Niedrig: 640×480). Mit „Bandbreite festlegen“:
+                    // sonst fordert die Kamera mehr USB-Bandbreite an, als das Board (Touchrahmen am selben Bus) hergibt –
+                    // das Bild steht kurz und reißt dann in Streifen.
+                    val grenze = when (stufe) { 2 -> 1920 * 1080; 0 -> 640 * 480; else -> 1280 * 720 }
+                    val liste = try { hh.supportedSizeList.orEmpty() } catch (_: Exception) { emptyList() }
+                    val beste = liste.filter { it.type == com.serenegiant.usb.UVCCamera.UVC_VS_FRAME_MJPEG && it.width * it.height <= grenze }.maxByOrNull { it.width * it.height }
+                        ?: liste.filter { it.width * it.height <= 640 * 480 }.maxByOrNull { it.width * it.height } // unkomprimiert nur klein
+                    val quirk = com.serenegiant.usb.UVCCamera.UVC_QUIRK_FIX_BANDWIDTH
+                    try {
+                        if (beste != null) hh.openCamera(com.serenegiant.usb.UVCParam(beste, quirk)) else hh.openCamera()
+                    } catch (_: Throwable) {
+                        if (beste != null) hh.openCamera(beste) else hh.openCamera()
+                    }
                 }
                 override fun onCameraOpen(device: UsbDevice) {
                     val hh = helfer ?: return

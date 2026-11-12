@@ -122,6 +122,8 @@ class TafelState(hintergrundStart: HintergrundStil = HintergrundStil(TafelGruen)
 
     // Kopieren/Einfügen (Lasso und Auswahl)
     var zwischenablage by mutableStateOf<List<BoardItem>>(emptyList())
+    /** Bild auf der Tafel, das gerade zugeschnitten wird (Auswahl → „Zuschneiden“) */
+    var bildZuschneiden by mutableStateOf<de.oejendorferdamm.dammboard.model.BildItem?>(null)
     var auswahlGesteLaeuft by mutableStateOf(false)
     var zwischenablageQuelle: Seite? = null
 

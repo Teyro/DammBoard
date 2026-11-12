@@ -112,6 +112,7 @@ fun TafelScreen(
     var pdfFortschritt by remember { mutableStateOf<String?>(null) }
     var pdfDatei by remember { mutableStateOf<File?>(null) }
     var zeigeBlattQuelle by remember { mutableStateOf(false) }
+    var zeigeSchulCloud by remember { mutableStateOf(false) }
     var blattLaedt by remember { mutableStateOf(false) }
 
     BackHandler {
@@ -213,6 +214,7 @@ fun TafelScreen(
             ExtraAktion.ARBEITSBLATT -> zeigeBlattQuelle = true
             ExtraAktion.ABDECKEN -> state.vorhang = if (state.vorhang == null) 0.15f else null
             ExtraAktion.TAFELN -> onTafeln()
+            ExtraAktion.SCHULCLOUD -> zeigeSchulCloud = true
             else -> helferFuer(aktion)?.let { art ->
                 if (art in state.offeneHelfer) state.offeneHelfer.remove(art) else state.offeneHelfer.add(art)
             }
@@ -294,6 +296,10 @@ fun TafelScreen(
                             "Vorlagen der Schule" to {
                                 zeigeBlattQuelle = false
                                 onIServOeffnen(true)
+                            },
+                            "Schul-Cloud (Fächer und Klassen, mit Vorschau)" to {
+                                zeigeBlattQuelle = false
+                                zeigeSchulCloud = true
                             }
                         ),
                         onSchliessen = { zeigeBlattQuelle = false }
@@ -346,6 +352,24 @@ fun TafelScreen(
                             }
                         },
                         onSchliessen = { zeigeSpieleMenue = false }
+                    )
+                }
+                if (zeigeSchulCloud) {
+                    de.oejendorferdamm.dammboard.ui.filemanager.SchulCloud(
+                        board = "",
+                        onBild = { datei, b, h -> zeigeSchulCloud = false; state.bildEinfuegen(datei, b, h) },
+                        onSchliessen = { zeigeSchulCloud = false }
+                    )
+                }
+                state.bildZuschneiden?.let { alt ->
+                    de.oejendorferdamm.dammboard.ui.kamera.BildZuschneiden(
+                        datei = alt.datei,
+                        onFertig = { neu, b, h ->
+                            // gleiche Stelle und Breite, Höhe nach dem neuen Seitenverhältnis
+                            state.seite.ersetze(alt, alt.copy(datei = neu, hoehe = alt.breite * h / b.coerceAtLeast(1)))
+                            state.bildZuschneiden = null
+                        },
+                        onAbbrechen = { state.bildZuschneiden = null }
                     )
                 }
                 if (zeigeKamera) {

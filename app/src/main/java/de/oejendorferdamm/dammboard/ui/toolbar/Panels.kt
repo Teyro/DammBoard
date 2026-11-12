@@ -90,7 +90,8 @@ enum class ExtraAktion(val titel: String, val symbol: WerkzeugkastenAktion) {
     LERNUHR("Lernuhr", WerkzeugkastenAktion.LERNUHR),
     NACHSPUREN("Nachspuren", WerkzeugkastenAktion.NACHSPUREN),
     WOERTER("Wörter raten", WerkzeugkastenAktion.WOERTER),
-    TAFELN("Tafeln teilen", WerkzeugkastenAktion.TAFELN)
+    TAFELN("Tafeln teilen", WerkzeugkastenAktion.TAFELN),
+    SCHULCLOUD("Schul-Cloud", WerkzeugkastenAktion.ARBEITSBLATT)
 }
 
 /** Diese Extras stehen seit 2.0 unter dem Würfel (Spiele) – nicht doppelt in den Extras. */

@@ -244,6 +244,9 @@ internal fun AuswahlAktionen(state: TafelState) {
                 .padding(6.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
+            // Ein einzelnes Bild (z. B. von der Dokumentenkamera): nachträglich zuschneiden, drehen, gerade ziehen
+            val einzelBild = seite.ausgewaehlteIds.singleOrNull()?.let { id -> seite.items.firstOrNull { it.id == id } } as? de.oejendorferdamm.dammboard.model.BildItem
+            if (einzelBild != null) RundTaste("Zuschneiden") { state.bildZuschneiden = einzelBild }
             RundTaste("Kopieren") { state.kopiereAuswahl() }
             RundTaste("Duplizieren") { state.dupliziereAuswahl(versatz) }
             if (state.zwischenablage.isNotEmpty()) RundTaste("Einfügen") { state.einfuegen(versatz) }
