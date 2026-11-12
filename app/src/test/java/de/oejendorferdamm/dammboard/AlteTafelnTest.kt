@@ -49,6 +49,7 @@ class NextcloudSchuleTest {
         val da = listOf("Deutsch", "Englisch", "Mathematik", "Sachunterricht")
         assertEquals("Mathematik", Nextcloud.fachOrdner("Mathe", da))
         assertEquals("Deutsch", Nextcloud.fachOrdner("deutsch", da))
-        assertEquals("Religion", Nextcloud.fachOrdner("Religion", da))
+        assertEquals(null, Nextcloud.fachOrdner("Religion", da))
+        assertEquals(null, Nextcloud.fachOrdner("Tafel", da + "Tafel")) // ohne laufende Stunde: kein Ordner „Tafel“
     }
 }
