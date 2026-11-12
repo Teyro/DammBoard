@@ -66,7 +66,7 @@ object Nextcloud {
         val o = JSONObject(json)
         val nc = o.optJSONObject("nextcloud") ?: return null
         val klasse = o.optString("klasse").ifBlank { klasseErsatz }.trim().lowercase()
-        val stufe = klasse.firstOrNull { it.isDigit() }?.digitToInt()
+        val stufe = VorschauCache.stufe(klasse) // „VSK 1“ = Vorschule, nicht Jahrgang 1
         val haeuser = nc.optJSONArray("haeuser")
         val passwort = (0 until (haeuser?.length() ?: 0)).map { haeuser!!.getJSONObject(it) }.firstOrNull { h ->
             val j = h.optJSONArray("jahrgaenge"); stufe != null && (0 until (j?.length() ?: 0)).any { j!!.optInt(it, -1) == stufe }
