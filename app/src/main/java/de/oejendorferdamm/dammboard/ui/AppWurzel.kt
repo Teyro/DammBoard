@@ -354,7 +354,13 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
         var planStand = 0L
         while (true) {
             if (System.currentTimeMillis() - planStand > 10 * 60_000L) {
-                plan = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { de.oejendorferdamm.dammboard.data.Stundenplan.heute(app) }
+                plan = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    // DammTable zuerst; leere Stunden (oder ganz ohne DammTable) aus den Klassenplänen im Schul-Ordner –
+                    // Klasse = Name des Ablage-Ordners (z. B. „2A“). Vorhandene Stunden werden nie überschrieben.
+                    val ausDammTable = de.oejendorferdamm.dammboard.data.Stundenplan.heute(app)
+                    try { de.oejendorferdamm.dammboard.data.Klassenplaene.aktualisieren(app, schulPasswort) } catch (_: Exception) {}
+                    de.oejendorferdamm.dammboard.data.Klassenplaene.ergaenzen(ausDammTable, de.oejendorferdamm.dammboard.data.Klassenplaene.tag(app, ablageOrdnerAktuell.value))
+                }
                 planStand = System.currentTimeMillis()
             }
             val jetzt = abschnittJetzt()
