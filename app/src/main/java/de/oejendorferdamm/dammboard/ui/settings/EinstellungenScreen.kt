@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,6 +33,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -64,16 +67,21 @@ import de.oejendorferdamm.dammboard.ui.update.installationsIntentFuer
 import de.oejendorferdamm.dammboard.ui.update.pruefeUpdateApk
 import de.oejendorferdamm.dammboard.ui.update.kannUnbekannteQuellenInstallieren
 import de.oejendorferdamm.dammboard.ui.update.oeffneUnbekannteQuellenEinstellungen
+import de.oejendorferdamm.dammboard.ui.m3.EinstellungenThema
+import de.oejendorferdamm.dammboard.ui.m3.M3Auswahl
+import de.oejendorferdamm.dammboard.ui.m3.M3Bereich
+import de.oejendorferdamm.dammboard.ui.m3.M3Feld
+import de.oejendorferdamm.dammboard.ui.m3.M3Gruppe
+import de.oejendorferdamm.dammboard.ui.m3.M3Hinweis
+import de.oejendorferdamm.dammboard.ui.m3.M3Knopf
+import de.oejendorferdamm.dammboard.ui.m3.M3Kopf
+import de.oejendorferdamm.dammboard.ui.m3.M3Schalter
 import kotlinx.coroutines.launch
 import java.io.File
 
-private val Hintergrundfarbe = Color(0xFFECEEF1) // Farben und Knöpfe wie in DammZeit
-private val Textfarbe = Color(0xFF1F2124)
-private val TextfarbeSchwach = Color(0xFF6B7078)
-private val Akzent = Color(0xFFE01E3C)
-private val Fehlerfarbe = Color(0xFFB3261E)
 
-/** Einstellungsmenü: Version/Updates, Darstellung, Symbolgröße und ganz unten IServ-Zugangsdaten. */
+/** Einstellungsmenü im Material-You-Stil (gemeinsame Bausteine ui/m3): Übersicht → Bereiche, ← zurück, ✕ schließen. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun EinstellungenScreen(
     aktuellerZugang: IServZugang,
@@ -117,255 +125,166 @@ fun EinstellungenScreen(
     var urlFehler by remember { mutableStateOf<String?>(null) }
     var seite by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
 
+    EinstellungenThema {
+    val f = MaterialTheme.colorScheme
     // systemBarsPadding: Die Karte bleibt zwischen Status- und Navigationsleiste, statt auf
     // kleineren Bildschirmen darunter zu verschwinden (die App zeichnet randlos).
-    Box(modifier = Modifier.fillMaxSize().background(Color(0xFFC9CED6)).systemBarsPadding()) {
+    Box(modifier = Modifier.fillMaxSize().background(Color(0x66000000)).systemBarsPadding()) {
         Column(
             modifier = Modifier
                 .align(Alignment.Center)
-                .widthIn(max = 480.dp)
-                .heightIn(max = 800.dp)
-                .shadow(16.dp, RoundedCornerShape(18.dp))
-                .clip(RoundedCornerShape(18.dp))
-                .background(Hintergrundfarbe)
+                .padding(24.dp)
+                .widthIn(max = 760.dp)
+                .heightIn(max = 1100.dp)
+                .shadow(16.dp, RoundedCornerShape(28.dp))
+                .clip(RoundedCornerShape(28.dp))
+                .background(f.surfaceContainer)
         ) {
             val titel = when (seite) {
-                "update" -> "Updates"; "darstellung" -> "Darstellung"; "zeichnen" -> "Zeichnen und Radieren"
+                "update" -> "Updates"; "darstellung" -> "Aussehen"; "zeichnen" -> "Zeichnen und Radieren"
                 "tafel" -> "Tafel"; "spass" -> "Überraschungen"; "iserv" -> "IServ"; "ueber" -> "Über DammBoard"; "kamera" -> "Dokumentenkamera"
                 else -> "Einstellungen"
             }
             // Zurück-Taste: erst zur Übersicht, dann wie das ✕
             androidx.activity.compose.BackHandler(enabled = seite != null) { seite = null }
             // Kopfzeile bleibt stehen (✕ immer sichtbar) – gescrollt wird nur der Inhalt darunter
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 8.dp)) {
-                if (seite != null) {
-                    Box(
-                        modifier = Modifier.size(48.dp).shadow(3.dp, CircleShape).clip(CircleShape).background(Color.White).clickable { seite = null }.semantics { contentDescription = "Zurück zur Übersicht" },
-                        contentAlignment = Alignment.Center
-                    ) { Text("‹", color = Textfarbe, fontSize = 28.sp, fontWeight = FontWeight.Bold) }
-                    Spacer(Modifier.width(12.dp))
-                } else {
-                    Spacer(Modifier.width(6.dp))
-                }
-                Text(titel, color = Textfarbe, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                Box(
-                    modifier = Modifier.size(48.dp).shadow(3.dp, CircleShape).clip(CircleShape).background(Color.White).clickable(onClick = onZurueck).semantics { contentDescription = "Schließen" },
-                    contentAlignment = Alignment.Center
-                ) {
-                    AllgemeinSymbol(AllgemeinesSymbol.SCHLIESSEN, Modifier.size(16.dp), Textfarbe)
-                }
-            }
-            Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(start = 24.dp, end = 24.dp, bottom = 24.dp, top = 10.dp)) {
+            M3Kopf(titel, if (seite != null) ({ seite = null }) else null, onZurueck)
+            androidx.compose.runtime.key(seite) {
+            Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 20.dp)) {
             val an = { b: Boolean -> if (b) "an" else "aus" }
             when (seite) {
                 null -> {
-                    BereichZeile("⬆️", Color(0xFF2563EB), "Updates",
-                        if (updateInfo != null) "Neue Version ${updateInfo.version} verfügbar" else "Installiert: $aktuelleVersion · automatisch prüfen ${an(autoUpdatePruefung)}",
-                        hinweis = updateInfo != null) { seite = "update" }
-                    BereichZeile("🎨", Color(0xFF7C3AED), "Darstellung",
-                        "${if (aktuellerModus == AnimationsModus.NORMAL) "Normal" else "Performance"} · Symbole ${aktuelleSymbolGroesse.bezeichnung}") { seite = "darstellung" }
-                    BereichZeile("📷", Color(0xFFE01E3C), "Dokumentenkamera",
-                        if (kameraKnopf) "an – Knopf unten links in der Leiste" else "aus – kein Kamera-Knopf") { seite = "kamera" }
-                    BereichZeile("✏️", Color(0xFFD97706), "Zeichnen und Radieren",
-                        "Formerkennung ${an(formErkennung)} · Radierer ${if (radierenStueckweise) "stückweise" else "ganz"} · Handballen ${an(handballenRadieren)}") { seite = "zeichnen" }
-                    BereichZeile("🗂", Color(0xFF0891B2), "Tafel",
-                        "Automatisch sichern ${an(tafelSichern)} · Hintergrund merken ${an(hintergrundMerken)}") { seite = "tafel" }
-                    BereichZeile("🎉", Color(0xFFDB2777), "Überraschungen", "Easter Eggs ${an(ueberraschungen)} · Überraschungsvideo") { seite = "spass" }
-                    BereichZeile("☁️", Color(0xFF16A34A), "IServ",
-                        if (aktuellerZugang.serverUrl.isBlank()) "nicht eingerichtet" else aktuellerZugang.serverUrl.removePrefix("https://").substringBefore("/")) { seite = "iserv" }
-                    BereichZeile("ℹ️", Color(0xFF6B7280), "Über DammBoard", "Version $aktuelleVersion · Bildschirm") { seite = "ueber" }
+                    // Reihenfolge wie in allen Damm-Apps: erst die eigenen Bereiche, unter „Allgemein“ Updates und Über
+                    M3Gruppe {
+                        M3Bereich("🎨", Color(0xFF7C3AED), "Aussehen",
+                            "${if (aktuellerModus == AnimationsModus.NORMAL) "Normal" else "Performance"} · Symbole ${aktuelleSymbolGroesse.bezeichnung}") { seite = "darstellung" }
+                        M3Bereich("✏️", Color(0xFFD97706), "Zeichnen und Radieren",
+                            "Formerkennung ${an(formErkennung)} · Radierer ${if (radierenStueckweise) "stückweise" else "ganz"} · Handballen ${an(handballenRadieren)}") { seite = "zeichnen" }
+                        M3Bereich("🗂", Color(0xFF0891B2), "Tafel",
+                            "Automatisch sichern ${an(tafelSichern)} · Hintergrund merken ${an(hintergrundMerken)}") { seite = "tafel" }
+                        M3Bereich("📷", Color(0xFFE01E3C), "Dokumentenkamera",
+                            if (kameraKnopf) "an – Knopf unten links in der Leiste" else "aus – kein Kamera-Knopf") { seite = "kamera" }
+                        M3Bereich("🎉", Color(0xFFDB2777), "Überraschungen", "Easter Eggs ${an(ueberraschungen)} · Überraschungsvideo") { seite = "spass" }
+                        M3Bereich("☁️", Color(0xFF16A34A), "IServ",
+                            if (aktuellerZugang.serverUrl.isBlank()) "nicht eingerichtet" else aktuellerZugang.serverUrl.removePrefix("https://").substringBefore("/")) { seite = "iserv" }
+                    }
+                    M3Gruppe("Allgemein") {
+                        M3Bereich("⬆️", Color(0xFF2563EB), "Updates",
+                            if (updateInfo != null) "Neue Version ${updateInfo.version} verfügbar" else "Installiert: $aktuelleVersion · automatisch prüfen ${an(autoUpdatePruefung)}",
+                            hinweis = updateInfo != null) { seite = "update" }
+                        M3Bereich("ℹ️", Color(0xFF6B7280), "Über DammBoard", "Version $aktuelleVersion · Bildschirm") { seite = "ueber" }
+                    }
                 }
-                "update" -> {
-            UpdateAbschnitt(
-                aktuelleVersion = aktuelleVersion,
-                info = updateInfo,
-                autoPruefung = autoUpdatePruefung,
-                pruefungLaeuft = updatePruefungLaeuft,
-                bereitsAktuell = updateBereitsAktuell,
-                onAutoGeaendert = onAutoUpdateGeaendert,
-                onJetztPruefen = onUpdatePruefungAnfordern
-            )
-                }
+                "update" -> UpdateAbschnitt(
+                    aktuelleVersion = aktuelleVersion,
+                    info = updateInfo,
+                    autoPruefung = autoUpdatePruefung,
+                    pruefungLaeuft = updatePruefungLaeuft,
+                    bereitsAktuell = updateBereitsAktuell,
+                    onAutoGeaendert = onAutoUpdateGeaendert,
+                    onJetztPruefen = onUpdatePruefungAnfordern
+                )
                 "darstellung" -> {
-            Text("Darstellung", color = Textfarbe, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-            Text(
-                "Normalmodus mit sanften Übergängen, oder Performance-Modus ganz ohne Animationen.",
-                color = TextfarbeSchwach, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(Color.White),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                ModusKnopf("Normal", ausgewaehlt = aktuellerModus == AnimationsModus.NORMAL, modifier = Modifier.weight(1f)) {
-                    onModusGeaendert(AnimationsModus.NORMAL)
+                    M3Gruppe("Animationen") {
+                        M3Feld {
+                            M3Hinweis("Normalmodus mit sanften Übergängen, oder Performance-Modus ganz ohne Animationen.")
+                            Spacer(Modifier.height(12.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                M3Auswahl("Normal", aktuellerModus == AnimationsModus.NORMAL, { onModusGeaendert(AnimationsModus.NORMAL) })
+                                M3Auswahl("Performance", aktuellerModus == AnimationsModus.PERFORMANCE, { onModusGeaendert(AnimationsModus.PERFORMANCE) })
+                            }
+                        }
+                    }
+                    M3Gruppe("Symbolgröße") {
+                        M3Feld {
+                            M3Hinweis("„Wie Original“ entspricht genau der Tafel-App des Boards – Knöpfe, Abstände und Menüs " +
+                                "werden automatisch an die Bildschirmbreite angepasst. Größer oder kleiner verändert alles gemeinsam.")
+                            Spacer(Modifier.height(12.dp))
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                SymbolGroesse.entries.forEach { g -> M3Auswahl(g.bezeichnung, aktuelleSymbolGroesse == g, { onSymbolGroesseGeaendert(g) }) }
+                            }
+                        }
+                    }
                 }
-                ModusKnopf("Performance", ausgewaehlt = aktuellerModus == AnimationsModus.PERFORMANCE, modifier = Modifier.weight(1f)) {
-                    onModusGeaendert(AnimationsModus.PERFORMANCE)
+                "kamera" -> M3Gruppe {
+                    M3Feld {
+                        M3Schalter("Kamera-Knopf zeigen", kameraKnopf,
+                            "Knopf „Dokumentenkamera“ unten links in der Leiste: fotografieren, zuschneiden, drehen, Zauberstab – und als Bild auf die Tafel. " +
+                                "Aus, wenn an diesem Board keine Dokumentenkamera hängt (auf den älteren CTOUCH-Boards ist sie von Haus aus aus).",
+                            onKameraKnopfGeaendert)
+                    }
                 }
-            }
-
-            Spacer(Modifier.height(22.dp))
-            Text("Symbolgröße", color = Textfarbe, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-            Text(
-                "\"Wie Original\" entspricht genau der Tafel-App des Boards – Knöpfe, Abstände und Menüs " +
-                    "werden automatisch an die Bildschirmbreite angepasst. Größer oder kleiner verändert alles gemeinsam.",
-                color = TextfarbeSchwach, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(Color.White),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                SymbolGroesse.entries.forEach { groesse ->
-                    ModusKnopf(groesse.bezeichnung, ausgewaehlt = aktuelleSymbolGroesse == groesse, modifier = Modifier.weight(1f)) {
-                        onSymbolGroesseGeaendert(groesse)
+                "zeichnen", "tafel", "spass" -> ErweiterteEinstellungen(
+                    teil = seite!!,
+                    zeichenPraezision = zeichenPraezision,
+                    hintergrundMerken = hintergrundMerken,
+                    handballenRadieren = handballenRadieren,
+                    handballenEmpfindlichkeit = handballenEmpfindlichkeit,
+                    radierenStueckweise = radierenStueckweise,
+                    tafelSichern = tafelSichern,
+                    formErkennung = formErkennung,
+                    onTafelSichernGeaendert = onTafelSichernGeaendert,
+                    onFormErkennungGeaendert = onFormErkennungGeaendert,
+                    onZeichenPraezisionGeaendert = onZeichenPraezisionGeaendert,
+                    onHintergrundMerkenGeaendert = onHintergrundMerkenGeaendert,
+                    onHandballenRadierenGeaendert = onHandballenRadierenGeaendert,
+                    onHandballenEmpfindlichkeitGeaendert = onHandballenEmpfindlichkeitGeaendert,
+                    onRadierenStueckweiseGeaendert = onRadierenStueckweiseGeaendert,
+                    ueberraschungen = ueberraschungen,
+                    onUeberraschungenGeaendert = onUeberraschungenGeaendert,
+                    onUeberraschungZeigen = onUeberraschungZeigen
+                )
+                "iserv" -> M3Gruppe("IServ-Speicher") {
+                    M3Feld {
+                        M3Hinweis("Web-Adresse deines IServ-WebDAV-Speichers, z. B. https://schule.example.de/iserv/webdav")
+                        Spacer(Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = serverUrl, onValueChange = { serverUrl = it; urlFehler = null },
+                            label = { Text("Web-Adresse") }, singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        OutlinedTextField(
+                            value = benutzername, onValueChange = { benutzername = it },
+                            label = { Text("Benutzername") }, singleLine = true, modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        OutlinedTextField(
+                            value = passwort, onValueChange = { passwort = it },
+                            label = { Text("Passwort") }, singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        M3Hinweis("Hinweis: Das Passwort wird lokal auf diesem Gerät gespeichert, nicht verschlüsselt.")
+                        urlFehler?.let {
+                            Spacer(Modifier.height(6.dp))
+                            Text(it, color = f.error, fontSize = 16.sp)
+                        }
+                        Spacer(Modifier.height(16.dp))
+                        M3Knopf("IServ-Zugang speichern", Modifier.fillMaxWidth(), betont = true) {
+                            val url = serverUrl.trim()
+                            if (url.isNotEmpty() && !url.startsWith("https://")) {
+                                urlFehler = "Aus Sicherheitsgründen nur eine https://-Adresse – sonst würden Benutzername und Passwort unverschlüsselt übertragen."
+                            } else {
+                                onZugangSpeichern(IServZugang(url, benutzername.trim(), passwort))
+                            }
+                        }
+                    }
+                }
+                else -> M3Gruppe {
+                    M3Feld {
+                        Text("DammBoard $aktuelleVersion", color = f.onSurface, fontSize = 20.sp, fontWeight = FontWeight.Medium)
+                        Spacer(Modifier.height(6.dp))
+                        // Hilft bei der Fehlersuche aus der Ferne: zeigt, was das Gerät Android meldet.
+                        M3Hinweis(bildschirmInfo)
                     }
                 }
             }
-
-                }
-                "kamera" -> {
-            SchalterZeile(
-                "Kamera-Knopf zeigen",
-                "Knopf „Dokumentenkamera“ unten links in der Leiste: fotografieren, zuschneiden, drehen, Zauberstab – und als Bild auf die Tafel. " +
-                    "Aus, wenn an diesem Board keine Dokumentenkamera hängt (auf den älteren CTOUCH-Boards ist sie von Haus aus aus).",
-                kameraKnopf, onKameraKnopfGeaendert
-            )
-                }
-                "zeichnen" -> {
-            ErweiterteEinstellungen(
-                teil = "zeichnen",
-                zeichenPraezision = zeichenPraezision,
-                hintergrundMerken = hintergrundMerken,
-                handballenRadieren = handballenRadieren,
-                handballenEmpfindlichkeit = handballenEmpfindlichkeit,
-                radierenStueckweise = radierenStueckweise,
-                tafelSichern = tafelSichern,
-                formErkennung = formErkennung,
-                onTafelSichernGeaendert = onTafelSichernGeaendert,
-                onFormErkennungGeaendert = onFormErkennungGeaendert,
-                onZeichenPraezisionGeaendert = onZeichenPraezisionGeaendert,
-                onHintergrundMerkenGeaendert = onHintergrundMerkenGeaendert,
-                onHandballenRadierenGeaendert = onHandballenRadierenGeaendert,
-                onHandballenEmpfindlichkeitGeaendert = onHandballenEmpfindlichkeitGeaendert,
-                onRadierenStueckweiseGeaendert = onRadierenStueckweiseGeaendert,
-                ueberraschungen = ueberraschungen,
-                onUeberraschungenGeaendert = onUeberraschungenGeaendert,
-                onUeberraschungZeigen = onUeberraschungZeigen
-            )
-                }
-                "tafel" -> {
-            ErweiterteEinstellungen(
-                teil = "tafel",
-                zeichenPraezision = zeichenPraezision,
-                hintergrundMerken = hintergrundMerken,
-                handballenRadieren = handballenRadieren,
-                handballenEmpfindlichkeit = handballenEmpfindlichkeit,
-                radierenStueckweise = radierenStueckweise,
-                tafelSichern = tafelSichern,
-                formErkennung = formErkennung,
-                onTafelSichernGeaendert = onTafelSichernGeaendert,
-                onFormErkennungGeaendert = onFormErkennungGeaendert,
-                onZeichenPraezisionGeaendert = onZeichenPraezisionGeaendert,
-                onHintergrundMerkenGeaendert = onHintergrundMerkenGeaendert,
-                onHandballenRadierenGeaendert = onHandballenRadierenGeaendert,
-                onHandballenEmpfindlichkeitGeaendert = onHandballenEmpfindlichkeitGeaendert,
-                onRadierenStueckweiseGeaendert = onRadierenStueckweiseGeaendert,
-                ueberraschungen = ueberraschungen,
-                onUeberraschungenGeaendert = onUeberraschungenGeaendert,
-                onUeberraschungZeigen = onUeberraschungZeigen
-            )
-                }
-                "spass" -> {
-            ErweiterteEinstellungen(
-                teil = "spass",
-                zeichenPraezision = zeichenPraezision,
-                hintergrundMerken = hintergrundMerken,
-                handballenRadieren = handballenRadieren,
-                handballenEmpfindlichkeit = handballenEmpfindlichkeit,
-                radierenStueckweise = radierenStueckweise,
-                tafelSichern = tafelSichern,
-                formErkennung = formErkennung,
-                onTafelSichernGeaendert = onTafelSichernGeaendert,
-                onFormErkennungGeaendert = onFormErkennungGeaendert,
-                onZeichenPraezisionGeaendert = onZeichenPraezisionGeaendert,
-                onHintergrundMerkenGeaendert = onHintergrundMerkenGeaendert,
-                onHandballenRadierenGeaendert = onHandballenRadierenGeaendert,
-                onHandballenEmpfindlichkeitGeaendert = onHandballenEmpfindlichkeitGeaendert,
-                onRadierenStueckweiseGeaendert = onRadierenStueckweiseGeaendert,
-                ueberraschungen = ueberraschungen,
-                onUeberraschungenGeaendert = onUeberraschungenGeaendert,
-                onUeberraschungZeigen = onUeberraschungZeigen
-            )
-                }
-                "iserv" -> {
-            Text("IServ-Speicher", color = Textfarbe, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-            Text(
-                "Web-Adresse deines IServ-WebDAV-Speichers, z. B. https://schule.example.de/iserv/webdav",
-                color = TextfarbeSchwach, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
-            )
-
-            OutlinedTextField(
-                value = serverUrl, onValueChange = { serverUrl = it; urlFehler = null },
-                label = { Text("Web-Adresse") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                colors = feldFarben(),
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(10.dp))
-            OutlinedTextField(
-                value = benutzername, onValueChange = { benutzername = it },
-                label = { Text("Benutzername") },
-                singleLine = true,
-                colors = feldFarben(),
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(10.dp))
-            OutlinedTextField(
-                value = passwort, onValueChange = { passwort = it },
-                label = { Text("Passwort") },
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                colors = feldFarben(),
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                "Hinweis: Das Passwort wird lokal auf diesem Gerät gespeichert, nicht verschlüsselt.",
-                color = TextfarbeSchwach, fontSize = 10.sp
-            )
-            urlFehler?.let {
-                Spacer(Modifier.height(6.dp))
-                Text(it, color = Fehlerfarbe, fontSize = 11.sp)
-            }
-
-            Spacer(Modifier.height(14.dp))
-            Button(
-                onClick = {
-                    val url = serverUrl.trim()
-                    if (url.isNotEmpty() && !url.startsWith("https://")) {
-                        urlFehler = "Aus Sicherheitsgründen nur eine https://-Adresse – sonst würden Benutzername und Passwort unverschlüsselt übertragen."
-                    } else {
-                        onZugangSpeichern(IServZugang(url, benutzername.trim(), passwort))
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = Akzent),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("IServ-Zugang speichern")
-            }
-
-                }
-                "ueber" -> {
-                    Text("DammBoard $aktuelleVersion", color = Textfarbe, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(6.dp))
-                    // Hilft bei der Fehlersuche aus der Ferne: zeigt, was das Gerät Android meldet.
-                    Text(bildschirmInfo, color = TextfarbeSchwach, fontSize = 11.sp)
-                }
             }
             }
         }
+    }
     }
 }
 
@@ -385,6 +304,7 @@ private fun UpdateAbschnitt(
     var ladend by remember { mutableStateOf(false) }
     var fortschritt by remember { mutableStateOf(0f) }
     var fehler by remember { mutableStateOf<String?>(null) }
+    val f = MaterialTheme.colorScheme
 
     fun starteHerunterladen(zielInfo: UpdateInfo) {
         if (!kannUnbekannteQuellenInstallieren(context)) {
@@ -415,88 +335,46 @@ private fun UpdateAbschnitt(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(if (info != null) Akzent else Color.White)
-            .padding(16.dp)
-    ) {
-        val textFarbe = if (info != null) Color.White else Textfarbe
-        val subFarbe = if (info != null) Color(0xFFD7DFD4) else TextfarbeSchwach
-
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-            Text("Version & Updates", color = textFarbe, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+    M3Gruppe {
+        M3Feld {
+            M3Hinweis("Installiert: $aktuelleVersion")
+            M3Schalter("Automatisch nach dem Start prüfen", autoPruefung, onAendern = onAutoGeaendert)
         }
-        Text("Installiert: $aktuelleVersion", color = subFarbe, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp, bottom = 10.dp))
-
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text(
-                "Automatisch nach dem Start prüfen",
-                color = textFarbe, fontSize = 12.sp,
-                modifier = Modifier.weight(1f)
-            )
-            Switch(
-                checked = autoPruefung,
-                onCheckedChange = onAutoGeaendert,
-                colors = SwitchDefaults.colors(checkedTrackColor = if (info != null) Color.White else Akzent)
-            )
-        }
-        Spacer(Modifier.height(10.dp))
-
         if (info != null) {
-            Text("Neue Version verfügbar: ${info.version}", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            if (info.changelog.isNotBlank()) {
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    info.changelog.trim(),
-                    color = Color(0xFFE9EEE7), fontSize = 11.sp,
-                    modifier = Modifier.heightIn(max = 90.dp).verticalScroll(rememberScrollState())
-                )
-            }
-            Spacer(Modifier.height(10.dp))
-            Button(
-                onClick = { starteHerunterladen(info) },
-                enabled = !ladend,
-                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Akzent),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                if (ladend) {
-                    CircularProgressIndicator(color = Akzent, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Lädt … ${(fortschritt * 100).toInt()}%")
-                } else {
-                    Text("Jetzt aktualisieren")
+            Column(Modifier.fillMaxWidth().background(f.primaryContainer).padding(horizontal = 24.dp, vertical = 20.dp)) {
+                Text("Neue Version verfügbar: ${info.version}", color = f.onPrimaryContainer, fontSize = 20.sp, fontWeight = FontWeight.Medium)
+                if (info.changelog.isNotBlank()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(info.changelog.trim(), color = f.onPrimaryContainer, fontSize = 16.sp,
+                        modifier = Modifier.heightIn(max = 160.dp).verticalScroll(rememberScrollState()))
                 }
-            }
-            fehler?.let {
-                Spacer(Modifier.height(8.dp))
-                Text(it, color = Color.White, fontSize = 11.sp)
+                Spacer(Modifier.height(14.dp))
+                M3Knopf(if (ladend) "Lädt … ${(fortschritt * 100).toInt()} %" else "Jetzt aktualisieren", Modifier.fillMaxWidth(), betont = true) {
+                    if (!ladend) starteHerunterladen(info)
+                }
+                fehler?.let {
+                    Spacer(Modifier.height(8.dp))
+                    Text(it, color = f.error, fontSize = 16.sp)
+                }
             }
         } else {
-            Button(
-                onClick = onJetztPruefen,
-                enabled = !pruefungLaeuft,
-                colors = ButtonDefaults.buttonColors(containerColor = Akzent),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                if (pruefungLaeuft) {
-                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Prüft …")
-                } else {
-                    Text("Jetzt nach Updates suchen")
+            M3Feld {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    M3Knopf(if (pruefungLaeuft) "Prüft …" else "Jetzt nach Updates suchen", Modifier.weight(1f), betont = true) {
+                        if (!pruefungLaeuft) onJetztPruefen()
+                    }
+                    if (pruefungLaeuft) {
+                        Spacer(Modifier.width(12.dp))
+                        CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                    }
+                }
+                if (bereitsAktuell && !pruefungLaeuft) {
+                    Spacer(Modifier.height(8.dp))
+                    M3Hinweis("Du hast bereits die neueste Version.")
                 }
             }
-            if (bereitsAktuell && !pruefungLaeuft) {
-                Spacer(Modifier.height(8.dp))
-                Text("Du hast bereits die neueste Version.", color = TextfarbeSchwach, fontSize = 11.sp)
-            }
         }
-        Spacer(Modifier.height(8.dp))
-        androidx.compose.material3.OutlinedButton(onClick = { oeffneFDroidRepo(context) }, modifier = Modifier.fillMaxWidth()) {
-            Text("Damm-Apps in F-Droid hinzufügen", fontSize = 12.sp)
-        }
+        M3Feld { M3Knopf("Damm-Apps in F-Droid hinzufügen", Modifier.fillMaxWidth()) { oeffneFDroidRepo(context) } }
     }
 }
 
@@ -534,187 +412,81 @@ private fun ErweiterteEinstellungen(
     onUeberraschungZeigen: () -> Unit = {}
 ) {
     if (teil == "zeichnen") {
-    Text("Zeichen-Genauigkeit", color = Textfarbe, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-    Text(
-        "Wie fein Freihandlinien erfasst werden. Weiter rechts = glattere Kurven und besser " +
-            "lesbare kleine Schrift, kostet aber mehr Leistung. Auf älteren Tafel-Geräten eher " +
-            "links lassen.",
-        color = TextfarbeSchwach, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp, bottom = 4.dp)
-    )
-    // Erst beim Loslassen speichern, nicht bei jedem Zwischenschritt des Reglers.
-    var praezision by remember(zeichenPraezision) { mutableFloatStateOf(zeichenPraezision) }
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        Text("Performance", color = TextfarbeSchwach, fontSize = 10.sp)
-        Slider(
-            value = praezision,
-            onValueChange = { praezision = it },
-            onValueChangeFinished = { onZeichenPraezisionGeaendert(praezision) },
-            valueRange = 0f..1f,
-            steps = 9,
-            colors = SliderDefaults.colors(thumbColor = Akzent, activeTrackColor = Akzent),
-            modifier = Modifier.weight(1f).padding(horizontal = 6.dp)
-        )
-        Text("Fein", color = TextfarbeSchwach, fontSize = 10.sp)
-    }
-    Spacer(Modifier.height(14.dp))
-    SchalterZeile(
-        "Formerkennung",
-        "Stift am Ende eines Strichs kurz still halten: aus Kreis, Linie, Dreieck oder Rechteck wird eine saubere Form.",
-        formErkennung, onFormErkennungGeaendert
-    )
+        M3Gruppe("Zeichen-Genauigkeit") {
+            M3Feld {
+                M3Hinweis("Wie fein Freihandlinien erfasst werden. Weiter rechts = glattere Kurven und besser " +
+                    "lesbare kleine Schrift, kostet aber mehr Leistung. Auf älteren Tafel-Geräten eher links lassen.")
+                // Erst beim Loslassen speichern, nicht bei jedem Zwischenschritt des Reglers.
+                var praezision by remember(zeichenPraezision) { mutableFloatStateOf(zeichenPraezision) }
+                ReglerZeile("Performance", "Fein", praezision, { praezision = it }) { onZeichenPraezisionGeaendert(praezision) }
+            }
+            M3Feld {
+                M3Schalter("Formerkennung", formErkennung,
+                    "Stift am Ende eines Strichs kurz still halten: aus Kreis, Linie, Dreieck oder Rechteck wird eine saubere Form.", onFormErkennungGeaendert)
+            }
+        }
+        M3Gruppe("Radierer und Wischen") {
+            M3Feld {
+                M3Hinweis("Stückweise: nur das, worüber gewischt wird, verschwindet – wie mit einem Schwamm, auch bei " +
+                    "Formen. Ganz: eine berührte Linie oder Form verschwindet komplett.")
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    M3Auswahl("Stückweise", radierenStueckweise, { onRadierenStueckweiseGeaendert(true) })
+                    M3Auswahl("Ganze Linie / Form", !radierenStueckweise, { onRadierenStueckweiseGeaendert(false) })
+                }
+            }
+            M3Feld {
+                M3Schalter("Mit dem Handballen wischen", handballenRadieren,
+                    "Wie an einer echten Tafel: Handballen oder flache Hand auflegen und wischen – das " +
+                        "Darunterliegende wird weggewischt, egal welches Werkzeug gerade gewählt ist.", onHandballenRadierenGeaendert)
+                if (handballenRadieren) {
+                    Spacer(Modifier.height(8.dp))
+                    M3Hinweis("Empfindlichkeit – weiter links, falls beim normalen Schreiben aus Versehen gewischt " +
+                        "wird; weiter rechts, falls die Hand nicht erkannt wird.")
+                    var empfindlichkeit by remember(handballenEmpfindlichkeit) { mutableFloatStateOf(handballenEmpfindlichkeit) }
+                    ReglerZeile("Nur große Hand", "Empfindlich", empfindlichkeit, { empfindlichkeit = it }) { onHandballenEmpfindlichkeitGeaendert(empfindlichkeit) }
+                }
+            }
+        }
     }
 
     if (teil == "tafel") {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-            Text("Letzten Hintergrund merken", color = Textfarbe, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-            Text(
-                "Aus: jede neue Seite startet auf dem bekannten grünen Tafelhintergrund. An: neue " +
-                    "Seiten – auch nach dem nächsten Start – übernehmen den zuletzt gewählten Hintergrund.",
-                color = TextfarbeSchwach, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp)
-            )
+        M3Gruppe {
+            M3Feld {
+                M3Schalter("Letzten Hintergrund merken", hintergrundMerken,
+                    "Aus: jede neue Seite startet auf dem bekannten grünen Tafelhintergrund. An: neue " +
+                        "Seiten – auch nach dem nächsten Start – übernehmen den zuletzt gewählten Hintergrund.", onHintergrundMerkenGeaendert)
+            }
+            M3Feld {
+                M3Schalter("Tafel automatisch sichern", tafelSichern,
+                    "Alle Seiten werden laufend gesichert. Nach einem Absturz oder dem Ausschalten des Boards ist " +
+                        "die Tafel beim nächsten Start wieder da. Neu anfangen: Seitenzahl unten rechts antippen → „Neue leere Tafel“.", onTafelSichernGeaendert)
+            }
         }
-        Switch(
-            checked = hintergrundMerken,
-            onCheckedChange = onHintergrundMerkenGeaendert,
-            colors = SwitchDefaults.colors(checkedTrackColor = Akzent, checkedThumbColor = Color.White)
-        )
-    }
-
-    Spacer(Modifier.height(14.dp))
-    SchalterZeile(
-        "Tafel automatisch sichern",
-        "Alle Seiten werden laufend gesichert. Nach einem Absturz oder dem Ausschalten des Boards ist " +
-            "die Tafel beim nächsten Start wieder da. Neu anfangen: Seitenzahl unten rechts antippen → „Neue leere Tafel“.",
-        tafelSichern, onTafelSichernGeaendert
-    )
     }
 
     if (teil == "spass") {
-    SchalterZeile(
-        "Überraschungen (Easter Eggs)",
-        "Standardmäßig aus. An: ab und zu schaut ein Emoji vom Rand herein (nur, wenn eine Weile niemand malt) – wer es antippt, " +
-            "löst 10 Sekunden Emoji-Party aus. Außerdem gibt es versteckte Überraschungen beim Würfel und beim Stift.",
-        ueberraschungen, onUeberraschungenGeaendert
-    )
-    androidx.compose.material3.OutlinedButton(onClick = onUeberraschungZeigen, modifier = Modifier.padding(top = 4.dp)) {
-        Text("Jetzt ausprobieren", fontSize = 12.sp)
-    }
-    Spacer(Modifier.height(14.dp))
-    UeberraschungsVideoWahl()
-    }
-
-    if (teil == "zeichnen") {
-    Spacer(Modifier.height(18.dp))
-    Text("Radierer und Wischen", color = Textfarbe, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-    Text(
-        "Stückweise: nur das, worüber gewischt wird, verschwindet – wie mit einem Schwamm, auch bei " +
-            "Formen. Ganz: eine berührte Linie oder Form verschwindet komplett.",
-        color = TextfarbeSchwach, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp, bottom = 6.dp)
-    )
-    Row(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(Color.White),
-        horizontalArrangement = Arrangement.SpaceEvenly
-    ) {
-        ModusKnopf("Stückweise", ausgewaehlt = radierenStueckweise, modifier = Modifier.weight(1f)) {
-            onRadierenStueckweiseGeaendert(true)
+        M3Gruppe {
+            M3Feld {
+                M3Schalter("Überraschungen (Easter Eggs)", ueberraschungen,
+                    "Standardmäßig aus. An: ab und zu schaut ein Emoji vom Rand herein (nur, wenn eine Weile niemand malt) – wer es antippt, " +
+                        "löst 10 Sekunden Emoji-Party aus. Außerdem gibt es versteckte Überraschungen beim Würfel und beim Stift.", onUeberraschungenGeaendert)
+                Spacer(Modifier.height(8.dp))
+                M3Knopf("Jetzt ausprobieren", onClick = onUeberraschungZeigen)
+            }
         }
-        ModusKnopf("Ganze Linie / Form", ausgewaehlt = !radierenStueckweise, modifier = Modifier.weight(1f)) {
-            onRadierenStueckweiseGeaendert(false)
-        }
-    }
-
-    Spacer(Modifier.height(14.dp))
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-            Text("Mit dem Handballen wischen", color = Textfarbe, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-            Text(
-                "Wie an einer echten Tafel: Handballen oder flache Hand auflegen und wischen – das " +
-                    "Darunterliegende wird weggewischt, egal welches Werkzeug gerade gewählt ist.",
-                color = TextfarbeSchwach, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp)
-            )
-        }
-        Switch(
-            checked = handballenRadieren,
-            onCheckedChange = onHandballenRadierenGeaendert,
-            colors = SwitchDefaults.colors(checkedTrackColor = Akzent, checkedThumbColor = Color.White)
-        )
-    }
-    if (handballenRadieren) {
-        Text(
-            "Empfindlichkeit – weiter links, falls beim normalen Schreiben aus Versehen gewischt " +
-                "wird; weiter rechts, falls die Hand nicht erkannt wird.",
-            color = TextfarbeSchwach, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp, bottom = 4.dp)
-        )
-        var empfindlichkeit by remember(handballenEmpfindlichkeit) { mutableFloatStateOf(handballenEmpfindlichkeit) }
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("Nur große Hand", color = TextfarbeSchwach, fontSize = 10.sp)
-            Slider(
-                value = empfindlichkeit,
-                onValueChange = { empfindlichkeit = it },
-                onValueChangeFinished = { onHandballenEmpfindlichkeitGeaendert(empfindlichkeit) },
-                valueRange = 0f..1f,
-                steps = 9,
-                colors = SliderDefaults.colors(thumbColor = Akzent, activeTrackColor = Akzent),
-                modifier = Modifier.weight(1f).padding(horizontal = 6.dp)
-            )
-            Text("Empfindlich", color = TextfarbeSchwach, fontSize = 10.sp)
-        }
-    }
+        M3Gruppe("Überraschungsvideo") { M3Feld { UeberraschungsVideoWahl() } }
     }
 }
 
-/** Eine Zeile der Übersicht: farbiges Symbol, Name, Zusammenfassung, Pfeil – wie im DammLauncher. */
+/** Regler mit Beschriftung links und rechts; gespeichert wird erst beim Loslassen */
 @Composable
-private fun BereichZeile(symbol: String, farbe: Color, titel: String, text: String, hinweis: Boolean = false, onClick: () -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp).shadow(2.dp, RoundedCornerShape(16.dp)).clip(RoundedCornerShape(16.dp)).background(Color.White)
-            .clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp)
-    ) {
-        Box(Modifier.size(44.dp).clip(CircleShape).background(farbe.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
-            Text(symbol, fontSize = 22.sp)
-        }
-        Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
-            Text(titel, color = Textfarbe, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            Text(text, color = if (hinweis) Fehlerfarbe else TextfarbeSchwach, fontSize = 12.sp, maxLines = 2)
-        }
-        Text("›", color = TextfarbeSchwach, fontSize = 26.sp)
-    }
-}
-
-@Composable
-private fun SchalterZeile(titel: String, text: String, wert: Boolean, onGeaendert: (Boolean) -> Unit) {
-    // Die ganze Zeile schaltet um (auf dem Board leichter zu treffen als der kleine Schalter)
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { onGeaendert(!wert) }) {
-        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-            Text(titel, color = Textfarbe, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-            Text(text, color = TextfarbeSchwach, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))
-        }
-        Switch(checked = wert, onCheckedChange = onGeaendert, colors = SwitchDefaults.colors(checkedTrackColor = Akzent, checkedThumbColor = Color.White))
-    }
-}
-
-@Composable
-private fun feldFarben() = OutlinedTextFieldDefaults.colors(
-    focusedBorderColor = Akzent,
-    unfocusedBorderColor = Color(0xFFCFCDC6),
-    focusedLabelColor = Akzent,
-    cursorColor = Akzent
-)
-
-@Composable
-private fun ModusKnopf(label: String, ausgewaehlt: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Box(
-        modifier = modifier
-            .padding(4.dp)
-            .clip(RoundedCornerShape(50))
-            .background(if (ausgewaehlt) Textfarbe else Color.Transparent)
-            .clickable(onClick = onClick)
-            .padding(vertical = 10.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(label, color = if (ausgewaehlt) Color.White else Textfarbe, fontSize = 13.sp)
+private fun ReglerZeile(links: String, rechts: String, wert: Float, onWert: (Float) -> Unit, onFertig: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+        M3Hinweis(links)
+        Slider(value = wert, onValueChange = onWert, onValueChangeFinished = onFertig, valueRange = 0f..1f, steps = 9,
+            modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
+        M3Hinweis(rechts)
     }
 }
 
@@ -737,22 +509,20 @@ private fun UeberraschungsVideoWahl() {
             meldung = if (ok) "Gespeichert." else "Das Video lässt sich nicht abspielen."
         }
     }
-    Spacer(Modifier.height(10.dp))
-    Text("Überraschungsvideo", color = Textfarbe, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-    Text(
+    M3Hinweis(
         (if (vorhanden) "Ein Video ist gewählt. " else "Noch kein Video gewählt. ") +
-            "Es bleibt nur auf diesem Board. Alternativ als „ueberraschung.mp4“ in den Tafeln-Ordner legen – dann holt es sich jedes Board selbst. Wie man es auslöst, bleibt geheim 😉",
-        color = TextfarbeSchwach, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp, bottom = 4.dp)
+            "Es bleibt nur auf diesem Board. Alternativ als „ueberraschung.mp4“ in den Tafeln-Ordner legen – dann holt es sich jedes Board selbst. Wie man es auslöst, bleibt geheim 😉"
     )
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        androidx.compose.material3.OutlinedButton(onClick = {
+    Spacer(Modifier.height(10.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        M3Knopf(if (vorhanden) "Anderes Video wählen …" else "Video wählen …") {
             try { wahl.launch(arrayOf("video/*")) } catch (_: Exception) { meldung = "Auf diesem Board gibt es keine Dateiauswahl." }
-        }) { Text(if (vorhanden) "Anderes Video wählen …" else "Video wählen …", fontSize = 12.sp) }
-        if (vorhanden) androidx.compose.material3.OutlinedButton(onClick = {
+        }
+        if (vorhanden) M3Knopf("Entfernen") {
             de.oejendorferdamm.dammboard.ui.spiel.UeberraschungsVideo.entfernen(context)
             vorhanden = false
             meldung = "Entfernt."
-        }) { Text("Entfernen", fontSize = 12.sp) }
+        }
     }
-    meldung?.let { Text(it, color = TextfarbeSchwach, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp)) }
+    meldung?.let { M3Hinweis(it, Modifier.padding(top = 8.dp)) }
 }
