@@ -81,7 +81,7 @@ object Nextcloud {
         }
     } catch (_: Exception) { null } // DammTable fehlt oder ist zu alt
 
-    /** Vorhandenen Fach-Ordner finden („Mathe“ → „Mathematik“); null = kein passender – die Fächer gibt die Schule vor, keine neuen anlegen */
+    /** Vorhandenen Fach-Ordner finden („Mathe“ → „Mathematik“); null = kein passender – die Fächer gibt die Schule vor, keine neuen anlegen (dann „Unsortiert“) */
     fun fachOrdner(fach: String, vorhanden: List<String>): String? {
         val f = fach.trim()
         // „Tafel“ = keine laufende Stunde – kein Fach, auch wenn der Ordner (von 2.3.0–2.5.0 angelegt) schon da ist
@@ -91,11 +91,14 @@ object Nextcloud {
         return null
     }
 
-    /** „cleverTouch/{fach}/Klasse {klasse}“ → Pfad; null, wenn es keinen passenden Fach-Ordner gibt (z. B. Pause, ohne Stundenplan) */
-    suspend fun zielPfad(c: IServClient, muster: String, fach: String, klasse: String): String? {
+    /** Ohne passendes Fach (Pause, ohne Stundenplan, unbekanntes Fach): dieser Ordner – so geht nichts verloren */
+    const val UNSORTIERT = "Unsortiert"
+
+    /** „cleverTouch/{fach}/Klasse {klasse}“ → Pfad; ohne passenden Fach-Ordner „cleverTouch/Unsortiert/Klasse 2b“ */
+    suspend fun zielPfad(c: IServClient, muster: String, fach: String, klasse: String): String {
         val ordner = if (muster.contains("{fach}")) {
             val vorhanden = c.liste(muster.substringBefore("{fach}").trim('/')).getOrNull()?.filter { it.istOrdner }?.map { it.name.trimEnd('/') } ?: emptyList()
-            fachOrdner(fach, vorhanden) ?: return null
+            fachOrdner(fach, vorhanden.filterNot { it.equals(UNSORTIERT, ignoreCase = true) }) ?: UNSORTIERT
         } else ""
         return muster.replace("{fach}", ordner).replace("{klasse}", klasse).split('/').filter { it.isNotBlank() }.joinToString("/")
     }
@@ -107,8 +110,7 @@ object Nextcloud {
     suspend fun hochladenSchule(context: Context, s: Schule, seiten: List<de.oejendorferdamm.dammboard.model.SeitenAbbild>, breite: Int, hoehe: Int,
                                 fach: String, datum: java.time.LocalDate, stunde: Int?): Result<Unit> {
         val c = IServClient(IServZugang(davAdresse(s.server, s.benutzer), s.benutzer, s.passwort))
-        // Ohne passenden Fach-Ordner nichts hochladen – die Tafel liegt trotzdem in der Ablage auf dem Board
-        val pfad = zielPfad(c, s.pfad, fach, s.klasse) ?: return Result.success(Unit)
+        val pfad = zielPfad(c, s.pfad, fach, s.klasse)
         c.ordnerAnlegen(pfad).onFailure { return Result.failure(it) }
         val name = datum.toString() + (stunde?.let { " $it. Std" } ?: "")
         seiten.forEachIndexed { i, seite ->

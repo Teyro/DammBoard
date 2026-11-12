@@ -279,8 +279,16 @@ private fun NextcloudEinstellungen() {
     val schule = remember { nc.schule(context, "") }
     Text("Nextcloud", color = Schrift1, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
     if (schule != null) {
-        Text("Zugänge der Schule (über DammTable): Klasse ${schule.klasse} → ${schule.pfad.replace("{klasse}", schule.klasse).replace("{fach}", "<Fach>")} – nach jeder Stunde als PNG. Nichts einzutippen.",
+        Text("Zugänge der Schule (über DammTable): Klasse ${schule.klasse} → ${schule.pfad.replace("{klasse}", schule.klasse).replace("{fach}", "<Fach>")} – nach jeder Stunde als PNG. Ohne passendes Fach in „Unsortiert“. Nichts einzutippen.",
             color = Akzent, fontSize = 12.sp)
+        val vc = de.oejendorferdamm.dammboard.data.VorschauCache
+        var inhalt by remember { mutableStateOf(vc.groesse(context)) }
+        val um = vc.zeitpunkt(java.time.LocalDate.now(), schule.klasse, "").let { "%d–%d Uhr".format(it / 60, it / 60 + 1) }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("Vorschaubilder im Speicher: ${inhalt.first} (${inhalt.second / 1_048_576} MB) – einmal am Tag zwischen $um aufgefrischt" +
+                vc.stand(context).let { if (it.isEmpty()) "" else ", zuletzt $it" }, color = Schrift2, fontSize = 12.sp, modifier = Modifier.weight(1f))
+            Text("Löschen", color = Akzent, fontSize = 12.sp, modifier = Modifier.clickable { vc.loeschen(context); inhalt = vc.groesse(context) }.padding(8.dp))
+        }
     }
     Text(
         if (schule != null) "Eigene Nextcloud (nur ohne Zugänge der Schule):"

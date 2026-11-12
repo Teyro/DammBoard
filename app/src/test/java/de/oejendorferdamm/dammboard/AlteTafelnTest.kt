@@ -3,6 +3,7 @@ package de.oejendorferdamm.dammboard
 import de.oejendorferdamm.dammboard.data.AlteTafeln
 import de.oejendorferdamm.dammboard.data.Nextcloud
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.file.Files
 
@@ -50,6 +51,16 @@ class NextcloudSchuleTest {
         assertEquals("Mathematik", Nextcloud.fachOrdner("Mathe", da))
         assertEquals("Deutsch", Nextcloud.fachOrdner("deutsch", da))
         assertEquals(null, Nextcloud.fachOrdner("Religion", da))
-        assertEquals(null, Nextcloud.fachOrdner("Tafel", da + "Tafel")) // ohne laufende Stunde: kein Ordner „Tafel“
+        assertEquals(null, Nextcloud.fachOrdner("Tafel", da + "Tafel")) // ohne laufende Stunde: kein Ordner „Tafel“ (→ „Unsortiert“)
+    }
+
+    @Test
+    fun vorschauZeitfenster() {
+        val d = java.time.LocalDate.of(2026, 11, 13)
+        val vc = de.oejendorferdamm.dammboard.data.VorschauCache
+        assertTrue(vc.zeitpunkt(d, "vsk a", "x") in 480 until 540)
+        assertTrue(vc.zeitpunkt(d, "2b", "x") in 600 until 660)
+        assertTrue(vc.zeitpunkt(d, "4c", "x") in 720 until 780)
+        assertTrue(vc.zeitpunkt(d, "", "x") in 780 until 840)
     }
 }

@@ -383,6 +383,10 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
                 if (vorher != null && ablageAutoAktuell.value) ablegen(vorher)
                 ablagePrefs.edit().putString("abschnitt", jetzt).apply()
             }
+            // Einmal am Tag die Vorschaubilder der Schul-Cloud auffrischen – Zeitfenster je Jahrgang, zufällige Minute
+            val vc = de.oejendorferdamm.dammboard.data.VorschauCache
+            val sch = de.oejendorferdamm.dammboard.data.Nextcloud.schule(app, ablageOrdnerAktuell.value)
+            if (sch != null && vc.faellig(app, sch, ablageOrdnerAktuell.value)) scope.launch { try { vc.auffrischen(app, sch) } catch (_: Exception) {} }
             delay(30_000)
         }
     }

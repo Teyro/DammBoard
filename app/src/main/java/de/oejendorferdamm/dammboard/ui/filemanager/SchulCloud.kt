@@ -95,18 +95,15 @@ fun SchulCloud(board: String, onBild: (datei: String, breite: Int, hoehe: Int) -
         laedt = false
     }
 
-    /** Vorschau: kleines Bild von Nextcloud (core/preview), sonst das ganze Bild verkleinert */
+    /** Vorschau: aus dem Speicher (einmal am Tag aufgefrischt), sonst klein von Nextcloud (core/preview), sonst das ganze Bild verkleinert */
     suspend fun ladeVorschau(e: IServEintrag): Bitmap? = withContext(Dispatchers.IO) {
         val s = schule ?: return@withContext null
         val rel = "/" + pfad.trim('/') + "/" + e.name
-        try {
-            val basis = Nextcloud.davAdresse(s.server, s.benutzer).substringBefore("/remote.php/")
-            val url = "$basis/index.php/core/preview.png?file=" + java.net.URLEncoder.encode(rel, "UTF-8").replace("+", "%20") + "&x=360&y=240&a=1"
-            val a = de.oejendorferdamm.dammboard.data.NetzwerkClient.instance.newCall(
-                Request.Builder().url(url).header("Authorization", Credentials.basic(s.benutzer, s.passwort)).build()
-            ).execute()
-            a.use { if (it.isSuccessful) it.body?.bytes()?.let { b -> BitmapFactory.decodeByteArray(b, 0, b.size) } else null }
-        } catch (_: Exception) { null } ?: client?.herunterladen(pfad.trim('/') + "/" + e.name)?.getOrNull()?.let { b ->
+        de.oejendorferdamm.dammboard.data.VorschauCache.lies(context, rel)
+            ?: de.oejendorferdamm.dammboard.data.VorschauCache.holen(s, rel)?.let { b ->
+                de.oejendorferdamm.dammboard.data.VorschauCache.schreibe(context, rel, b); BitmapFactory.decodeByteArray(b, 0, b.size)
+            }
+            ?: client?.herunterladen(pfad.trim('/') + "/" + e.name)?.getOrNull()?.let { b ->
             val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }; BitmapFactory.decodeByteArray(b, 0, b.size, o)
             BitmapFactory.decodeByteArray(b, 0, b.size, BitmapFactory.Options().apply { inSampleSize = maxOf(1, o.outWidth / 360) })
         }
