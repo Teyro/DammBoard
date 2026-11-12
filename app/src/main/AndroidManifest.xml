@@ -3,9 +3,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Nur für Android 9 und älter nötig: ab Android 10 übernimmt Scoped Storage das Speichern. -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" tools:node="replace" />
-    <!-- Die USB-Kamera-Bibliothek bringt diese mit – DammBoard braucht sie nicht -->
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:node="remove" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove" />
+    <!-- Alte Tafeln (.ubmx2) auf dem ganzen Board suchen (Ablage → Einstellungen): ab Android 11 „Zugriff auf alle Dateien“, davor Speicher lesen -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" tools:node="replace" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" tools:node="replace" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" tools:node="remove" />
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
     <!-- Stundenplan aus DammTable (Fach der laufenden Stunde, Symbole der Fächer) – nur mit demselben Schlüssel -->
@@ -25,6 +25,7 @@
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
 
     <application
+        android:requestLegacyExternalStorage="true"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"

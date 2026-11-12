@@ -40,6 +40,13 @@ object Klassenplaene {
         return try { tag(f.readText(), klasse, datum) } catch (_: Exception) { null }
     }
 
+    /** Stundenraster der Schule (wie DammTable) – ohne Stundenplan wird trotzdem zu jedem Stundenende abgelegt */
+    private val RASTER = listOf(1 to ("08:30" to "09:15"), 2 to ("09:15" to "10:00"), 3 to ("10:25" to "11:10"), 4 to ("11:10" to "11:55"), 5 to ("12:20" to "13:05"), 6 to ("13:05" to "13:30"))
+
+    fun raster(datum: LocalDate = LocalDate.now()): Stundenplan.Tag? =
+        if (datum.dayOfWeek.value > 5) null
+        else Stundenplan.Tag(datum, false, RASTER.map { (n, z) -> Stundenplan.Stunde(n, LocalTime.parse(z.first), LocalTime.parse(z.second), "Tafel", "") })
+
     /**
      * Nur ergänzen, nie überschreiben: Stunden aus DammTable bleiben, wie sie sind; aus der Untis-Datei kommen nur
      * Stunden dazu, die dort leer sind. Freier Tag in DammTable bleibt frei. Ohne DammTable: die Untis-Datei.

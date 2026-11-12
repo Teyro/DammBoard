@@ -94,6 +94,25 @@ class IServClient(private val zugang: IServZugang) {
         }
     }
 
+    /** Ordner (und alle darüber) anlegen – schon vorhanden ist kein Fehler */
+    suspend fun ordnerAnlegen(pfad: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            var bisher = ""
+            for (teil in pfad.split('/').filter { it.isNotBlank() }) {
+                bisher = if (bisher.isEmpty()) teil else "$bisher/$teil"
+                val url = adresse(bisher.substringBeforeLast('/', ""), bisher.substringAfterLast('/')).newBuilder().addPathSegment("").build()
+                val anfrage = Request.Builder().url(url)
+                    .header("Authorization", Credentials.basic(zugang.benutzername, zugang.passwort))
+                    .method("MKCOL", null).build()
+                iservHttp.newCall(anfrage).execute().use { a ->
+                    // 201 = angelegt, 405 = gibt es schon
+                    if (!a.isSuccessful && a.code != 405) return@withContext Result.failure(IOException("Ordner „$bisher“ anlegen: HTTP ${a.code}"))
+                }
+            }
+            Result.success(Unit)
+        } catch (e: Exception) { Result.failure(e) }
+    }
+
     suspend fun hochladen(pfad: String, dateiname: String, bytes: ByteArray, mime: String = "image/png"): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val anfrage = Request.Builder()

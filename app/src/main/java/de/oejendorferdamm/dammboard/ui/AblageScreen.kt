@@ -73,6 +73,8 @@ interface AblageAktionen {
     suspend fun oeffnen(e: Ablage.Eintrag): String?
     fun importieren()
     fun ordnerImportieren()
+    fun boardDurchsuchen()
+    fun pfadDurchsuchen(pfad: String)
     fun jetztAblegen()
     fun tafelnTeilen()
 }
@@ -154,7 +156,7 @@ fun AblageScreen(
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { onAutomatisch(!automatisch) }) {
                         Column(Modifier.weight(1f)) {
                             Text("Automatisch ablegen", color = Schrift1, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                            Text("Nach jeder Stunde in den Ordner des Fachs (aus dem Stundenplan von DammTable), am Ende des Tages und beim Ausschalten. Am nächsten Tag startet die Tafel leer.", color = Schrift2, fontSize = 12.sp)
+                            Text("Zu jedem Stundenende in den Ordner des Fachs (Stundenplan aus DammTable, sonst Klassenpläne aus dem Schul-Ordner, sonst nach dem Stundenraster der Schule unter „Tafel“), am Ende des Tages und beim Ausschalten – mit Nextcloud auch dorthin. Am nächsten Tag startet die Tafel leer.", color = Schrift2, fontSize = 12.sp)
                         }
                         Switch(checked = automatisch, onCheckedChange = onAutomatisch, colors = SwitchDefaults.colors(checkedTrackColor = Akzent, checkedThumbColor = Color.White))
                     }
@@ -166,6 +168,24 @@ fun AblageScreen(
                     }
                     Spacer(Modifier.height(6.dp))
                     Text("Ablage auf dem Board: Android/data/de.oejendorferdamm.dammboard/files/Tafeln/$ordnerName", color = Schrift2, fontSize = 11.sp)
+
+                    // --- Alte Tafeln suchen
+                    Spacer(Modifier.height(16.dp))
+                    Text("Alte Tafeln (.ubmx2) suchen", color = Schrift1, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Durchsucht das ganze Board (und eingesteckte USB-Sticks) – alles Neue kommt in den Ordner „Importiert“. Braucht einmal „Zugriff auf alle Dateien“.", color = Schrift2, fontSize = 12.sp)
+                    Spacer(Modifier.height(6.dp))
+                    var pfad by remember { mutableStateOf("/sdcard/") }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Button(onClick = aktionen::boardDurchsuchen, enabled = !arbeitet, colors = ButtonDefaults.buttonColors(containerColor = Akzent)) { Text("Ganzes Board durchsuchen") }
+                        Spacer(Modifier.width(10.dp))
+                        OutlinedTextField(pfad, { pfad = it.take(200) }, singleLine = true, label = { Text("oder Ordner, z. B. /sdcard/Notes") }, modifier = Modifier.weight(1f))
+                        Spacer(Modifier.width(8.dp))
+                        OutlinedButton(onClick = { aktionen.pfadDurchsuchen(pfad) }, enabled = !arbeitet && pfad.isNotBlank()) { Text("Durchsuchen") }
+                    }
+
+                    // --- Nextcloud
+                    Spacer(Modifier.height(16.dp))
+                    NextcloudEinstellungen()
                 }
                 Spacer(Modifier.height(12.dp))
             }
@@ -242,4 +262,48 @@ private fun AblageFrage(text: String, ja: String, farbe: Color, onJa: () -> Unit
             }
         }
     }
+}
+
+/** Nextcloud: Server und Benutzer meist schon vorbelegt (fest oder aus dem Schul-Ordner) – nur das App-Passwort eintippen */
+@Composable
+private fun NextcloudEinstellungen() {
+    val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val nc = de.oejendorferdamm.dammboard.data.Nextcloud
+    var k by remember { mutableStateOf(nc.lese(context)) }
+    var passwort by remember { mutableStateOf("") }
+    var mehr by remember { mutableStateOf(k.server.isBlank() || k.benutzer.isBlank()) }
+    var meldung by remember { mutableStateOf(nc.status(context).let { if (it.isEmpty()) "" else "Zuletzt hochgeladen: $it" }) }
+    fun speichern() { val neu = k.copy(passwort = passwort.ifEmpty { k.passwort }); nc.speichere(context, neu); k = neu; passwort = "" }
+
+    Text("Nextcloud", color = Schrift1, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+    Text(
+        if (k.server.isNotBlank() && k.benutzer.isNotBlank()) "Nach jeder Stunde geht die Tafel auch nach ${k.server.removePrefix("https://")} (Benutzer ${k.benutzer}, Ordner „${k.ordner}“)."
+        else "Server und Benutzer eintragen – oder als versteckte Datei „DammBoard/.nextcloud.json“ in den Schul-Ordner legen, dann füllt sich das von selbst.",
+        color = Schrift2, fontSize = 12.sp
+    )
+    Spacer(Modifier.height(6.dp))
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        OutlinedTextField(passwort, { passwort = it }, singleLine = true, modifier = Modifier.weight(1f),
+            label = { Text(if (k.passwort.isEmpty()) "App-Passwort" else "App-Passwort (gespeichert – nur zum Ändern)") },
+            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation())
+        Spacer(Modifier.width(8.dp))
+        Button(onClick = { speichern(); scope.launch { meldung = "Prüft …"; meldung = nc.testen(nc.lese(context)) } }, colors = ButtonDefaults.buttonColors(containerColor = Akzent)) { Text("Speichern und testen") }
+    }
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { k = k.copy(an = !k.an); nc.speichere(context, k) }) {
+        Text("Nach jeder Stunde hochladen", color = Schrift1, fontSize = 14.sp, modifier = Modifier.weight(1f))
+        Switch(checked = k.an, onCheckedChange = { k = k.copy(an = it); nc.speichere(context, k) }, colors = SwitchDefaults.colors(checkedTrackColor = Akzent, checkedThumbColor = Color.White))
+    }
+    if (mehr) {
+        Row {
+            OutlinedTextField(k.server, { k = k.copy(server = it) }, singleLine = true, label = { Text("Server, z. B. https://cloud.schule.de") }, modifier = Modifier.weight(1.4f))
+            Spacer(Modifier.width(8.dp))
+            OutlinedTextField(k.benutzer, { k = k.copy(benutzer = it) }, singleLine = true, label = { Text("Benutzer") }, modifier = Modifier.weight(1f))
+            Spacer(Modifier.width(8.dp))
+            OutlinedTextField(k.ordner, { k = k.copy(ordner = it) }, singleLine = true, label = { Text("Ordner") }, modifier = Modifier.weight(1f))
+        }
+    } else {
+        Text("Server, Benutzer oder Ordner ändern", color = Akzent, fontSize = 12.sp, modifier = Modifier.clickable { mehr = true }.padding(vertical = 4.dp))
+    }
+    if (meldung.isNotEmpty()) Text(meldung, color = if (meldung.startsWith("Keine")) Rot else Schrift2, fontSize = 12.sp)
 }

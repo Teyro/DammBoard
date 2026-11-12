@@ -341,9 +341,12 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
         val stunde = teile.getOrNull(1)?.toIntOrNull()
         val fach = teile.getOrNull(2)?.ifBlank { null } ?: "Tafel"
         try {
-            de.oejendorferdamm.dammboard.data.Ablage.speichere(app, ablageOrdnerAktuell.value, fach, de.oejendorferdamm.dammboard.data.Ablage.name(fach, datum, stunde),
+            val datei = de.oejendorferdamm.dammboard.data.Ablage.speichere(app, ablageOrdnerAktuell.value, fach, de.oejendorferdamm.dammboard.data.Ablage.name(fach, datum, stunde),
                 tafelState.seiten.map { it.abbild() }, tafelState.aktiveSeite, bildschirmPx.first, bildschirmPx.second)
             abgelegtSignatur = signatur
+            // auch in die Nextcloud (falls eingerichtet) – im Hintergrund, ein Fehler hält das Ablegen nicht auf
+            val board = ablageOrdnerAktuell.value
+            scope.launch(kotlinx.coroutines.Dispatchers.IO) { de.oejendorferdamm.dammboard.data.Nextcloud.hochladen(app, datei, board, fach) }
             ablageNeu++
             null
         } catch (e: Exception) { "Fehler beim Ablegen: ${e.message}" }
@@ -359,7 +362,10 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
                     // Klasse = Name des Ablage-Ordners (z. B. „2A“). Vorhandene Stunden werden nie überschrieben.
                     val ausDammTable = de.oejendorferdamm.dammboard.data.Stundenplan.heute(app)
                     try { de.oejendorferdamm.dammboard.data.Klassenplaene.aktualisieren(app, schulPasswort) } catch (_: Exception) {}
+                    try { de.oejendorferdamm.dammboard.data.Nextcloud.ausSchulOrdner(app, schulPasswort) } catch (_: Exception) {}
+                    // ganz ohne Plan: Stundenraster der Schule – abgelegt wird trotzdem zu jedem Stundenende (Fach „Tafel“)
                     de.oejendorferdamm.dammboard.data.Klassenplaene.ergaenzen(ausDammTable, de.oejendorferdamm.dammboard.data.Klassenplaene.tag(app, ablageOrdnerAktuell.value))
+                        ?: de.oejendorferdamm.dammboard.data.Klassenplaene.raster()
                 }
                 planStand = System.currentTimeMillis()
             }
@@ -448,6 +454,37 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
             ablageNeu++
         }
     }
+    val leseErlaubnis = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { ok ->
+        ablageMeldung = if (ok) "Erlaubt – bitte noch einmal „Ganzes Board durchsuchen“ tippen." else "Ohne Erlaubnis kann DammBoard das Board nicht durchsuchen."
+    }
+    /** Ganzes Board (bzw. [pfad]) nach alten Tafeln durchsuchen und alles Neue nach „Importiert“ übernehmen */
+    fun suchenUndImportieren(pfad: String?) {
+        val ag = de.oejendorferdamm.dammboard.data.AlteTafeln
+        if (!ag.erlaubt(app)) {
+            val seite = ag.erlaubnisSeite(app)
+            if (seite != null) {
+                ablageMeldung = "Bitte „Zugriff auf alle Dateien“ für DammBoard erlauben, zurückkommen und noch einmal tippen."
+                try { app.startActivity(seite.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) { ablageMeldung = "Dieses Board bietet die Einstellung „Zugriff auf alle Dateien“ nicht an – bitte „Ordner importieren …“ nutzen." }
+            } else leseErlaubnis.launch(android.Manifest.permission.READ_EXTERNAL_STORAGE)
+            return
+        }
+        ablageArbeitet = true
+        ablageMeldung = if (pfad == null) "Durchsucht das ganze Board …" else "Durchsucht $pfad …"
+        scope.launch {
+            val dateien = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val start = if (pfad == null) ag.wurzeln() else listOf(java.io.File(pfad.trim()))
+                ag.neu(app, ag.suche(start))
+            }
+            val (n, _) = importiere(dateien.map { it.absolutePath to android.net.Uri.fromFile(it) }) { ag.ORDNER }
+            ag.merke(app, dateien)
+            ablageMeldung = when {
+                dateien.isEmpty() -> "Keine neuen alten Tafeln (.ubmx2) gefunden."
+                else -> "$n von ${dateien.size} alten Tafeln importiert (Ordner „${ag.ORDNER}“)."
+            }
+            ablageArbeitet = false
+            ablageNeu++
+        }
+    }
     val ordnerImportWahl = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree()) { baum ->
         if (baum == null) return@rememberLauncherForActivityResult
         ablageArbeitet = true
@@ -503,6 +540,8 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
             } catch (x: Exception) { ablageMeldung = "Öffnen fehlgeschlagen: ${x.message}"; ablageMeldung }
             override fun importieren() { try { importWahl.launch(arrayOf("*/*")) } catch (_: Exception) { ablageMeldung = "Auf diesem Board gibt es keine Dateiauswahl." } }
             override fun ordnerImportieren() { try { ordnerImportWahl.launch(null) } catch (_: Exception) { ablageMeldung = "Auf diesem Board gibt es keine Ordnerauswahl." } }
+            override fun boardDurchsuchen() = suchenUndImportieren(null)
+            override fun pfadDurchsuchen(pfad: String) = suchenUndImportieren(pfad)
             override fun jetztAblegen() { scope.launch { ablageMeldung = ablegen(abschnittJetzt(), auchUnveraendert = true) ?: if (hatInhalt()) "Abgelegt unter „${abschnittJetzt().split('|')[2]}“." else "Die Tafel ist leer." } }
             override fun tafelnTeilen() { bildschirm = Bildschirm.Tafeln }
         }
