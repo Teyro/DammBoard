@@ -13,7 +13,7 @@ android {
         minSdk = 26
         targetSdk = 34
         // Version = Datum des Releases: Jahr.Monat.Tag (zweites Release am selben Tag: .1 dahinter)
-        versionName = "26.11.12"
+        versionName = "26.11.13"
         versionCode = versionName!!.split(".").map { it.toInt() }.let { p -> p[0] * 1_000_000 + p[1] * 10_000 + p[2] * 100 + p.getOrElse(3) { 0 } }
     }
 
