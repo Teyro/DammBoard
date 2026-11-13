@@ -961,7 +961,7 @@ private fun DrawScope.zeichneSeitenInhalt(
 ) {
     val p = pixelFaktor
     drawRect(color = hintergrund.farbe)
-    zeichneMuster(hintergrund.muster, hintergrund.farbe)
+    zeichneMuster(hintergrund.muster, hintergrund.farbe, hintergrund.abstand, hintergrund.staerke)
     if (bild != null) zeichneArbeitsblatt(bild)
     if (geteilt) {
         geradeLinie(
@@ -1066,7 +1066,7 @@ private fun DrawScope.zeichneGeometrieFuehrung(werkzeug: GeometrieWerkzeug, zent
     drawCircle(Color.White.copy(alpha = 0.5f), radius = 5f * p, center = griff)
 }
 
-private fun DrawScope.zeichneMuster(muster: MusterTyp, basisFarbe: Color) {
+private fun DrawScope.zeichneMuster(muster: MusterTyp, basisFarbe: Color, rasterAbstand: Float = 1f, rasterStaerke: Float = 1f) {
     if (muster == MusterTyp.KEIN) return
     val helligkeit = 0.299f * basisFarbe.red + 0.587f * basisFarbe.green + 0.114f * basisFarbe.blue
     val linienFarbe = if (helligkeit > 0.5f) Color.Black.copy(alpha = 0.10f) else Color.White.copy(alpha = 0.14f)
@@ -1076,24 +1076,25 @@ private fun DrawScope.zeichneMuster(muster: MusterTyp, basisFarbe: Color) {
     // Beschriftungen (Hundertertafel, Zahlenstrahl, Karten) etwas kräftiger als die Linien.
     val textFarbe = if (helligkeit > 0.5f) Color.Black.copy(alpha = 0.55f) else Color.White.copy(alpha = 0.6f)
     val p = pixelFaktor
-    val abstand = 48f * p
+    // Raster: Abstand und Stärke je Seite einstellbar (Faktor 1 = 48 Pixel, normale Stärke)
+    val abstand = 48f * p * rasterAbstand
     when (muster) {
         MusterTyp.LINIERT -> {
             var y = abstand
             while (y < size.height) {
-                drawLine(linienFarbe, Offset(0f, y), Offset(size.width, y), strokeWidth = 1.4f * p)
+                drawLine(linienFarbe, Offset(0f, y), Offset(size.width, y), strokeWidth = 1.4f * p * rasterStaerke)
                 y += abstand
             }
         }
         MusterTyp.KARIERT -> {
             var x = abstand
             while (x < size.width) {
-                drawLine(linienFarbe, Offset(x, 0f), Offset(x, size.height), strokeWidth = 1.2f * p)
+                drawLine(linienFarbe, Offset(x, 0f), Offset(x, size.height), strokeWidth = 1.2f * p * rasterStaerke)
                 x += abstand
             }
             var y = abstand
             while (y < size.height) {
-                drawLine(linienFarbe, Offset(0f, y), Offset(size.width, y), strokeWidth = 1.2f * p)
+                drawLine(linienFarbe, Offset(0f, y), Offset(size.width, y), strokeWidth = 1.2f * p * rasterStaerke)
                 y += abstand
             }
         }
@@ -1102,7 +1103,7 @@ private fun DrawScope.zeichneMuster(muster: MusterTyp, basisFarbe: Color) {
             while (y < size.height) {
                 var x = abstand
                 while (x < size.width) {
-                    drawCircle(linienFarbe, radius = 2.2f * p, center = Offset(x, y))
+                    drawCircle(linienFarbe, radius = 2.2f * p * rasterStaerke, center = Offset(x, y))
                     x += abstand
                 }
                 y += abstand

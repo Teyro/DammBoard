@@ -29,7 +29,26 @@ enum class MusterTyp {
     KARTE_DEUTSCHLAND, KARTE_HAMBURG, KARTE_WELT
 }
 
-data class HintergrundStil(val farbe: Color, val muster: MusterTyp = MusterTyp.KEIN)
+/**
+ * Hintergrund einer Seite. [abstand] und [staerke]: Faktor für Raster (Liniert, Kariert, Gepunktet) – 1 = 48 Pixel Abstand,
+ * normale Linien- bzw. Punktstärke.
+ */
+data class HintergrundStil(val farbe: Color, val muster: MusterTyp = MusterTyp.KEIN, val abstand: Float = 1f, val staerke: Float = 1f) {
+    val istRaster get() = muster == MusterTyp.LINIERT || muster == MusterTyp.KARIERT || muster == MusterTyp.GEPUNKTET
+
+    /** Muster als Text für Sicherung/Dateien: „GEPUNKTET“ oder „GEPUNKTET|1.5|2.0“ (ältere Versionen lesen das als einfarbig) */
+    fun musterText() = if (abstand == 1f && staerke == 1f) muster.name else "${muster.name}|$abstand|$staerke"
+
+    companion object {
+        fun ausText(farbe: Color, text: String?): HintergrundStil {
+            val teile = text.orEmpty().split('|')
+            val muster = MusterTyp.entries.find { it.name == teile[0] } ?: MusterTyp.KEIN
+            val abstand = teile.getOrNull(1)?.toFloatOrNull()?.coerceIn(0.4f, 3f) ?: 1f
+            val staerke = teile.getOrNull(2)?.toFloatOrNull()?.coerceIn(0.4f, 4f) ?: 1f
+            return HintergrundStil(farbe, muster, abstand, staerke)
+        }
+    }
+}
 
 /** Die 12 Kreide-/Stiftfarben aus der Werkzeugleiste (4 Spalten x 3 Zeilen). */
 val KreidePalette = listOf(

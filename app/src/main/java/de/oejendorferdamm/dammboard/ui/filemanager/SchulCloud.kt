@@ -36,6 +36,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
@@ -71,8 +72,19 @@ private val BILD = Regex("(?i).+\\.(png|jpe?g|webp)$")
  * Bilder aus der Schul-Cloud öffnen: durch Fächer und Klassen klicken (cleverTouch/<Fach>/Klasse 4c), Vorschaubilder sehen,
  * antippen legt das Bild auf die Tafel. Zugänge kommen aus DammTable (wie beim Ablegen nach jeder Stunde).
  */
+/** Quellen in der Leiste links des Öffnen-Dialogs */
+enum class Quelle(val symbol: String, val titel: String) {
+    CLOUD("☁️", "Schul-Cloud"), ISERV("🏫", "IServ"), VORLAGEN("📂", "Vorlagen der Schule"), USB("🔌", "USB-Stick"), INTERN("💾", "Interner Speicher")
+}
+
+/** Steckt gerade ein USB-Stick (oder eine SD-Karte)? */
+fun usbDa(context: android.content.Context): Boolean = try {
+    (context.getSystemService(android.content.Context.STORAGE_SERVICE) as android.os.storage.StorageManager).storageVolumes
+        .any { it.isRemovable && it.state == android.os.Environment.MEDIA_MOUNTED }
+} catch (_: Exception) { false }
+
 @Composable
-fun SchulCloud(board: String, onBild: (datei: String, breite: Int, hoehe: Int) -> Unit, onSchliessen: () -> Unit) {
+fun SchulCloud(board: String, onBild: (datei: String, breite: Int, hoehe: Int) -> Unit, onSchliessen: () -> Unit, onQuelle: ((Quelle) -> Unit)? = null) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val schule = remember { Nextcloud.schule(context, board) }
@@ -84,6 +96,7 @@ fun SchulCloud(board: String, onBild: (datei: String, breite: Int, hoehe: Int) -
     var meldung by remember { mutableStateOf<String?>(null) }
     val vorschau = remember { mutableStateMapOf<String, Bitmap?>() }
     val sperre = remember { Semaphore(3) }
+    var erweitert by remember { mutableStateOf(context.getSharedPreferences("oeffnen", android.content.Context.MODE_PRIVATE).getBoolean("erweitert", false)) }
 
     LaunchedEffect(pfad, client) {
         val c = client ?: return@LaunchedEffect
@@ -130,6 +143,28 @@ fun SchulCloud(board: String, onBild: (datei: String, breite: Int, hoehe: Int) -
             Modifier.align(Alignment.Center).fillMaxSize().padding(36.dp).shadow(16.dp, RoundedCornerShape(24.dp)).clip(RoundedCornerShape(24.dp))
                 .background(Grund).clickable(remember { MutableInteractionSource() }, null) {}.padding(22.dp)
         ) {
+        Row(Modifier.fillMaxSize()) {
+        // Leiste links: woher öffnen – USB ausgegraut, wenn kein Stick steckt
+        if (onQuelle != null) {
+            val usb = remember { usbDa(context) }
+            Column(Modifier.width(230.dp).padding(end = 18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Spacer(Modifier.height(4.dp))
+                Quelle.entries.forEach { q ->
+                    val aktiv = q != Quelle.USB || usb
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(if (q == Quelle.CLOUD) Color.White else Color.Transparent)
+                            .clickable(enabled = aktiv && q != Quelle.CLOUD) { onQuelle(q) }.padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(q.symbol, fontSize = 22.sp, modifier = Modifier.alpha(if (aktiv) 1f else 0.35f))
+                        Spacer(Modifier.width(12.dp))
+                        Text(q.titel + if (q == Quelle.USB && !usb) "\nkein Stick" else "", color = if (aktiv) Schrift1 else Schrift2.copy(alpha = 0.6f),
+                            fontSize = 16.sp, fontWeight = if (q == Quelle.CLOUD) FontWeight.SemiBold else FontWeight.Normal, lineHeight = 18.sp)
+                    }
+                }
+            }
+        }
+        Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 if (pfad != wurzel) {
                     Box(Modifier.size(44.dp).shadow(3.dp, CircleShape).clip(CircleShape).background(Color.White).clickable { pfad = pfad.substringBeforeLast('/', wurzel) }
@@ -151,7 +186,7 @@ fun SchulCloud(board: String, onBild: (datei: String, breite: Int, hoehe: Int) -
             }
             meldung?.let { Text(it, color = Akzent, fontSize = 14.sp) }
             if (client != null && !laedt && eintraege.isEmpty() && meldung == null) Text("Leer.", color = Schrift2, fontSize = 15.sp)
-            LazyVerticalGrid(GridCells.Adaptive(190.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            LazyVerticalGrid(GridCells.Adaptive(190.dp), Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 items(eintraege, key = { it.pfad }) { e ->
                     Column(Modifier.clip(RoundedCornerShape(18.dp)).background(Color.White).clickable {
                         if (e.istOrdner) pfad = pfad.trim('/') + "/" + e.name.trimEnd('/') else oeffne(e)
@@ -168,9 +203,32 @@ fun SchulCloud(board: String, onBild: (datei: String, breite: Int, hoehe: Int) -
                         }
                         Spacer(Modifier.height(8.dp))
                         Text(e.name.trimEnd('/').substringBeforeLast(".png").substringBeforeLast(".jpg"), color = Schrift1, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        if (erweitert && (e.geaendert > 0 || e.groesse >= 0)) Text(infoText(e), color = Schrift2, fontSize = 13.sp, maxLines = 1)
                     }
                 }
             }
+            // unten: zuletzt aktualisiert (neueste Änderung in diesem Ordner) und das Häkchen für Datum/Größe je Ordner
+            Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                val neueste = eintraege.maxOfOrNull { it.geaendert } ?: 0L
+                Text(if (neueste > 0) "Zuletzt aktualisiert: " + datumText(neueste) else "", color = Schrift2, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                Row(Modifier.clip(RoundedCornerShape(50)).clickable { erweitert = !erweitert; erweitertMerken(context, erweitert) }.padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.material3.Checkbox(erweitert, null)
+                    Text("Erweiterte Infos", color = Schrift1, fontSize = 15.sp)
+                }
+            }
+        }
+        }
         }
     }
 }
+
+private fun datumText(ms: Long) = java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", java.util.Locale.GERMAN).format(java.util.Date(ms))
+
+/** „13.11.2026 10:42 · 3,2 MB“ */
+private fun infoText(e: IServEintrag) = listOfNotNull(
+    e.geaendert.takeIf { it > 0 }?.let(::datumText),
+    e.groesse.takeIf { it >= 0 }?.let { b -> if (b >= 1_048_576) "%.1f MB".format(java.util.Locale.GERMAN, b / 1_048_576.0) else "${(b + 1023) / 1024} KB" }
+).joinToString(" · ")
+
+private fun erweitertMerken(c: android.content.Context, an: Boolean) = c.getSharedPreferences("oeffnen", android.content.Context.MODE_PRIVATE).edit().putBoolean("erweitert", an).apply()

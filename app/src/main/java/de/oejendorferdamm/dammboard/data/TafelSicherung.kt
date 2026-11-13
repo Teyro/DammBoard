@@ -98,7 +98,7 @@ object TafelSicherung {
         aus.writeInt(seiten.size)
         seiten.forEach { seite ->
             aus.writeInt(seite.hintergrund.farbe.toArgb())
-            aus.writeUTF(seite.hintergrund.muster.name)
+            aus.writeUTF(seite.hintergrund.musterText())
             aus.writeBoolean(seite.geteilt)
             aus.writeUTF(seite.bild ?: "")
             aus.writeInt(seite.items.size)
@@ -115,9 +115,7 @@ object TafelSicherung {
         val seiten = ArrayList<Seite>(anzahl)
         repeat(anzahl) {
             val farbe = Color(ein.readInt())
-            val musterName = ein.readUTF()
-            val muster = MusterTyp.entries.find { it.name == musterName } ?: MusterTyp.KEIN
-            val seite = Seite(HintergrundStil(farbe, muster))
+            val seite = Seite(HintergrundStil.ausText(farbe, ein.readUTF()))
             seite.geteilteAnsicht.value = ein.readBoolean()
             val bild = ein.readUTF()
             if (bild.isNotEmpty() && File(Arbeitsblaetter.ordner(context), bild).exists()) seite.hintergrundBild.value = bild

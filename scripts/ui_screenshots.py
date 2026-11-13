@@ -78,6 +78,24 @@ def tippe_mitte_von(beschreibung: str) -> bool:
     return False
 
 
+def einstellungen_oeffnen() -> bool:
+    """Seit 26.11: ☰ öffnet ein Menü (Öffnen, PDF, Tafeln teilen, Einstellungen)."""
+    if not tippe_mitte_von("Menü"):
+        return False
+    time.sleep(1.2)
+    if not os.path.exists(os.path.join(AUSGABE_ORDNER, "11z_hauptmenue.png")):
+        screenshot("11z_hauptmenue.png")
+        if tippe_text("Öffnen …"):
+            time.sleep(2.5)
+            screenshot("11y_oeffnen.png")
+            adb("shell", "input", "keyevent", "KEYCODE_BACK")
+            time.sleep(1)
+        if not tippe_mitte_von("Menü"):
+            return False
+        time.sleep(1.2)
+    return tippe_text("Einstellungen")
+
+
 def tippe_text(text: str) -> bool:
     """Tippt auf das erste Element mit genau diesem sichtbaren Text."""
     baum = ui_baum()
@@ -551,7 +569,7 @@ def ueberraschung_und_ordner():
     """0.9.3: Emoji-Überraschung und Tafeln im gemeinsamen Ordner."""
     breite, hoehe = bildschirm_groesse()
     # Emoji-Überraschung über Einstellungen → „Jetzt ausprobieren“
-    if tippe_mitte_von("Menü"):
+    if einstellungen_oeffnen():
         time.sleep(1.5)
         tippe_text("Überraschungen")  # seit 2.0: Übersicht mit Bereichen
         time.sleep(1)
@@ -971,7 +989,7 @@ def main():
     time.sleep(1)
 
     # Einstellungen (zeigt auch die gemeldete Auflösung/Dichte und die Oberflächengröße)
-    if tippe_mitte_von("Menü"):
+    if einstellungen_oeffnen():
         time.sleep(1.5)
         screenshot("12_einstellungen.png")
         # 2.0: Bereiche wie im DammLauncher; Kopfzeile mit X bleibt beim Scrollen stehen
@@ -993,7 +1011,7 @@ def main():
         time.sleep(1)
         screenshot("12d_ohne_kamera_knopf.png")
         # Kamera-Knopf wieder einschalten
-        if tippe_mitte_von("Menü"):
+        if einstellungen_oeffnen():
             time.sleep(1.5)
             tippe_text("Dokumentenkamera")
             time.sleep(1)

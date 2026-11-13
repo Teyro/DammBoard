@@ -14,6 +14,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -113,11 +115,14 @@ fun TafelScreen(
     var pdfDatei by remember { mutableStateOf<File?>(null) }
     var zeigeBlattQuelle by remember { mutableStateOf(false) }
     var zeigeSchulCloud by remember { mutableStateOf(false) }
+    var zeigeMenue by remember { mutableStateOf(false) }
     var blattLaedt by remember { mutableStateOf(false) }
 
     BackHandler {
         when {
             zeigeBeendenAbfrage -> zeigeBeendenAbfrage = false
+            zeigeMenue -> zeigeMenue = false
+            zeigeSchulCloud -> zeigeSchulCloud = false
             pdfDatei != null -> pdfDatei = null
             zeigeBlattQuelle -> zeigeBlattQuelle = false
             state.textEingabe != null -> state.textEingabe = null
@@ -246,7 +251,7 @@ fun TafelScreen(
                     animationsModus = animationsModus,
                     zeigeUpdatePunkt = zeigeUpdatePunkt,
                     onSchliessen = { zeigeBeendenAbfrage = true },
-                    onMenu = onOeffneEinstellungen,
+                    onMenu = { state.schliessePanel(); zeigeSpieleMenue = false; zeigeMenue = !zeigeMenue },
                     onTeilen = { state.aufnahmeAnfrage = AufnahmeZweck.TEILEN },
                     onSpiel = {
                         // Erst kurz abwarten, ob noch weitere Tipper kommen (fünfmal schnell = Easter Egg)
@@ -354,11 +359,34 @@ fun TafelScreen(
                         onSchliessen = { zeigeSpieleMenue = false }
                     )
                 }
+                if (zeigeMenue) {
+                    HauptMenue(
+                        zeigeUpdatePunkt = zeigeUpdatePunkt,
+                        onSchliessen = { zeigeMenue = false },
+                        onOeffnen = { zeigeMenue = false; zeigeSchulCloud = true },
+                        onPdf = { zeigeMenue = false; extra(ExtraAktion.PDF) },
+                        onTafeln = { zeigeMenue = false; onTafeln() },
+                        onEinstellungen = { zeigeMenue = false; onOeffneEinstellungen() }
+                    )
+                }
                 if (zeigeSchulCloud) {
                     de.oejendorferdamm.dammboard.ui.filemanager.SchulCloud(
                         board = "",
                         onBild = { datei, b, h -> zeigeSchulCloud = false; state.bildEinfuegen(datei, b, h) },
-                        onSchliessen = { zeigeSchulCloud = false }
+                        onSchliessen = { zeigeSchulCloud = false },
+                        onQuelle = { q ->
+                            zeigeSchulCloud = false
+                            when (q) {
+                                de.oejendorferdamm.dammboard.ui.filemanager.Quelle.ISERV -> onIServOeffnen(false)
+                                de.oejendorferdamm.dammboard.ui.filemanager.Quelle.VORLAGEN -> onIServOeffnen(true)
+                                else -> try {
+                                    // USB-Stick und interner Speicher: die Dateiauswahl des Systems (PDF oder Bild)
+                                    blattAuswahl.launch(arrayOf("application/pdf", "image/*"))
+                                } catch (e: android.content.ActivityNotFoundException) {
+                                    Toast.makeText(context, "Auf diesem Board gibt es keine Dateiauswahl", Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        }
                     )
                 }
                 state.bildZuschneiden?.let { alt ->
@@ -547,6 +575,40 @@ private fun fuehreSpeicherungAus(zweck: AufnahmeZweck, bitmap: Bitmap, context: 
                 Toast.makeText(context, "Teilen fehlgeschlagen", Toast.LENGTH_SHORT).show()
             }
             AufnahmeZweck.ISERV -> Unit
+        }
+    }
+}
+
+/** Menü hinter ☰ unten links: Öffnen, als PDF speichern, Tafeln teilen, Einstellungen – im Stil der Leisten der Tafel. */
+@Composable
+private fun HauptMenue(
+    zeigeUpdatePunkt: Boolean,
+    onSchliessen: () -> Unit,
+    onOeffnen: () -> Unit,
+    onPdf: () -> Unit,
+    onTafeln: () -> Unit,
+    onEinstellungen: () -> Unit
+) {
+    Box(Modifier.fillMaxSize().clickable(remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, null, onClick = onSchliessen)) {
+        Column(
+            Modifier.align(Alignment.BottomStart).padding(start = 24.dp, bottom = 120.dp).width(340.dp)
+                .shadow(12.dp, androidx.compose.foundation.shape.RoundedCornerShape(20.dp)).clip(androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
+                .background(Color.White).padding(vertical = 8.dp)
+        ) {
+            @Composable
+            fun Eintrag(symbol: String, titel: String, punkt: Boolean = false, onClick: () -> Unit) {
+                Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(symbol, fontSize = 24.sp)
+                    Spacer(Modifier.width(16.dp))
+                    Text(titel, color = Color(0xFF333333), fontSize = 19.sp, modifier = Modifier.weight(1f))
+                    if (punkt) Box(Modifier.size(12.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Color(0xFFE01E3C)))
+                }
+            }
+            Eintrag("📂", "Öffnen …", onClick = onOeffnen)
+            Eintrag("📄", "Als PDF speichern", onClick = onPdf)
+            Eintrag("🔗", "Tafeln teilen", onClick = onTafeln)
+            Box(Modifier.fillMaxWidth().padding(vertical = 4.dp).height(1.dp).background(Color(0xFFE1E4E8)))
+            Eintrag("⚙️", "Einstellungen", punkt = zeigeUpdatePunkt, onClick = onEinstellungen)
         }
     }
 }

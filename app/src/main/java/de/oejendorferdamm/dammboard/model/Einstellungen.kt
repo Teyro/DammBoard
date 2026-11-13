@@ -30,7 +30,11 @@ data class IServZugang(
 data class IServEintrag(
     val name: String,
     val pfad: String,
-    val istOrdner: Boolean
+    val istOrdner: Boolean,
+    /** Zuletzt geändert (ms seit 1970, 0 = unbekannt) – bei Nextcloud-Ordnern: letzte Änderung darin */
+    val geaendert: Long = 0,
+    /** Größe in Bytes (-1 = unbekannt; Ordner nur bei Nextcloud) */
+    val groesse: Long = -1
 )
 
 /**

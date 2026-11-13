@@ -248,14 +248,13 @@ class EinstellungenSpeicher(private val context: Context) {
 
     val gespeicherterHintergrund: Flow<HintergrundStil?> = context.einstellungenDataStore.data.map { prefs ->
         val farbe = prefs[Schluessel.HINTERGRUND_FARBE] ?: return@map null
-        val muster = MusterTyp.entries.find { it.name == prefs[Schluessel.HINTERGRUND_MUSTER] } ?: MusterTyp.KEIN
-        HintergrundStil(Color(farbe), muster)
+        HintergrundStil.ausText(Color(farbe), prefs[Schluessel.HINTERGRUND_MUSTER])
     }
 
     suspend fun speichereHintergrund(stil: HintergrundStil) {
         context.einstellungenDataStore.edit { prefs ->
             prefs[Schluessel.HINTERGRUND_FARBE] = stil.farbe.toArgb()
-            prefs[Schluessel.HINTERGRUND_MUSTER] = stil.muster.name
+            prefs[Schluessel.HINTERGRUND_MUSTER] = stil.musterText()
         }
     }
 }

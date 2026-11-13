@@ -29,6 +29,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import kotlin.math.roundToInt
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -96,6 +97,9 @@ enum class ExtraAktion(val titel: String, val symbol: WerkzeugkastenAktion) {
 
 /** Diese Extras stehen seit 2.0 unter dem Würfel (Spiele) – nicht doppelt in den Extras. */
 internal val IN_DEN_SPIELEN = setOf(ExtraAktion.WUERFEL, ExtraAktion.NACHSPUREN, ExtraAktion.WOERTER)
+
+/** Diese stehen seit 26.11 im Menü unten links (☰) – Öffnen, als PDF speichern, Tafeln teilen. */
+internal val IM_MENUE = setOf(ExtraAktion.PDF, ExtraAktion.ARBEITSBLATT, ExtraAktion.TAFELN, ExtraAktion.SCHULCLOUD)
 
 internal fun hatPanel(werkzeug: Werkzeug): Boolean = werkzeug != Werkzeug.LASSO && werkzeug != Werkzeug.AUSWAHL
 
@@ -579,7 +583,7 @@ private fun WerkzeugkastenPanel(state: TafelState, onIServ: () -> Unit, onExtra:
             Box(Modifier.width(596.dp).height(1.dp).background(PanelLinie))
             Spacer(Modifier.height(10.dp))
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                ExtraAktion.entries.filter { it !in IN_DEN_SPIELEN }.chunked(5).forEach { zeile ->
+                ExtraAktion.entries.filter { it !in IN_DEN_SPIELEN && it !in IM_MENUE }.chunked(5).forEach { zeile ->
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         zeile.forEach { aktion ->
                             val offen = when (aktion) {
@@ -600,6 +604,7 @@ private fun WerkzeugkastenPanel(state: TafelState, onIServ: () -> Unit, onExtra:
             Box(Modifier.width(496.dp).height(1.dp).background(PanelLinie))
             Spacer(Modifier.height(12.dp))
             val aktuellerStil = state.seite.hintergrund.value
+            val kontext = androidx.compose.ui.platform.LocalContext.current
             Text("Farbe", color = TextFarbeSchwach, fontSize = 15.sp)
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -655,12 +660,17 @@ private fun WerkzeugkastenPanel(state: TafelState, onIServ: () -> Unit, onExtra:
                                 muster = muster,
                                 label = label,
                                 ausgewaehlt = aktuellerStil.muster == muster,
-                                onClick = { state.seite.hintergrund.value = aktuellerStil.copy(muster = muster) }
+                                onClick = {
+                                    // Raster bekommt Abstand und Stärke, die für dieses Board als Standard gesetzt sind
+                                    val std = RasterStandard.lies(kontext)
+                                    state.seite.hintergrund.value = aktuellerStil.copy(muster = muster, abstand = std.first, staerke = std.second)
+                                }
                             )
                         }
                     }
                 }
             }
+            if (aktuellerStil.istRaster) RasterEinstellung(state)
         }
     }
 }
@@ -818,4 +828,57 @@ internal fun helferFuer(aktion: ExtraAktion): HelferArt? = when (aktion) {
     ExtraAktion.NACHSPUREN -> HelferArt.NACHSPUREN
     ExtraAktion.WOERTER -> HelferArt.WOERTER
     else -> null
+}
+
+/** Abstand und Stärke der Raster, die dieses Board für neue Raster-Seiten nimmt (Häkchen „Als Standard“). */
+object RasterStandard {
+    private fun p(c: android.content.Context) = c.getSharedPreferences("raster", android.content.Context.MODE_PRIVATE)
+    fun lies(c: android.content.Context): Pair<Float, Float> = p(c).getFloat("abstand", 1f) to p(c).getFloat("staerke", 1f)
+    fun setze(c: android.content.Context, abstand: Float, staerke: Float) = p(c).edit().putFloat("abstand", abstand).putFloat("staerke", staerke).apply()
+}
+
+/**
+ * Raster einstellen (Liniert, Kariert, Gepunktet): drei Vorgaben, Regler für Abstand und Stärke – die Tafel ändert sich
+ * sofort mit. Das Häkchen merkt die Einstellung als Standard für dieses Board.
+ */
+@Composable
+private fun RasterEinstellung(state: TafelState) {
+    val kontext = androidx.compose.ui.platform.LocalContext.current
+    val stil = state.seite.hintergrund.value
+    var standard by remember(stil.muster) { mutableStateOf(RasterStandard.lies(kontext) == (stil.abstand to stil.staerke)) }
+    fun setze(abstand: Float, staerke: Float) {
+        state.seite.hintergrund.value = stil.copy(abstand = abstand, staerke = staerke)
+        if (standard) RasterStandard.setze(kontext, abstand, staerke)
+    }
+    Spacer(Modifier.height(14.dp))
+    Box(Modifier.width(496.dp).height(1.dp).background(PanelLinie))
+    Spacer(Modifier.height(10.dp))
+    Text(when (stil.muster) { MusterTyp.LINIERT -> "Linien"; MusterTyp.KARIERT -> "Kästchen"; else -> "Punkte" }, color = TextFarbeSchwach, fontSize = 15.sp)
+    Spacer(Modifier.height(8.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf(Triple("Klein", 0.67f, 0.9f), Triple("Mittel", 1f, 1f), Triple("Groß", 1.5f, 1.4f)).forEach { (name, a, s) ->
+            val gewaehlt = stil.abstand == a && stil.staerke == s
+            Box(
+                Modifier.clip(RoundedCornerShape(50)).background(if (gewaehlt) PanelAuswahl else Color.White)
+                    .clickable(role = Role.RadioButton) { setze(a, s) }.padding(horizontal = 18.dp, vertical = 8.dp)
+            ) { Text(name, color = TextFarbe, fontSize = 15.sp) }
+        }
+    }
+    @Composable
+    fun Regler(name: String, wert: Float, bereich: ClosedFloatingPointRange<Float>, aendern: (Float) -> Unit) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.width(496.dp)) {
+            Text(name, color = TextFarbe, fontSize = 15.sp, modifier = Modifier.width(110.dp))
+            androidx.compose.material3.Slider(wert, aendern, Modifier.weight(1f), valueRange = bereich,
+                colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = SymbolFarbe, activeTrackColor = SymbolFarbe))
+        }
+    }
+    Regler(if (stil.muster == MusterTyp.LINIERT) "Zeilenabstand" else "Abstand", stil.abstand, 0.5f..2.5f) { setze((it * 20).roundToInt() / 20f, stil.staerke) }
+    Regler(if (stil.muster == MusterTyp.GEPUNKTET) "Punktgröße" else "Linienstärke", stil.staerke, 0.5f..3f) { setze(stil.abstand, (it * 20).roundToInt() / 20f) }
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable(role = Role.Checkbox) {
+        standard = !standard
+        if (standard) RasterStandard.setze(kontext, stil.abstand, stil.staerke)
+    }.padding(vertical = 4.dp)) {
+        androidx.compose.material3.Checkbox(standard, null)
+        Text("Als Standard für dieses Board", color = TextFarbe, fontSize = 15.sp)
+    }
 }

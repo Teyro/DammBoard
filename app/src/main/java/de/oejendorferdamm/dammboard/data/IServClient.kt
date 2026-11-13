@@ -21,7 +21,7 @@ import java.net.URLDecoder
 import javax.xml.parsers.DocumentBuilderFactory
 
 private const val PROPFIND_KOERPER = """<?xml version="1.0" encoding="utf-8"?>
-<d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/><d:displayname/></d:prop></d:propfind>"""
+<d:propfind xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns"><d:prop><d:resourcetype/><d:displayname/><d:getlastmodified/><d:getcontentlength/><oc:size/></d:prop></d:propfind>"""
 
 /** Obergrenze für eine Ordnerliste – schützt vor riesigen oder endlosen Antworten. */
 private const val MAX_ANTWORT_BYTES = 4 * 1024 * 1024
@@ -233,7 +233,12 @@ class IServClient(private val zugang: IServZugang) {
             if (normalisiert == angefragtNormalisiert || normalisiert.isEmpty()) continue
             val name = normalisiert.substringAfterLast('/')
             if (name.isBlank() || name == "." || name == "..") continue
-            ergebnis.add(IServEintrag(name = name, pfad = normalisiert, istOrdner = istOrdner))
+            fun wert(ns: String, tag: String) = knoten.getElementsByTagNameNS(ns, tag).item(0)?.textContent?.trim().orEmpty()
+            val geaendert = try {
+                java.time.ZonedDateTime.parse(wert("DAV:", "getlastmodified"), java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME).toInstant().toEpochMilli()
+            } catch (_: Exception) { 0L }
+            val groesse = (wert("http://owncloud.org/ns", "size").ifEmpty { wert("DAV:", "getcontentlength") }).toLongOrNull() ?: -1L
+            ergebnis.add(IServEintrag(name = name, pfad = normalisiert, istOrdner = istOrdner, geaendert = geaendert, groesse = groesse))
         }
 
         return ergebnis.sortedWith(compareByDescending<IServEintrag> { it.istOrdner }.thenBy { it.name.lowercase() })
