@@ -591,7 +591,7 @@ private fun HauptMenue(
 ) {
     Box(Modifier.fillMaxSize().clickable(remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, null, onClick = onSchliessen)) {
         Column(
-            Modifier.align(Alignment.BottomStart).padding(start = 24.dp, bottom = 120.dp).width(340.dp)
+            Modifier.align(Alignment.BottomStart).padding(start = 24.dp, bottom = 175.dp).width(360.dp)
                 .shadow(12.dp, androidx.compose.foundation.shape.RoundedCornerShape(20.dp)).clip(androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
                 .background(Color.White).padding(vertical = 8.dp)
         ) {
