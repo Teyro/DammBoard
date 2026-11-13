@@ -613,10 +613,16 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
         updatePruefungLaeuft = false
     }
 
+    // Automatisch nur in ruhigen Zeiten (Pausen, vor/nach dem Unterricht) – höchstens alle 6 Stunden
     LaunchedEffect(autoUpdatePruefung) {
-        if (autoUpdatePruefung) {
-            delay(UPDATE_PRUEFUNG_VERZOEGERUNG_MS)
-            pruefeAufUpdate()
+        if (!autoUpdatePruefung) return@LaunchedEffect
+        delay(UPDATE_PRUEFUNG_VERZOEGERUNG_MS)
+        var zuletzt = 0L
+        while (true) {
+            if (de.oejendorferdamm.dammboard.data.UpdateZeit.erlaubt() && System.currentTimeMillis() - zuletzt > 6 * 60 * 60_000L) {
+                pruefeAufUpdate(); zuletzt = System.currentTimeMillis()
+            }
+            delay(60_000)
         }
     }
 
