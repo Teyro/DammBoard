@@ -9,14 +9,4 @@ data class UpdateInfo(
 )
 
 /** Einfacher Semver-Vergleich (x.y.z, fehlende Teile zählen als 0). */
-fun istNeuereVersion(aktuell: String, remote: String): Boolean {
-    val a = aktuell.trim().removePrefix("v").split(".").map { it.toIntOrNull() ?: 0 }
-    val r = remote.trim().removePrefix("v").split(".").map { it.toIntOrNull() ?: 0 }
-    val laenge = maxOf(a.size, r.size)
-    for (i in 0 until laenge) {
-        val av = a.getOrElse(i) { 0 }
-        val rv = r.getOrElse(i) { 0 }
-        if (rv != av) return rv > av
-    }
-    return false
-}
+fun istNeuereVersion(aktuell: String, remote: String): Boolean = de.oejendorferdamm.core.update.Versionen.istNeuer(remote, aktuell)
