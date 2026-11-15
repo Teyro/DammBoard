@@ -5,6 +5,7 @@ plugins {
 }
 
 android {
+    sourceSets["main"].java.srcDir("../core/src")
     namespace = "de.oejendorferdamm.dammboard"
     compileSdk = 34
 

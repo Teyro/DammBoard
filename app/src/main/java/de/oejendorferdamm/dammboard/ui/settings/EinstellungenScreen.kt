@@ -67,15 +67,15 @@ import de.oejendorferdamm.dammboard.ui.update.installationsIntentFuer
 import de.oejendorferdamm.dammboard.ui.update.pruefeUpdateApk
 import de.oejendorferdamm.dammboard.ui.update.kannUnbekannteQuellenInstallieren
 import de.oejendorferdamm.dammboard.ui.update.oeffneUnbekannteQuellenEinstellungen
-import de.oejendorferdamm.dammboard.ui.m3.EinstellungenThema
-import de.oejendorferdamm.dammboard.ui.m3.M3Auswahl
-import de.oejendorferdamm.dammboard.ui.m3.M3Bereich
-import de.oejendorferdamm.dammboard.ui.m3.M3Feld
-import de.oejendorferdamm.dammboard.ui.m3.M3Gruppe
-import de.oejendorferdamm.dammboard.ui.m3.M3Hinweis
-import de.oejendorferdamm.dammboard.ui.m3.M3Knopf
-import de.oejendorferdamm.dammboard.ui.m3.M3Kopf
-import de.oejendorferdamm.dammboard.ui.m3.M3Schalter
+import de.oejendorferdamm.core.m3.EinstellungenThema
+import de.oejendorferdamm.core.m3.M3Auswahl
+import de.oejendorferdamm.core.m3.M3Bereich
+import de.oejendorferdamm.core.m3.M3Feld
+import de.oejendorferdamm.core.m3.M3Gruppe
+import de.oejendorferdamm.core.m3.M3Hinweis
+import de.oejendorferdamm.core.m3.M3Knopf
+import de.oejendorferdamm.core.m3.M3Kopf
+import de.oejendorferdamm.core.m3.M3Schalter
 import kotlinx.coroutines.launch
 import java.io.File
 
