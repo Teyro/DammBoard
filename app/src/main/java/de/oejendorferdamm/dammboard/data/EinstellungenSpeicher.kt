@@ -42,6 +42,7 @@ private object Schluessel {
     val TAFEL_SICHERN = booleanPreferencesKey("tafel_sichern")
     val FORM_ERKENNUNG = booleanPreferencesKey("form_erkennung")
     val KAMERA_KNOPF = booleanPreferencesKey("kamera_knopf")
+    val HOCHLADE_PUNKT = booleanPreferencesKey("hochlade_punkt")
     val ABLAGE_ORDNER = stringPreferencesKey("ablage_ordner")
     val ABLAGE_AUTOMATISCH = booleanPreferencesKey("ablage_automatisch")
     val SYNC_ORDNER = stringPreferencesKey("sync_ordner")
@@ -191,6 +192,13 @@ class EinstellungenSpeicher(private val context: Context) {
 
     /** Knopf „Dokumentenkamera“ unten links zeigen – standardmäßig an. */
     val kameraKnopf: Flow<Boolean> = context.einstellungenDataStore.data.map { prefs -> prefs[Schluessel.KAMERA_KNOPF] ?: kameraStandard }
+
+    /** Kleiner Punkt oben links: grün hochgeladen, orange lädt, rot gescheitert – standardmäßig an. */
+    val hochladePunkt: Flow<Boolean> = context.einstellungenDataStore.data.map { prefs -> prefs[Schluessel.HOCHLADE_PUNKT] ?: true }
+
+    suspend fun speichereHochladePunkt(an: Boolean) {
+        context.einstellungenDataStore.edit { prefs -> prefs[Schluessel.HOCHLADE_PUNKT] = an }
+    }
 
     suspend fun speichereKameraKnopf(an: Boolean) {
         context.einstellungenDataStore.edit { prefs -> prefs[Schluessel.KAMERA_KNOPF] = an }

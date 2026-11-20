@@ -16,7 +16,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -97,6 +97,7 @@ private class StiftTipper {
 }
 
 /** Komplette Bedienung über der Tafel: untere Leiste plus das Panel des offenen Werkzeugs. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun TafelBedienung(
     state: TafelState,
@@ -118,7 +119,8 @@ fun TafelBedienung(
     val animiert = animationsModus == AnimationsModus.NORMAL
 
     Layout(
-        modifier = modifier.fillMaxSize().navigationBarsPadding(),
+        // Leiste ausgeblendet (MainActivity) – trotzdem Abstand wie bisher, damit nichts unter den Wisch-Streifen des Boards rutscht
+        modifier = modifier.fillMaxSize().windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.navigationBarsIgnoringVisibility),
         content = {
             LinkeGruppe(zeigeUpdatePunkt, onSchliessen, onMenu, onTeilen, onSpiel, if (state.kameraKnopf) onKamera else null, Modifier.layoutId(ID_LINKS))
             WerkzeugGruppe(state, Modifier.layoutId(ID_WERKZEUGE))

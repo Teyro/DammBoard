@@ -102,6 +102,8 @@ fun EinstellungenScreen(
     formErkennung: Boolean,
     onTafelSichernGeaendert: (Boolean) -> Unit,
     onFormErkennungGeaendert: (Boolean) -> Unit,
+    hochladePunkt: Boolean = true,
+    onHochladePunktGeaendert: (Boolean) -> Unit = {},
     kameraKnopf: Boolean = true,
     onKameraKnopfGeaendert: (Boolean) -> Unit = {},
     ueberraschungen: Boolean = true,
@@ -224,6 +226,8 @@ fun EinstellungenScreen(
                     tafelSichern = tafelSichern,
                     formErkennung = formErkennung,
                     onTafelSichernGeaendert = onTafelSichernGeaendert,
+                    hochladePunkt = hochladePunkt,
+                    onHochladePunktGeaendert = onHochladePunktGeaendert,
                     onFormErkennungGeaendert = onFormErkennungGeaendert,
                     onZeichenPraezisionGeaendert = onZeichenPraezisionGeaendert,
                     onHintergrundMerkenGeaendert = onHintergrundMerkenGeaendert,
@@ -402,6 +406,8 @@ private fun ErweiterteEinstellungen(
     formErkennung: Boolean,
     onTafelSichernGeaendert: (Boolean) -> Unit,
     onFormErkennungGeaendert: (Boolean) -> Unit,
+    hochladePunkt: Boolean = true,
+    onHochladePunktGeaendert: (Boolean) -> Unit = {},
     onZeichenPraezisionGeaendert: (Float) -> Unit,
     onHintergrundMerkenGeaendert: (Boolean) -> Unit,
     onHandballenRadierenGeaendert: (Boolean) -> Unit,
@@ -461,6 +467,11 @@ private fun ErweiterteEinstellungen(
                 M3Schalter("Tafel automatisch sichern", tafelSichern,
                     "Alle Seiten werden laufend gesichert. Nach einem Absturz oder dem Ausschalten des Boards ist " +
                         "die Tafel beim nächsten Start wieder da. Neu anfangen: Seitenzahl unten rechts antippen → „Neue leere Tafel“.", onTafelSichernGeaendert)
+            }
+            M3Feld {
+                M3Schalter("Hochlade-Punkt zeigen", hochladePunkt,
+                    "Kleiner Punkt oben links an der Tafel: grün = abgelegt und hochgeladen, orange = lädt gerade hoch, rot = Hochladen gescheitert. " +
+                        "Abgelegt wird automatisch nach einer Minute ohne Änderung, beim Stundenwechsel und beim Verlassen.", onHochladePunktGeaendert)
             }
         }
     }

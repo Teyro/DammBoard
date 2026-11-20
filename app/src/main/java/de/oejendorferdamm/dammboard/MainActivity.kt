@@ -27,6 +27,22 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Android-Navigationsleiste ausblenden: Auf den Boards liegt schon der Wisch-Streifen des Herstellers über allem,
+     * sonst stehen zwei Striche untereinander. Hochwischen am Rand holt die Leiste kurz zurück.
+     */
+    private fun leisteAus() {
+        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
+            systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            hide(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) leisteAus()
+    }
+
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         testStartordnerLesen(intent)

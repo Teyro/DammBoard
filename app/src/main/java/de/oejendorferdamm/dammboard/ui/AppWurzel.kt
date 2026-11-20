@@ -43,6 +43,15 @@ import de.oejendorferdamm.dammboard.model.SchulOrdner
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 
 private sealed interface Bildschirm {
     data object Brett : Bildschirm
@@ -90,6 +99,9 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
     val schulPasswort by speicher.schulPasswort.collectAsState(initial = "")
     val ablageOrdner by speicher.ablageOrdner.collectAsState(initial = "Tafel")
     val ablageAutomatisch by speicher.ablageAutomatisch.collectAsState(initial = true)
+    val hochladePunkt by speicher.hochladePunkt.collectAsState(initial = true)
+    /** Letztes Ablegen/Hochladen: null = noch nichts, 0 = lädt, 1 = geschafft, 2 = gescheitert */
+    var hochladeStand by remember { mutableStateOf<Int?>(null) }
 
     val tafelState = rememberTafelState()
     var bildschirm by remember { mutableStateOf<Bildschirm>(Bildschirm.Brett) }
@@ -349,18 +361,34 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
             val board = ablageOrdnerAktuell.value
             val seiten = tafelState.seiten.map { it.abbild() }
             val (b, h) = bildschirmPx
+            hochladeStand = 0
             scope.launch(kotlinx.coroutines.Dispatchers.IO) {
                 // Fehler (auch zu wenig Speicher beim Rendern auf alten Boards) dürfen die Tafel nie abstürzen lassen
-                try {
+                val ok = try {
                     val nc = de.oejendorferdamm.dammboard.data.Nextcloud
                     val schule = nc.schule(app, board)
-                    if (schule != null && nc.lese(app).an) nc.hochladenSchule(app, schule, seiten, b, h, fach, datum, stunde)
-                    else nc.hochladen(app, datei, board, fach)
-                } catch (_: Throwable) {}
+                    when {
+                        schule != null && nc.lese(app).an -> nc.hochladenSchule(app, schule, seiten, b, h, fach, datum, stunde).isSuccess
+                        nc.lese(app).bereit -> nc.hochladen(app, datei, board, fach).isSuccess
+                        else -> true // keine Cloud eingerichtet: lokal abgelegt genügt
+                    }
+                } catch (_: Throwable) { false }
+                hochladeStand = if (ok) 1 else 2
             }
             ablageNeu++
             null
-        } catch (e: Exception) { "Fehler beim Ablegen: ${e.message}" }
+        } catch (e: Exception) { hochladeStand = 2; "Fehler beim Ablegen: ${e.message}" }
+    }
+
+    // Eine Minute nach der letzten Änderung ablegen und hochladen (zusätzlich zu Stundenwechsel und Verlassen);
+    // ohne Änderung passiert nichts – die Signatur in ablegen() verhindert doppelte Arbeit
+    LaunchedEffect(Unit) {
+        snapshotFlow { tafelState.seiten.map { it.versionsZaehler to it.hintergrundBild.value } }
+            .drop(1)
+            .collectLatest {
+                delay(60_000)
+                if (ablageAutoAktuell.value) ablegen(abschnittJetzt())
+            }
     }
 
     // Beim Stundenwechsel die Tafel in den Ordner der Stunde legen, die gerade zu Ende ist (alle 30 s geprüft)
@@ -695,6 +723,8 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
                 tafelSichern = tafelSichern,
                 formErkennung = formErkennung,
                 onTafelSichernGeaendert = { neu -> scope.launch { speicher.speichereTafelSichern(neu) } },
+                hochladePunkt = hochladePunkt,
+                onHochladePunktGeaendert = { neu -> scope.launch { speicher.speichereHochladePunkt(neu) } },
                 onFormErkennungGeaendert = { neu -> scope.launch { speicher.speichereFormErkennung(neu) } },
                 kameraKnopf = kameraKnopf,
                 onKameraKnopfGeaendert = { neu -> scope.launch { speicher.speichereKameraKnopf(neu) } },
@@ -739,6 +769,16 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
                 schulOrdner = aktuell.schulOrdner,
                 onSchulPasswort = { neu -> scope.launch { speicher.speichereSchulPasswort(neu) } },
                 onFertig = { bildschirm = Bildschirm.Brett }
+            )
+        }
+    }
+    // Hochlade-Punkt: winzig und halb durchsichtig oben links, fängt keine Berührung ab
+    val punktFarbe = when (hochladeStand) { 0 -> Color(0xFFF59E0B); 1 -> Color(0xFF22C55E); 2 -> Color(0xFFE01E3C); else -> null }
+    if (hochladePunkt && punktFarbe != null && bildschirm is Bildschirm.Brett) {
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().statusBarsPadding()) {
+            androidx.compose.foundation.layout.Box(
+                Modifier.align(androidx.compose.ui.Alignment.TopStart).padding(5.dp).size(9.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape).background(punktFarbe.copy(alpha = 0.75f))
             )
         }
     }
