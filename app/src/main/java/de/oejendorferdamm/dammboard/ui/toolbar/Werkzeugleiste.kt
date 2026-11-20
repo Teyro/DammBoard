@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -120,7 +122,7 @@ fun TafelBedienung(
 
     Layout(
         // Leiste ausgeblendet (MainActivity) – trotzdem Abstand wie bisher, damit nichts unter den Wisch-Streifen des Boards rutscht
-        modifier = modifier.fillMaxSize().windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.navigationBarsIgnoringVisibility),
+        modifier = modifier.fillMaxSize().windowInsetsPadding(WindowInsets.navigationBarsIgnoringVisibility),
         content = {
             LinkeGruppe(zeigeUpdatePunkt, onSchliessen, onMenu, onTeilen, onSpiel, if (state.kameraKnopf) onKamera else null, Modifier.layoutId(ID_LINKS))
             WerkzeugGruppe(state, Modifier.layoutId(ID_WERKZEUGE))
