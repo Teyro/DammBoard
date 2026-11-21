@@ -92,6 +92,8 @@ fun TafelScreen(
     onIServPdf: (File) -> Unit,
     /** true = aus dem Schul-Ordner (Vorlagen), false = aus IServ. */
     onIServOeffnen: (Boolean) -> Unit,
+    /** Alte Tafel (.ubmx2) aus der Dateiauswahl übernehmen und öffnen */
+    onAlteTafel: () -> Unit = {},
     onTafeln: () -> Unit = {},
     ueberraschungen: Boolean = false,
     /** Tafeln-Ordner: dort kann „ueberraschung.mp4“ liegen (Easter Egg, siehe KritzelVideo). */
@@ -298,6 +300,10 @@ fun TafelScreen(
                                 zeigeBlattQuelle = false
                                 onIServOeffnen(false)
                             },
+                            "Alte Tafel (.ubmx2)" to {
+                                zeigeBlattQuelle = false
+                                onAlteTafel()
+                            },
                             "Vorlagen der Schule" to {
                                 zeigeBlattQuelle = false
                                 onIServOeffnen(true)
@@ -379,6 +385,7 @@ fun TafelScreen(
                             when (q) {
                                 de.oejendorferdamm.dammboard.ui.filemanager.Quelle.ISERV -> onIServOeffnen(false)
                                 de.oejendorferdamm.dammboard.ui.filemanager.Quelle.VORLAGEN -> onIServOeffnen(true)
+                                de.oejendorferdamm.dammboard.ui.filemanager.Quelle.ALT -> onAlteTafel()
                                 else -> try {
                                     // USB-Stick und interner Speicher: die Dateiauswahl des Systems (PDF oder Bild)
                                     blattAuswahl.launch(arrayOf("application/pdf", "image/*"))

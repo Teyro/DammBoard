@@ -480,11 +480,8 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
         return anzahl to letzte
     }
 
-    val importWahl = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-        if (uris.isEmpty()) return@rememberLauncherForActivityResult
-        ablageArbeitet = true
-        scope.launch {
-            val liste = uris.map { u -> (android.provider.OpenableColumns.DISPLAY_NAME.let { spalte -> app.contentResolver.query(u, arrayOf(spalte), null, null, null)?.use { c -> if (c.moveToFirst()) c.getString(0) else null } } ?: u.lastPathSegment ?: "Tafel") to u }
+    /** Alte Tafeln in die Ablage („Import“) übernehmen – eine einzelne gleich öffnen */
+    suspend fun importUndOeffnen(liste: List<Pair<String, android.net.Uri>>) {
             val (n, letzte) = importiere(liste) { "Import" }
             // eine einzelne Tafel gleich öffnen (die aktuelle vorher ablegen)
             if (n == 1 && letzte != null) {
@@ -494,8 +491,16 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
                 abgelegtSignatur = tafelState.syncSignatur()
             }
             if (ablageMeldung == null || n > 0) ablageMeldung = if (n == 0) "Nichts importiert." else "$n alte Tafel" + (if (n == 1) " importiert und geöffnet (Ordner „Import“)." else "n importiert (Ordner „Import“).")
-            ablageArbeitet = false
             ablageNeu++
+            if (n == 1 && bildschirm is Bildschirm.Brett) { syncMeldung = ablageMeldung; ablageMeldung = null }
+    }
+    val importWahl = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+        ablageArbeitet = true
+        scope.launch {
+            val liste = uris.map { u -> (android.provider.OpenableColumns.DISPLAY_NAME.let { spalte -> app.contentResolver.query(u, arrayOf(spalte), null, null, null)?.use { c -> if (c.moveToFirst()) c.getString(0) else null } } ?: u.lastPathSegment ?: "Tafel") to u }
+            importUndOeffnen(liste)
+            ablageArbeitet = false
         }
     }
     val leseErlaubnis = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { ok ->
@@ -687,10 +692,17 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
             onTafeln = { ablageMeldung = null; bildschirm = Bildschirm.Ablage },
             ueberraschungen = ueberraschungen,
             videoOrdner = syncOrdner,
+            onAlteTafel = { try { importWahl.launch(arrayOf("*/*")) } catch (_: Exception) { ablageMeldung = "Auf diesem Board gibt es keine Dateiauswahl." } },
             onIServOeffnen = { schulOrdner ->
                 bildschirm = Bildschirm.Dateimanager(
                     schulOrdner = schulOrdner,
                     modus = DateiModus.Oeffnen { name, bytes ->
+                        if (name.endsWith(".ubmx2", ignoreCase = true)) return@Oeffnen try {
+                            val temp = java.io.File(app.cacheDir, "import.ubmx2").apply { writeBytes(bytes) }
+                            importUndOeffnen(listOf(name to android.net.Uri.fromFile(temp)))
+                            bildschirm = Bildschirm.Brett
+                            null
+                        } catch (e: Exception) { e.message ?: "Alte Tafel konnte nicht geöffnet werden" }
                         try {
                             val namen = Arbeitsblaetter.importiere(context.applicationContext, name) { bytes.inputStream() }
                             tafelState.arbeitsblaetterEinfuegen(namen)

@@ -71,7 +71,7 @@ sealed interface DateiModus {
 
 /** Dateien, die als Arbeitsblatt geöffnet werden können. */
 private fun istArbeitsblatt(name: String): Boolean =
-    listOf(".pdf", ".png", ".jpg", ".jpeg", ".webp").any { name.endsWith(it, ignoreCase = true) }
+    listOf(".pdf", ".png", ".jpg", ".jpeg", ".webp", ".ubmx2").any { name.endsWith(it, ignoreCase = true) }
 
 /** Einfacher Dateimanager für den IServ-WebDAV-Speicher: durch Ordner blättern, schnell oder gezielt speichern bzw. öffnen. */
 @Composable

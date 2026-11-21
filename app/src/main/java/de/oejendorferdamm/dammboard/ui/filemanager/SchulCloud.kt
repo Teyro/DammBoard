@@ -74,7 +74,7 @@ private val BILD = Regex("(?i).+\\.(png|jpe?g|webp)$")
  */
 /** Quellen in der Leiste links des Öffnen-Dialogs */
 enum class Quelle(val symbol: String, val titel: String) {
-    CLOUD("☁️", "Schul-Cloud"), ISERV("🏫", "IServ"), VORLAGEN("📂", "Vorlagen der Schule"), USB("🔌", "USB-Stick"), INTERN("💾", "Interner Speicher")
+    CLOUD("☁️", "Schul-Cloud"), ISERV("🏫", "IServ"), VORLAGEN("📂", "Vorlagen der Schule"), USB("🔌", "USB-Stick"), INTERN("💾", "Interner Speicher"), ALT("🗂️", "Alte Tafel (.ubmx2)")
 }
 
 /** Steckt gerade ein USB-Stick (oder eine SD-Karte)? */
