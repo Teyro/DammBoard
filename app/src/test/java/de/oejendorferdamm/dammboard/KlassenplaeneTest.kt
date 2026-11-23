@@ -49,3 +49,19 @@ class KlassenplaeneUntisTest {
         assertNull(Klassenplaene.ausUntis(text, "9z", LocalDate.of(2026, 11, 23)))
     }
 }
+
+/** Haus-Zugänge: Haus 1 = 4a–4d, Haus 2 = 3a–3c, Haus 3 = VSK 1/2 + 0A/0B, Haus 4 = 1a–2c */
+class HausZugangTest {
+    private val nc = de.oejendorferdamm.dammboard.data.Nextcloud
+    private val json = """{"klasse":"","nextcloud":{"server":"https://cloud.example.de","benutzer":"board","haeuser":[
+        {"jahrgaenge":[4],"passwort":"p1"},{"jahrgaenge":[3],"passwort":"p2"},{"jahrgaenge":[0],"passwort":"p3"},{"jahrgaenge":[1,2],"passwort":"p4"}]}}"""
+    @org.junit.Test fun hausNachKlasse() {
+        assertEquals(listOf(1, 1, 2, 3, 3, 3, 4, 4), listOf("4a", "4D", "3c", "VSK 1", "VSK2", "0A", "1a", "2c").map { nc.hausVonKlasse(it) })
+        assertNull(nc.hausVonKlasse("Tafel"))
+        assertEquals(4 to "p4", nc.hausZugangAus(json, null, "2c")!!.let { it.first to it.second.passwort })
+        assertEquals(3 to "p3", nc.hausZugangAus(json, null, "VSK 2")!!.let { it.first to it.second.passwort })
+        assertEquals(2 to "p2", nc.hausZugangAus(json, 2, "2c")!!.let { it.first to it.second.passwort })   // fest gewählt schlägt Klasse
+        assertEquals("https://cloud.example.de/remote.php/dav/files/board", nc.hausZugangAus(json, 1, "")!!.second.serverUrl)
+        assertNull(nc.hausZugangAus(json, null, "Tafel"))
+    }
+}

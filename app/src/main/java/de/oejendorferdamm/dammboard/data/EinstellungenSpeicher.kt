@@ -49,6 +49,8 @@ private object Schluessel {
     // Neuer Name: mit 0.9.6 sind alle Easter Eggs aus, auch wo der alte Schalter „ueberraschungen“ an war.
     val UEBERRASCHUNGEN = booleanPreferencesKey("eastereggs_096")
     val SCHUL_PASSWORT = stringPreferencesKey("schulordner_passwort")
+    /** IServ-Speicher: "auto" (Haus nach Klasse), "1"…"4" (Haus-Zugang der Schule) oder "eigen" (eigener Zugang) */
+    val ISERV_HAUS = stringPreferencesKey("iserv_haus")
 }
 
 /**
@@ -232,6 +234,22 @@ class EinstellungenSpeicher(private val context: Context) {
     /** Passwort des Schul-Ordners (siehe SchulOrdner), verschlüsselt wie das IServ-Passwort. */
     val schulPasswort: Flow<String> = context.einstellungenDataStore.data.map { it[Schluessel.SCHUL_PASSWORT] ?: "" }
         .distinctUntilChanged().map { Tresor.entschluesseln(it) }.flowOn(Dispatchers.Default)
+
+    val iservHaus: Flow<String> = context.einstellungenDataStore.data.map { it[Schluessel.ISERV_HAUS] ?: "auto" }.distinctUntilChanged()
+
+    suspend fun speichereIServHaus(wert: String) { context.einstellungenDataStore.edit { it[Schluessel.ISERV_HAUS] = wert } }
+
+    /**
+     * Einmalig beim ersten Start mit Haus-Zugängen: früher von Hand eingetippte (persönliche) IServ-Anmeldungen löschen –
+     * die Boards nutzen ab jetzt die Haus-Zugänge der Schule. Ein eigener Zugang lässt sich danach bewusst wieder eintragen.
+     */
+    suspend fun aufHausZugaengeUmstellen() {
+        context.einstellungenDataStore.edit { prefs ->
+            if (prefs[Schluessel.ISERV_HAUS] != null) return@edit
+            prefs.remove(Schluessel.SERVER_URL); prefs.remove(Schluessel.BENUTZERNAME); prefs.remove(Schluessel.PASSWORT)
+            prefs[Schluessel.ISERV_HAUS] = "auto"
+        }
+    }
 
     suspend fun speichereSchulPasswort(passwort: String) {
         val verschluesselt = withContext(Dispatchers.Default) { Tresor.verschluesseln(passwort) }

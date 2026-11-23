@@ -5,6 +5,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
@@ -79,6 +80,8 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
     val scope = rememberCoroutineScope()
 
     val iservZugang by speicher.iservZugang.collectAsState(initial = IServZugang())
+    val iservHaus by speicher.iservHaus.collectAsState(initial = "auto")
+    LaunchedEffect(Unit) { speicher.aufHausZugaengeUmstellen() }
     val animationsModus by speicher.animationsModus.collectAsState(initial = AnimationsModus.NORMAL)
     val symbolGroesse by speicher.symbolGroesse.collectAsState(initial = SymbolGroesse.STANDARD)
     val autoUpdatePruefung by speicher.autoUpdatePruefung.collectAsState(initial = false)
@@ -98,6 +101,11 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
     val ueberraschungen by speicher.ueberraschungen.collectAsState(initial = false)
     val schulPasswort by speicher.schulPasswort.collectAsState(initial = "")
     val ablageOrdner by speicher.ablageOrdner.collectAsState(initial = "Tafel")
+    // IServ-Speicher: Haus-Zugang der Schule (fest gewählt oder nach Klasse) – ein eigener Zugang nur, wenn bewusst gewählt
+    val hausZugang by produceState<Pair<Int, IServZugang>?>(null, iservHaus, ablageOrdner) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { de.oejendorferdamm.dammboard.data.Nextcloud.hausZugang(context.applicationContext, iservHaus.toIntOrNull(), ablageOrdner) }
+    }
+    val speicherZugang = if (iservHaus == "eigen") iservZugang else hausZugang?.second ?: IServZugang()
     val ablageAutomatisch by speicher.ablageAutomatisch.collectAsState(initial = true)
     val hochladePunkt by speicher.hochladePunkt.collectAsState(initial = true)
     /** Letztes Ablegen/Hochladen: null = noch nichts, 0 = lädt, 1 = geschafft, 2 = gescheitert */
@@ -720,6 +728,9 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
         is Bildschirm.Einstellungen -> VorbildRaster(faktor = symbolGroesse.skalierung * MENUE_FAKTOR) {
             EinstellungenScreen(
                 aktuellerZugang = iservZugang,
+                iservHaus = iservHaus,
+                hausErkannt = hausZugang?.first,
+                onIServHaus = { neu -> scope.launch { speicher.speichereIServHaus(neu) } },
                 aktuellerModus = animationsModus,
                 aktuelleSymbolGroesse = symbolGroesse,
                 aktuelleVersion = BuildConfig.VERSION_NAME,
@@ -777,7 +788,7 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
         )
         is Bildschirm.Dateimanager -> VorbildRaster(faktor = symbolGroesse.skalierung * MENUE_FAKTOR) {
             DateiManagerScreen(
-                zugang = if (aktuell.schulOrdner) SchulOrdner.zugang(schulPasswort) else iservZugang,
+                zugang = if (aktuell.schulOrdner) SchulOrdner.zugang(schulPasswort) else speicherZugang,
                 modus = aktuell.modus,
                 schulOrdner = aktuell.schulOrdner,
                 onSchulPasswort = { neu -> scope.launch { speicher.speichereSchulPasswort(neu) } },

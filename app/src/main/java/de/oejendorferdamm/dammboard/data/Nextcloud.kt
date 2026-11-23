@@ -75,6 +75,31 @@ object Nextcloud {
         if (s.server.isBlank() || s.benutzer.isBlank() || s.passwort.isBlank() || klasse.isBlank()) null else s
     } catch (_: Exception) { null }
 
+    /** Häuser der Schule nach Jahrgang: Haus 1 = 4a–4d, Haus 2 = 3a–3c, Haus 3 = VSK 1/2 + 0A/0B, Haus 4 = 1a–2c */
+    val HAUS_JAHRGAENGE = mapOf(1 to setOf(4), 2 to setOf(3), 3 to setOf(0), 4 to setOf(1, 2))
+
+    fun hausVonKlasse(klasse: String): Int? = VorschauCache.stufe(klasse.trim())?.let { s -> HAUS_JAHRGAENGE.entries.firstOrNull { s in it.value }?.key }
+
+    /** Haus-Zugang (Nextcloud der Schule) als WebDAV-Zugang: [haus] fest gewählt oder null = nach Klasse; Rückgabe (Haus, Zugang) */
+    fun hausZugangAus(json: String, haus: Int?, klasseErsatz: String): Pair<Int, IServZugang>? = try {
+        val o = JSONObject(json)
+        val nc = o.getJSONObject("nextcloud")
+        val h = haus ?: hausVonKlasse(o.optString("klasse").ifBlank { klasseErsatz })
+        val jg = h?.let { HAUS_JAHRGAENGE[it] }
+        val liste = nc.optJSONArray("haeuser")
+        val pw = (0 until (liste?.length() ?: 0)).map { liste!!.getJSONObject(it) }.firstOrNull { e ->
+            val j = e.optJSONArray("jahrgaenge"); jg != null && (0 until (j?.length() ?: 0)).any { j!!.optInt(it, -1) in jg }
+        }?.optString("passwort").orEmpty()
+        if (h == null || pw.isBlank() || nc.optString("server").isBlank()) null
+        else h to IServZugang(davAdresse(nc.optString("server"), nc.optString("benutzer")), nc.optString("benutzer"), pw)
+    } catch (_: Exception) { null }
+
+    fun hausZugang(context: Context, haus: Int?, klasseErsatz: String): Pair<Int, IServZugang>? = try {
+        context.contentResolver.query(android.net.Uri.parse("content://de.oejendorferdamm.dammtable.stundenplan/zugaenge"), null, null, null, null)?.use { c ->
+            if (c.moveToFirst()) hausZugangAus(c.getString(0), haus, klasseErsatz) else null
+        }
+    } catch (_: Exception) { null }
+
     /** Warum es (noch) keine Zugänge der Schule gibt – für die Anzeige in der Ablage; null = alles da */
     fun schuleGrund(context: Context, klasseErsatz: String): String? {
         val json = try {

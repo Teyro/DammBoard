@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
@@ -85,6 +86,11 @@ import java.io.File
 @Composable
 fun EinstellungenScreen(
     aktuellerZugang: IServZugang,
+    /** "auto", "1"…"4" oder "eigen" */
+    iservHaus: String = "auto",
+    /** Haus, dessen Zugang gerade benutzt wird (null = keiner gefunden) */
+    hausErkannt: Int? = null,
+    onIServHaus: (String) -> Unit = {},
     aktuellerModus: AnimationsModus,
     aktuelleSymbolGroesse: SymbolGroesse,
     aktuelleVersion: String,
@@ -168,7 +174,11 @@ fun EinstellungenScreen(
                             if (kameraKnopf) "an – Knopf unten links in der Leiste" else "aus – kein Kamera-Knopf") { seite = "kamera" }
                         M3Bereich("🎉", Color(0xFFDB2777), "Überraschungen", "Easter Eggs ${an(ueberraschungen)} · Überraschungsvideo") { seite = "spass" }
                         M3Bereich("☁️", Color(0xFF16A34A), "IServ",
-                            if (aktuellerZugang.serverUrl.isBlank()) "nicht eingerichtet" else aktuellerZugang.serverUrl.removePrefix("https://").substringBefore("/")) { seite = "iserv" }
+                            when {
+                                iservHaus == "eigen" -> if (aktuellerZugang.serverUrl.isBlank()) "eigener Zugang – nicht eingerichtet" else "eigener Zugang"
+                                hausErkannt != null -> "Haus $hausErkannt" + if (iservHaus == "auto") " (nach Klasse)" else ""
+                                else -> "Haus-Zugang nicht gefunden"
+                            }) { seite = "iserv" }
                     }
                     M3Gruppe("Allgemein") {
                         M3Bereich("⬆️", Color(0xFF2563EB), "Updates",
@@ -238,7 +248,27 @@ fun EinstellungenScreen(
                     onUeberraschungenGeaendert = onUeberraschungenGeaendert,
                     onUeberraschungZeigen = onUeberraschungZeigen
                 )
-                "iserv" -> M3Gruppe("IServ-Speicher") {
+                "iserv" -> Column {
+                M3Gruppe("Zugang") {
+                    M3Feld {
+                        M3Hinweis("Die Boards nutzen die Haus-Zugänge der Schule (über DammTable) – keine persönlichen Anmeldungen.")
+                        Spacer(Modifier.height(8.dp))
+                        listOf("auto" to "Automatisch nach Klasse" + (if (iservHaus == "auto" && hausErkannt != null) " – Haus $hausErkannt" else ""),
+                            "1" to "Haus 1 (4a–4d)", "2" to "Haus 2 (3a–3c)", "3" to "Haus 3 (VSK 1/2, 0A/0B)", "4" to "Haus 4 (1a–2c)",
+                            "eigen" to "Eigener IServ-Zugang").forEach { (wert, text) ->
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { onIServHaus(wert) }.padding(vertical = 2.dp)) {
+                                RadioButton(selected = iservHaus == wert, onClick = { onIServHaus(wert) })
+                                Text(text, color = f.onSurface, fontSize = 16.sp)
+                            }
+                        }
+                        if (iservHaus != "eigen" && hausErkannt == null) {
+                            Spacer(Modifier.height(6.dp))
+                            Text(if (iservHaus == "auto") "Keine Klasse erkannt oder DammTable hat die Zugänge noch nicht – Haus von Hand wählen oder DammTable einmal öffnen."
+                                else "DammTable hat die Zugänge der Schule noch nicht – DammTable einmal öffnen (mit Internet).", color = f.error, fontSize = 14.sp)
+                        }
+                    }
+                }
+                if (iservHaus == "eigen") M3Gruppe("Eigener IServ-Speicher") {
                     M3Feld {
                         M3Hinweis("Web-Adresse deines IServ-WebDAV-Speichers, z. B. https://schule.example.de/iserv/webdav")
                         Spacer(Modifier.height(12.dp))
@@ -275,6 +305,7 @@ fun EinstellungenScreen(
                             }
                         }
                     }
+                }
                 }
                 else -> M3Gruppe {
                     M3Feld {
