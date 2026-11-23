@@ -65,3 +65,21 @@ class HausZugangTest {
         assertNull(nc.hausZugangAus(json, null, "Tafel"))
     }
 }
+
+class KalenderwocheUndErsatzTest {
+    @org.junit.Test fun wochenOrdner() {
+        assertEquals("KW 48 (23.11.–27.11.)", de.oejendorferdamm.dammboard.data.Nextcloud.wochenOrdner(LocalDate.of(2026, 11, 25)))
+        assertEquals("KW 02 (05.01.–09.01.)", de.oejendorferdamm.dammboard.data.Nextcloud.wochenOrdner(LocalDate.of(2026, 1, 8)))
+    }
+
+    /** Karte ohne Namen in DammTable („Fach“) → Fach aus Untis; benannte Karten bleiben */
+    @org.junit.Test fun namenloseKarteBekommtUntisFach() {
+
+        val tag = LocalDate.of(2026, 11, 23)
+        val dt = de.oejendorferdamm.dammboard.data.Stundenplan.Tag(tag, false, listOf(de.oejendorferdamm.dammboard.data.Stundenplan.Stunde(1, null, null, "Fach", "k1"), de.oejendorferdamm.dammboard.data.Stundenplan.Stunde(2, null, null, "Kunst", "k2")))
+        val u = de.oejendorferdamm.dammboard.data.Stundenplan.Tag(tag, false, listOf(de.oejendorferdamm.dammboard.data.Stundenplan.Stunde(1, null, null, "Deutsch", ""), de.oejendorferdamm.dammboard.data.Stundenplan.Stunde(2, null, null, "Deutsch", ""), de.oejendorferdamm.dammboard.data.Stundenplan.Stunde(3, null, null, "Mathe", "")))
+        val e = Klassenplaene.ergaenzen(dt, u)!!
+        assertEquals(listOf("Deutsch", "Kunst", "Mathe"), e.stunden.map { it.fach })
+        assertEquals("k1", e.stunden[0].karte)
+    }
+}

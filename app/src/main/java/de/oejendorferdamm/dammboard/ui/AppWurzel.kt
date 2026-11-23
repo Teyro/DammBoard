@@ -409,7 +409,7 @@ fun AppWurzel(onAppSchliessen: () -> Unit) {
                     // Klasse = Name des Ablage-Ordners (z. B. „2A“). Vorhandene Stunden werden nie überschrieben.
                     val ausDammTable = de.oejendorferdamm.dammboard.data.Stundenplan.heute(app)
                     try { de.oejendorferdamm.dammboard.data.Klassenplaene.aktualisieren(app, schulPasswort) } catch (_: Exception) {}
-                    try { de.oejendorferdamm.dammboard.data.Klassenplaene.untisAktualisieren(app, schulPasswort) } catch (_: Exception) {}
+                    try { de.oejendorferdamm.dammboard.data.Klassenplaene.untisAktualisieren(app, schulPasswort.ifBlank { de.oejendorferdamm.dammboard.data.Nextcloud.schule(app, ablageOrdnerAktuell.value)?.schulOrdner.orEmpty() }) } catch (_: Exception) {}
                     try { de.oejendorferdamm.dammboard.data.Nextcloud.ausSchulOrdner(app, schulPasswort) } catch (_: Exception) {}
                     // ganz ohne Plan: Stundenraster der Schule – abgelegt wird trotzdem zu jedem Stundenende (Fach „Tafel“)
                     de.oejendorferdamm.dammboard.data.Klassenplaene.ergaenzen(ausDammTable, de.oejendorferdamm.dammboard.data.Klassenplaene.tag(app, ablageOrdnerAktuell.value))

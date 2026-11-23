@@ -59,7 +59,7 @@ object Nextcloud {
     // ---------------------------------------------------------------- Zugänge der Schule über DammTable
 
     /** Zugänge der Schule (Nextcloud je Haus) und Klasse dieses Boards – aus DammTable (nur mit demselben Signaturschlüssel) */
-    data class Schule(val server: String, val benutzer: String, val passwort: String, val pfad: String, val klasse: String)
+    data class Schule(val server: String, val benutzer: String, val passwort: String, val pfad: String, val klasse: String, val schulOrdner: String = "")
 
     /** Haus nach Jahrgang: die erste Ziffer der Klasse („4c“ → 4) */
     fun schuleAus(json: String, klasseErsatz: String): Schule? = try {
@@ -71,7 +71,7 @@ object Nextcloud {
         val passwort = (0 until (haeuser?.length() ?: 0)).map { haeuser!!.getJSONObject(it) }.firstOrNull { h ->
             val j = h.optJSONArray("jahrgaenge"); stufe != null && (0 until (j?.length() ?: 0)).any { j!!.optInt(it, -1) == stufe }
         }?.optString("passwort").orEmpty()
-        val s = Schule(nc.optString("server"), nc.optString("benutzer"), passwort, nc.optString("pfad").ifBlank { "cleverTouch/{fach}/Klasse {klasse}" }, klasse)
+        val s = Schule(nc.optString("server"), nc.optString("benutzer"), passwort, nc.optString("pfad").ifBlank { "cleverTouch/{fach}/Klasse {klasse}" }, klasse, o.optString("schulOrdner"))
         if (s.server.isBlank() || s.benutzer.isBlank() || s.passwort.isBlank() || klasse.isBlank()) null else s
     } catch (_: Exception) { null }
 
@@ -139,10 +139,19 @@ object Nextcloud {
         val ordner = if (muster.contains("{fach}")) {
             val vorhanden = c.liste(muster.substringBefore("{fach}").trim('/')).getOrNull()?.filter { it.istOrdner }?.map { it.name.trimEnd('/') } ?: emptyList()
             val wahl = vorhanden.filterNot { it.equals(UNSORTIERT, ignoreCase = true) }
-            // Fach aus DammTable; passt es zu keinem Ordner (oder ist es „Tafel“), das Fach laut Untis-Sicherung
-            fachOrdner(fach, wahl) ?: ersatzFach?.let { fachOrdner(it, wahl) } ?: UNSORTIERT
+            // Fach aus DammTable; passt es zu keinem Ordner (oder ist es „Tafel“/„Fach“), das Fach laut Untis-Sicherung –
+            // gibt es dafür noch keinen Ordner, wird er mit dem Namen aus Untis angelegt (sprechende Ordner statt „Unsortiert“)
+            fachOrdner(fach, wahl) ?: ersatzFach?.let { fachOrdner(it, wahl) ?: Ablage.sicher(it).takeIf { n -> n.isNotBlank() } } ?: UNSORTIERT
         } else ""
         return muster.replace("{fach}", ordner).replace("{klasse}", klasse).split('/').filter { it.isNotBlank() }.joinToString("/")
+    }
+
+    /** Ordner der Kalenderwoche, z. B. „KW 48 (23.11.–27.11.)“ – zweistellig, damit er richtig sortiert */
+    fun wochenOrdner(datum: java.time.LocalDate): String {
+        val kw = datum.get(java.time.temporal.IsoFields.WEEK_OF_WEEK_BASED_YEAR)
+        val mo = datum.with(java.time.DayOfWeek.MONDAY); val fr = mo.plusDays(4)
+        val f = java.time.format.DateTimeFormatter.ofPattern("dd.MM.")
+        return "KW %02d (%s–%s)".format(kw, mo.format(f), fr.format(f))
     }
 
     /**
@@ -152,7 +161,9 @@ object Nextcloud {
     suspend fun hochladenSchule(context: Context, s: Schule, seiten: List<de.oejendorferdamm.dammboard.model.SeitenAbbild>, breite: Int, hoehe: Int,
                                 fach: String, datum: java.time.LocalDate, stunde: Int?): Result<Unit> {
         val c = IServClient(IServZugang(davAdresse(s.server, s.benutzer), s.benutzer, s.passwort))
-        val pfad = zielPfad(c, s.pfad, fach, s.klasse, Klassenplaene.untisFach(context, s.klasse, datum, stunde))
+        // Untis-Sicherung bereithalten – mit dem Schul-Ordner-Passwort aus DammTable, falls am Board keins eingetragen ist
+        if (s.schulOrdner.isNotBlank()) runCatching { Klassenplaene.untisAktualisieren(context, s.schulOrdner) }
+        val pfad = zielPfad(c, s.pfad, fach, s.klasse, Klassenplaene.untisFach(context, s.klasse, datum, stunde)) + "/" + wochenOrdner(datum)
         c.ordnerAnlegen(pfad).onFailure { return Result.failure(it) }
         val name = datum.toString() + (stunde?.let { " $it. Std" } ?: "")
         seiten.forEachIndexed { i, seite ->

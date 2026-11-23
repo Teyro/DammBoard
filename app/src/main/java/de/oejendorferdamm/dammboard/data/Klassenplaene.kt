@@ -103,7 +103,9 @@ object Klassenplaene {
         if (dammTable == null) return ersatz
         if (dammTable.frei || ersatz == null) return dammTable
         val belegt = dammTable.stunden.map { it.stunde }.toSet()
-        return dammTable.copy(stunden = (dammTable.stunden + ersatz.stunden.filter { it.stunde !in belegt }).sortedBy { it.stunde })
+        // Karte ohne Namen („Fach“) oder „Tafel“: das Fach laut Ersatz (Untis) – sonst landet die Tafel in „Unsortiert“
+        val dt = dammTable.stunden.map { s -> if (s.fach.isBlank() || s.fach == "Fach" || s.fach == "Tafel") ersatz.stunden.firstOrNull { it.stunde == s.stunde }?.let { s.copy(fach = it.fach) } ?: s else s }
+        return dammTable.copy(stunden = (dt + ersatz.stunden.filter { it.stunde !in belegt }).sortedBy { it.stunde })
     }
 
     fun tag(text: String, klasse: String, datum: LocalDate): Stundenplan.Tag? {
