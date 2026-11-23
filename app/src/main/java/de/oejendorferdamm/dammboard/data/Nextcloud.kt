@@ -75,6 +75,21 @@ object Nextcloud {
         if (s.server.isBlank() || s.benutzer.isBlank() || s.passwort.isBlank() || klasse.isBlank()) null else s
     } catch (_: Exception) { null }
 
+    /** Warum es (noch) keine Zugänge der Schule gibt – für die Anzeige in der Ablage; null = alles da */
+    fun schuleGrund(context: Context, klasseErsatz: String): String? {
+        val json = try {
+            context.contentResolver.query(android.net.Uri.parse("content://de.oejendorferdamm.dammtable.stundenplan/zugaenge"), null, null, null, null)?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+        } catch (_: SecurityException) { return "DammBoard darf DammTable nicht fragen – DammBoard einmal neu installieren (DammTable war noch nicht da, als DammBoard installiert wurde)." }
+        catch (_: Exception) { null } ?: return "DammTable fehlt oder ist zu alt (ab 2.4.0) – dann hier eigene Zugangsdaten eintragen."
+        if (schuleAus(json, klasseErsatz) != null) return null
+        val o = runCatching { JSONObject(json) }.getOrNull() ?: return "DammTable liefert nichts Lesbares."
+        val nc = o.optJSONObject("nextcloud")
+        if (nc == null || nc.optString("server").isBlank()) return "DammTable hat die Zugänge der Schule noch nicht geladen – DammTable einmal öffnen (mit Internet), dann kommen sie von selbst."
+        val klasse = o.optString("klasse").ifBlank { klasseErsatz }.trim()
+        if (klasse.isBlank() || VorschauCache.stufe(klasse) == null) return "Keine Klasse bekannt – in DammTable die Klasse des Boards wählen (oder den Ablage-Ordner nach der Klasse benennen, z. B. „2c“)."
+        return "Für Klasse $klasse (Jahrgang ${VorschauCache.stufe(klasse)}) ist kein Haus-Zugang hinterlegt."
+    }
+
     fun schule(context: Context, klasseErsatz: String): Schule? = try {
         context.contentResolver.query(android.net.Uri.parse("content://de.oejendorferdamm.dammtable.stundenplan/zugaenge"), null, null, null, null)?.use { c ->
             if (c.moveToFirst()) schuleAus(c.getString(0), klasseErsatz) else null

@@ -185,7 +185,7 @@ fun AblageScreen(
 
                     // --- Nextcloud
                     Spacer(Modifier.height(16.dp))
-                    NextcloudEinstellungen()
+                    NextcloudEinstellungen(ordnerName)
                 }
                 Spacer(Modifier.height(12.dp))
             }
@@ -266,7 +266,7 @@ private fun AblageFrage(text: String, ja: String, farbe: Color, onJa: () -> Unit
 
 /** Nextcloud: Server und Benutzer meist schon vorbelegt (fest oder aus dem Schul-Ordner) – nur das App-Passwort eintippen */
 @Composable
-private fun NextcloudEinstellungen() {
+private fun NextcloudEinstellungen(board: String) {
     val context = LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val nc = de.oejendorferdamm.dammboard.data.Nextcloud
@@ -276,7 +276,9 @@ private fun NextcloudEinstellungen() {
     var meldung by remember { mutableStateOf(nc.status(context).let { if (it.isEmpty()) "" else "Zuletzt hochgeladen: $it" }) }
     fun speichern() { val neu = k.copy(passwort = passwort.ifEmpty { k.passwort }); nc.speichere(context, neu); k = neu; passwort = "" }
 
-    val schule = remember { nc.schule(context, "") }
+    // wie beim Hochladen: ohne Klasse in DammTable zählt der Name des Ablage-Ordners („2c“)
+    val schule = remember(board) { nc.schule(context, board) }
+    val grund = remember(board) { if (schule == null) nc.schuleGrund(context, board) else null }
     Text("Nextcloud", color = Schrift1, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
     if (schule != null) {
         Text("Zugänge der Schule (über DammTable): Klasse ${schule.klasse} → ${schule.pfad.replace("{klasse}", schule.klasse).replace("{fach}", "<Fach>")} – nach jeder Stunde als PNG. Ohne passendes Fach in „Unsortiert“. Nichts einzutippen.",
@@ -290,6 +292,7 @@ private fun NextcloudEinstellungen() {
             Text("Löschen", color = Akzent, fontSize = 12.sp, modifier = Modifier.clickable { vc.loeschen(context); inhalt = vc.groesse(context) }.padding(8.dp))
         }
     }
+    if (grund != null) Text("Zugänge der Schule: $grund", color = Color(0xFFE8710A), fontSize = 12.sp)
     Text(
         if (schule != null) "Eigene Nextcloud (nur ohne Zugänge der Schule):"
         else if (k.server.isNotBlank() && k.benutzer.isNotBlank()) "Nach jeder Stunde geht die Tafel auch nach ${k.server.removePrefix("https://")} (Benutzer ${k.benutzer}, Ordner „${k.ordner}“)."
