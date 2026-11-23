@@ -95,10 +95,12 @@ object Nextcloud {
     const val UNSORTIERT = "Unsortiert"
 
     /** „cleverTouch/{fach}/Klasse {klasse}“ → Pfad; ohne passenden Fach-Ordner „cleverTouch/Unsortiert/Klasse 2b“ */
-    suspend fun zielPfad(c: IServClient, muster: String, fach: String, klasse: String): String {
+    suspend fun zielPfad(c: IServClient, muster: String, fach: String, klasse: String, ersatzFach: String? = null): String {
         val ordner = if (muster.contains("{fach}")) {
             val vorhanden = c.liste(muster.substringBefore("{fach}").trim('/')).getOrNull()?.filter { it.istOrdner }?.map { it.name.trimEnd('/') } ?: emptyList()
-            fachOrdner(fach, vorhanden.filterNot { it.equals(UNSORTIERT, ignoreCase = true) }) ?: UNSORTIERT
+            val wahl = vorhanden.filterNot { it.equals(UNSORTIERT, ignoreCase = true) }
+            // Fach aus DammTable; passt es zu keinem Ordner (oder ist es „Tafel“), das Fach laut Untis-Sicherung
+            fachOrdner(fach, wahl) ?: ersatzFach?.let { fachOrdner(it, wahl) } ?: UNSORTIERT
         } else ""
         return muster.replace("{fach}", ordner).replace("{klasse}", klasse).split('/').filter { it.isNotBlank() }.joinToString("/")
     }
@@ -110,7 +112,7 @@ object Nextcloud {
     suspend fun hochladenSchule(context: Context, s: Schule, seiten: List<de.oejendorferdamm.dammboard.model.SeitenAbbild>, breite: Int, hoehe: Int,
                                 fach: String, datum: java.time.LocalDate, stunde: Int?): Result<Unit> {
         val c = IServClient(IServZugang(davAdresse(s.server, s.benutzer), s.benutzer, s.passwort))
-        val pfad = zielPfad(c, s.pfad, fach, s.klasse)
+        val pfad = zielPfad(c, s.pfad, fach, s.klasse, Klassenplaene.untisFach(context, s.klasse, datum, stunde))
         c.ordnerAnlegen(pfad).onFailure { return Result.failure(it) }
         val name = datum.toString() + (stunde?.let { " $it. Std" } ?: "")
         seiten.forEachIndexed { i, seite ->

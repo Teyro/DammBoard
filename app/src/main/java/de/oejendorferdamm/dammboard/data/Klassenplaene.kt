@@ -29,6 +29,52 @@ object Klassenplaene {
         return true
     }
 
+    // ---------------------------------------------------------------- Untis-Sicherung (täglich aus WebUntis, Schul-Ordner „Untis/untis-plan.json“)
+
+    const val UNTIS = "untis-plan.json"
+    private fun untisCache(context: Context) = File(context.filesDir, UNTIS)
+
+    /** Untis-Sicherung holen (höchstens alle 6 Stunden) – liegt neben „DammBoard“ im Schul-Ordner */
+    suspend fun untisAktualisieren(context: Context, schulPasswort: String): Boolean {
+        if (schulPasswort.isBlank()) return false
+        val f = untisCache(context)
+        if (f.exists() && System.currentTimeMillis() - f.lastModified() < 6 * 60 * 60_000L) return false
+        val z = SchulOrdner.zugang(schulPasswort)
+        val wurzel = z.copy(serverUrl = z.serverUrl.substringBeforeLast("/DammBoard"))
+        val text = IServClient(wurzel).herunterladen("Untis/$UNTIS").getOrNull()?.toString(Charsets.UTF_8) ?: return false
+        if (runCatching { JSONObject(text).getJSONObject("plaene") }.isFailure) return false
+        f.writeText(text)
+        return true
+    }
+
+    /** Nebenfächer und Doppelbesetzungen zählen nicht als Fach der Stunde (Förderung, Schulbegleitung …) */
+    private val NEBEN = Regex("förder|sprachf|doppel|begleit|^sbl|sopäd|frühbetr|^bus|routine|vertretung|hospi|koop", RegexOption.IGNORE_CASE)
+
+    /** Tag einer Klasse aus der Untis-Sicherung: je Raster-Stunde das Hauptfach (Langname, z. B. „Deutsch“) */
+    fun ausUntis(text: String, klasse: String, datum: LocalDate): Stundenplan.Tag? = try {
+        val j = JSONObject(text)
+        val lang = j.optJSONArray("faecher")?.let { a -> (0 until a.length()).associate { a.getJSONObject(it).optString("name") to a.getJSONObject(it).optString("lang") } } ?: emptyMap()
+        val alle = j.getJSONObject("plaene").getJSONObject("klassen")
+        val name = alle.keys().asSequence().firstOrNull { it.equals(klasse.trim(), ignoreCase = true) }
+        val liste = name?.let { alle.getJSONArray(it) }
+        if (liste == null || datum.dayOfWeek.value > 5) null else {
+            val heute = (0 until liste.length()).map { liste.getJSONObject(it) }.filter { it.optString("datum") == datum.toString() }
+            Stundenplan.Tag(datum, false, RASTER.mapNotNull { (n, z) ->
+                val faecher = heute.filter { it.optString("von") < z.second && it.optString("bis") > z.first }
+                    .flatMap { o -> o.optJSONArray("faecher")?.let { a -> (0 until a.length()).map { a.getString(it) } } ?: emptyList() }
+                    .map { lang[it]?.ifBlank { null } ?: it }
+                faecher.firstOrNull { !NEBEN.containsMatchIn(it) }?.let { Stundenplan.Stunde(n, LocalTime.parse(z.first), LocalTime.parse(z.second), it, "") }
+            })
+        }
+    } catch (_: Exception) { null }
+
+    /** Hauptfach der Klasse in dieser Stunde laut Untis-Sicherung (null = unbekannt) */
+    fun untisFach(context: Context, klasse: String, datum: LocalDate, stunde: Int?): String? {
+        val f = untisCache(context)
+        if (stunde == null || !f.exists()) return null
+        return ausUntis(f.readText(), klasse, datum)?.stunden?.firstOrNull { it.stunde == stunde }?.fach
+    }
+
     fun klassen(text: String): List<String> = try {
         JSONObject(text).getJSONObject("klassen").keys().asSequence().toList().sorted()
     } catch (_: Exception) { emptyList() }
@@ -36,7 +82,9 @@ object Klassenplaene {
     /** Tag einer Klasse aus der gemerkten Datei (Wochenende/unbekannte Klasse: null) */
     fun tag(context: Context, klasse: String, datum: LocalDate = LocalDate.now()): Stundenplan.Tag? {
         val f = cache(context)
-        if (!f.exists()) return null
+        // ohne Klassenpläne-Datei: die tägliche Untis-Sicherung
+        val u = untisCache(context)
+        if (!f.exists()) return if (u.exists()) ausUntis(u.readText(), klasse, datum) else null
         return try { tag(f.readText(), klasse, datum) } catch (_: Exception) { null }
     }
 

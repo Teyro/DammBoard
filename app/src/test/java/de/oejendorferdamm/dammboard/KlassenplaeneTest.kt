@@ -35,3 +35,17 @@ class KlassenplaeneErgaenzenTest {
         assertEquals(0, Klassenplaene.ergaenzen(frei, untis)!!.stunden.size)
     }
 }
+
+/** Untis-Sicherung (echter Ausschnitt 2C, Montag 23.11.2026): Hauptfach je Stunde, Förderung/SBL zählen nicht */
+class KlassenplaeneUntisTest {
+    private val text = "{\"faecher\":[{\"name\":\"D\",\"lang\":\"Deutsch\"},{\"name\":\"E\",\"lang\":\"Englisch\"},{\"name\":\"F\",\"lang\":\"Förderung\"},{\"name\":\"Ma\",\"lang\":\"Mathe\"},{\"name\":\"Maxi\",\"lang\":\"Maxistunde\"},{\"name\":\"Sach\",\"lang\":\"Sachunterricht\"},{\"name\":\"SBL\",\"lang\":\"SBL\"},{\"name\":\"SF m\",\"lang\":\"Sprachförderung morgens\"}],\"plaene\":{\"klassen\":{\"2C\":[{\"datum\":\"2026-11-23\",\"von\":\"08:30\",\"bis\":\"09:15\",\"faecher\":[\"D\"]},{\"datum\":\"2026-11-23\",\"von\":\"09:15\",\"bis\":\"10:00\",\"faecher\":[\"D\"]},{\"datum\":\"2026-11-23\",\"von\":\"12:20\",\"bis\":\"13:05\",\"faecher\":[\"E\"]},{\"datum\":\"2026-11-23\",\"von\":\"09:15\",\"bis\":\"10:00\",\"faecher\":[\"F\"]},{\"datum\":\"2026-11-23\",\"von\":\"10:25\",\"bis\":\"11:10\",\"faecher\":[\"F\"]},{\"datum\":\"2026-11-23\",\"von\":\"11:10\",\"bis\":\"11:55\",\"faecher\":[\"F\"]},{\"datum\":\"2026-11-23\",\"von\":\"10:25\",\"bis\":\"11:10\",\"faecher\":[\"Ma\"]},{\"datum\":\"2026-11-23\",\"von\":\"13:05\",\"bis\":\"13:30\",\"faecher\":[\"Maxi\"]},{\"datum\":\"2026-11-23\",\"von\":\"11:10\",\"bis\":\"11:55\",\"faecher\":[\"Sach\"]},{\"datum\":\"2026-11-23\",\"von\":\"08:00\",\"bis\":\"08:30\",\"faecher\":[\"SF m\"]},{\"datum\":\"2026-11-23\",\"von\":\"11:10\",\"bis\":\"11:55\",\"faecher\":[\"SBL\"]},{\"datum\":\"2026-11-23\",\"von\":\"12:20\",\"bis\":\"13:05\",\"faecher\":[\"SBL\"]}]}}}"
+    @org.junit.Test fun hauptfachJeStunde() {
+        val t = Klassenplaene.ausUntis(text, "2c", LocalDate.of(2026, 11, 23))!!
+        assertEquals(listOf("Deutsch", "Deutsch", "Mathe", "Sachunterricht", "Englisch", "Maxistunde"), t.stunden.map { it.fach })
+        assertEquals(listOf(1, 2, 3, 4, 5, 6), t.stunden.map { it.stunde })
+        // → Ordner der Nextcloud
+        assertEquals("Deutsch", de.oejendorferdamm.dammboard.data.Nextcloud.fachOrdner(t.stunden[0].fach, listOf("Deutsch", "Englisch", "Mathematik", "Musik", "Sachunterricht", "Sport", "Tafel")))
+        assertEquals("Mathematik", de.oejendorferdamm.dammboard.data.Nextcloud.fachOrdner(t.stunden[2].fach, listOf("Deutsch", "Mathematik")))
+        assertNull(Klassenplaene.ausUntis(text, "9z", LocalDate.of(2026, 11, 23)))
+    }
+}
